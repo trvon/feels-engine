@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Store kit in `docs/store`: listing texts, icon, feature graphic, framed
+  screenshots.
+- Dependencies: AGP 9.4.1, Gradle 9.6, Compose BOM 2026.09.00, lifecycle
+  2.11, WorkManager 2.12, DataStore 1.2.1, JUnit 6.1, jqwik 1.10.
 - Rename to Feels Engine; Apache License 2.0.
 - Screen saver: a group plays under Settings > Display > Screen saver, with
   cross-fades and a slow drift (`screensaver/GroupDreamService`).

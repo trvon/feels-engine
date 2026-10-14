@@ -1,7 +1,7 @@
 # Build
 
-Single Gradle module. AGP 9.2.1 with its built-in Kotlin, Compose plugin
-2.3.21, compileSdk 36, minSdk 28, Gradle wrapper 9.4.1. JDK 17 or newer; the
+Single Gradle module. AGP 9.4.1 with its built-in Kotlin, Compose plugin
+2.4.21, compileSdk 37, minSdk 28, Gradle wrapper 9.6.0. JDK 17 or newer; the
 wrapper is the only supported entry point.
 
 ```bash

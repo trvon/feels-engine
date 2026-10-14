@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "dev.fengine.wallpaper"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.fengine.wallpaper"
@@ -18,6 +18,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -46,6 +47,8 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    // Material 3 1.4+ no longer pulls the icon set in; Close is the only icon the UI uses.
+    implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.work.runtime.ktx)
@@ -55,9 +58,9 @@ dependencies {
     implementation(libs.mlkit.genai.prompt)
     testImplementation(libs.junit)
     // Invariant / fuzz suite: jqwik properties on the JUnit platform; JUnit 4 tests keep running via vintage.
-    testImplementation("net.jqwik:jqwik:1.9.3")
-    testImplementation("org.junit.vintage:junit-vintage-engine:5.11.4")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
+    testImplementation(libs.jqwik)
+    testImplementation(libs.junit.vintage.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
     // Real org.json for JVM tests; android.jar ships stubs that throw.
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
 }

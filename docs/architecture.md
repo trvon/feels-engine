@@ -1,7 +1,9 @@
 # Architecture
 
-One module, package `dev.fengine.wallpaper`. Android classes do I/O and stay
-thin; decisions live in pure Kotlin with jqwik properties.
+One module, package `dev.fengine.wallpaper`. The rule that shapes it: Android
+classes do I/O and stay thin, and every decision lives in plain Kotlin with a
+jqwik property next to it. That is what lets a wallpaper app have a real test
+suite.
 
 ## Layers
 

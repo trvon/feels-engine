@@ -1,6 +1,6 @@
 # Contributing
 
-Pull requests and issues are welcome. Keep changes small and tested.
+Issues and pull requests are welcome. Small, tested changes land fastest.
 
 ## Before a pull request
 

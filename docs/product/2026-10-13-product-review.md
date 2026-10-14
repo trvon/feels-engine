@@ -1,8 +1,8 @@
-# Fengine product review (product-manager pass, 2026-10-13)
+# Feels Engine product review (product-manager pass, 2026-10-13)
 
 ## Decision
 
-Should fengine's next engineering cycle go to (a) automatic photo groups on
+Should the next engineering cycle go to (a) automatic photo groups on
 device, (b) the live wallpaper engine for motion and foldables, or (c) the
 unglamorous trust layer (instrumentation, legibility, manual "next"), for the
 segment "Android users who want their own photos cycling on home and lock, with

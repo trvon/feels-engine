@@ -56,7 +56,7 @@ Verified in the API 37 source:
   down to API 19, falls back to `ACTION_OPEN_DOCUMENT`.
 - Grants are temporary by default (until reboot or process end). Call
   `takePersistableUriPermission(uri, FLAG_GRANT_READ_URI_PERMISSION)` per URI
-  for background use. Cap: **512 persisted grants per app**
+  for background use. Cap: 512 persisted grants per app
   (`UriGrantsManagerService.MAX_PERSISTED_URI_GRANTS`, oldest evicted by
   create time; corrected 2026-10-14, see section 6). The 5,000 figure in the
   picker docs is the Android 14 partial-access `media_grants` table, a different
@@ -215,8 +215,8 @@ Routing in `WallpaperManagerService.setWallpaper` (services.jar):
    the device supports a sub display, except type lock-only on cover-watchface
    devices (Flip family), which returns null and the app sees id 0.
 3. For every caller except Samsung's theme center and SystemUI,
-   `SubDisplayMode.getFolderStateBasedWhich(which)`: **only when no mode bits
-   are present**, it ORs in 16 if the hinge is closed, else 4.
+   `SubDisplayMode.getFolderStateBasedWhich(which)`: only when no mode bits
+   are present, it ORs in 16 if the hinge is closed, else 4.
 4. `getModeEnsuredWhich` does the same from the lid state. So an app that passes
    no display bits always writes the screen that is currently active, and an app
    that passes them explicitly writes the display it named.
@@ -342,13 +342,13 @@ cloud provider, which stays the route for hand-picked cloud photos.
 With AICore `0.release.qc.prod_aicore_20260917` the Prompt API reports
 AVAILABLE and judges photos at roughly one per second. Two findings:
 
-- **Policy refusals.** For some portraits AICore throws
+- Policy refusals. For some portraits AICore throws
   `GenAiException [ErrorCode 4] Request doesn't pass certain policy check`
   (`INFERENCE_ERROR / REQUEST_PROCESSING_ERROR`). The first refusal was a
-  child's school portrait. A refusal is not a verdict: the scan hands that one
+  portrait. A refusal is not a verdict: the scan hands that one
   photo to the labels (`ScanPlan.pass`), does not cache it, and the next pass
   asks again. Counting a refusal as a match was a bug found on device and fixed.
-- **Verdicts are usable.** Screenshots, a landscape and the synthetic test
+- The verdicts hold up. Screenshots, a landscape and the synthetic test
   images were all rejected for "kids eating ice cream". The refusal rate on
   photos of children decides how much a family group can rely on Nano; the
   bundled embedding fallback stays on the list for that reason.
@@ -379,7 +379,7 @@ scratchpad `aosp/`):
 - One picker pick is capped at `MediaStore.PICK_IMAGES_MAX_LIMIT = 100`
   (`MediaStore.java:586`); `EXTRA_PICK_IMAGES_MAX` above it is RESULT_CANCELED
   and androidx `PickMultipleVisualMedia` refuses it client-side.
-- Picker URIs survive only as persisted URI grants, **512 per app**
+- Picker URIs survive only as persisted URI grants, 512 per app
   (`UriGrantsManagerService.java:127`, `maybePrunePersistedUriGrantsLocked`
   drops the oldest). So at most 512 picked photos keep working, ever; the app
   now warns from 400 and must never rely on picks for a library.
