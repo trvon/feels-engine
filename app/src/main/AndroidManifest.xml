@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Live wallpaper engine: phones without live wallpaper support still get the static path. -->
+    <uses-feature android:name="android.software.live_wallpaper" android:required="false" />
+
     <!-- Normal permission: granted at install, no runtime prompt. -->
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Re-arm time-of-day alarms after reboot. -->
@@ -60,6 +63,21 @@
             <meta-data
                 android:name="android.service.dream"
                 android:resource="@xml/dream" />
+        </service>
+
+        <!-- Live wallpaper engine (0.2.0): motion over the user's photos. BIND_WALLPAPER is a
+             system-held permission; the user picks the engine in the system's wallpaper chooser. -->
+        <service
+            android:name=".wallpaper.live.PhotoWallpaperService"
+            android:exported="true"
+            android:label="@string/live_label"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/live_wallpaper" />
         </service>
 
         <!-- Backported photo picker on Android 4.4-10 and Go devices via Play services. -->

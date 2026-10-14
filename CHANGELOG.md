@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (0.2.0)
+
+- Live wallpaper engine: motion over your photos. Cross-fade on change,
+  parallax with the home screen pages, the system zoom on transitions, a
+  fresh crop per posture on foldables. Zero frames at rest. Turn it on from
+  the Motion section; the static path stays for screens the engine does not
+  draw.
+- Debug builds take `dev.fengine.wallpaper.ROTATE_NOW` from adb for the device
+  loop.
+
 ## 0.1.0 (2026-10-14)
 
 First tagged release: github.com/trvon/feels-engine/releases/tag/v0.1.0.

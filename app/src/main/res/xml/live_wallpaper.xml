@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Live wallpaper metadata: the system chooser shows this; settings open the app. -->
+<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:thumbnail="@mipmap/ic_launcher"
+    android:description="@string/live_description"
+    android:settingsActivity="dev.fengine.wallpaper/.MainActivity"
+    android:showMetadataInPreview="true" />

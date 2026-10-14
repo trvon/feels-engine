@@ -52,6 +52,8 @@ fun HomeScreen(
     onChangeNow: () -> Unit,
     dreamConfigured: Boolean = false,
     onOpenDreamSettings: () -> Unit = {},
+    motion: Pair<Boolean, Boolean> = false to false,
+    onTurnOnMotion: () -> Unit = {},
 ) {
     var chooser by remember { mutableStateOf(false) }
     if (chooser) {
@@ -84,6 +86,19 @@ fun HomeScreen(
                 item { NewCoverCard("New group") { chooser = true } }
             }
         }
+
+        Section("Motion") {
+            val (home, lock) = motion
+            Caption(
+                when {
+                    home && lock -> "On. Photos cross-fade, drift with the home screen and settle on the lock screen."
+                    home -> "On for the home screen. The lock screen keeps the still photo."
+                    else -> "Off. Turn it on and photos cross-fade and move with the home screen, at no cost while nothing moves."
+                },
+            )
+            TextAction(if (home) "Motion settings" else "Turn on motion", onTurnOnMotion)
+        }
+        Spacer(Modifier.height(Space.section))
 
         Section("Screen saver") {
             val dream = settings.dreamGroup ?: settings.homeGroup

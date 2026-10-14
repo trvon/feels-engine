@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: lets the device loop trigger a rotation from adb without touching the UI.
+     Guarded by DUMP, which only shell and system hold. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver
+            android:name=".debug.RotateNowReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="dev.fengine.wallpaper.ROTATE_NOW" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

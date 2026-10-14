@@ -23,6 +23,7 @@ import dev.fengine.wallpaper.ui.FengineTheme
 import dev.fengine.wallpaper.ui.GroupScreen
 import dev.fengine.wallpaper.ui.HomeScreen
 import dev.fengine.wallpaper.ui.MainViewModel
+import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 import dev.fengine.wallpaper.smart.AiReadiness
 import dev.fengine.wallpaper.smart.MediaLibrary
 
@@ -111,6 +112,11 @@ private fun FengineApp(vm: MainViewModel) {
             onSetEnabled = vm::setEnabled,
             onChangeNow = vm::rotateNow,
             dreamConfigured = vm.dreamConfigured(),
+            motion = vm.motion(),
+            onTurnOnMotion = {
+                runCatching { context.startActivity(LiveWallpaper.chooserIntent(context)) }
+                    .onFailure { context.startActivity(Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) }
+            },
             onOpenDreamSettings = {
                 runCatching { context.startActivity(Intent(android.provider.Settings.ACTION_DREAM_SETTINGS)) }
                     .onFailure { context.startActivity(Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS)) }

@@ -25,6 +25,18 @@ object RotationPlan {
     }
 
     /** Index of the next photo to show. Returns -1 when there is nothing to show. */
+    /**
+     * The flags of [which] that still need a static setBitmap when the live engine draws the home
+     * ([liveHome]) or lock ([liveLock]) screen itself. The engine reads the group's cursor, so the
+     * worker still advances it; this only decides whether a bitmap is written for that step.
+     */
+    fun staticFlags(which: Int, liveHome: Boolean, liveLock: Boolean): Int {
+        var out = which
+        if (liveHome) out = out and FLAG_SYSTEM.inv()
+        if (liveLock) out = out and FLAG_LOCK.inv()
+        return out
+    }
+
     fun nextIndex(count: Int, cursor: Int, shuffle: Boolean, random: Random = Random.Default): Int {
         if (count <= 0) return -1
         if (!shuffle || count == 1) return (cursor + 1).mod(count)

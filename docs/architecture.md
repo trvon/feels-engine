@@ -12,6 +12,7 @@ ui/            MainActivity, HomeScreen, GroupScreen, MainViewModel, design/ (to
 data/          Settings, Group, PhotoId, SettingsCodec (pure), SettingsStore (DataStore)
 schedule/      RotationPlan (pure), RotationScheduler, RotateWallpaperWorker, alarm + boot receivers
 wallpaper/     WallpaperCrop (pure), Displays, SamsungDisplays (pure), WallpaperApplier
+wallpaper/live/ LiveFrame (pure), LiveWallpaper, PhotoWallpaperService (the live engine)
 smart/         MediaLibrary, Labeler (ML Kit), PhotoIndex (SQLite), DescriptionMatcher (Nano, keywords),
                ScanPlan (pure), SmartGroupWorker, IndexLibraryWorker, AiReadiness
 screensaver/   KenBurns (pure), DreamPlan (pure), GroupDreamService
@@ -41,6 +42,19 @@ it once at the largest panel's size, computes a crop per target panel with
 `WallpaperCrop.fit`, and calls `WallpaperManager.setBitmap` once per expanded
 `which`. On Samsung foldables that is two calls, inner and cover, each with
 its own crop.
+
+## Live engine
+
+`PhotoWallpaperService` is a `WallpaperService`. Its engine watches the
+settings flow and shows its screen's group at the group's cursor; the rotation
+worker keeps advancing cursors and only writes a static bitmap for screens the
+engine does not own (`RotationPlan.staticFlags`). The engine draws nothing at
+rest. It draws once per launcher page offset (parallax over an 8 % overscan),
+once per system zoom event (6 % headroom that relaxes on zoom-out), a short
+cross-fade when the photo changes, and a fresh decode when the surface changes
+size on a fold or rotation. Bitmaps are decoded once per surface size at the
+largest size any frame needs (`LiveFrame.decodeTarget`) as hardware bitmaps
+drawn through a hardware canvas; at most two are alive, during a fade.
 
 ## Described groups
 

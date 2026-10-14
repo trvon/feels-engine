@@ -31,9 +31,11 @@ or AGP refuse 25.
   Do not add `SCHEDULE_EXACT_ALARM` or `USE_EXACT_ALARM`.
 - Pure scheduling logic lives in `schedule/RotationPlan.kt` and stays free of
   Android types so it is JVM-testable.
-- Owner priorities: foldables first-class, Apple-like motion. The static
-  `setBitmap` path is v1; motion and per-posture crops need the live wallpaper
-  engine (audit doc section 4). Do not add those features to the static path.
+- Owner priorities: foldables first-class, Apple-like motion. The live engine
+  (`wallpaper/live/`) owns motion; the static `setBitmap` path stays as the
+  fallback for screens the engine does not draw. The engine draws zero frames
+  at rest: only on a photo change, an offset or zoom event, or a surface change.
+  Keep it that way; no render loop, no drift on the wallpaper.
 - Samsung foldables need the display bits (4 inner, 16 cover) on `which` or
   only the active screen changes. `SamsungDisplays.expand` handles it; keep it.
 - Changing a device's wallpaper is visible and cannot be undone by the app
@@ -60,6 +62,9 @@ app/src/main/kotlin/dev/fengine/wallpaper/
                              DescriptionMatcher (NanoMatcher, KeywordMatcher), SmartGroupWorker (I/O),
                              ScanPlan (pure candidate order, budgeted pass, note; property-tested)
   wallpaper/WallpaperApplier.kt   decode + per-display crop + WallpaperManager.setBitmap(which)
+  wallpaper/live/PhotoWallpaperService.kt   the 0.2.0 live engine: cross-fade, parallax, zoom, per-posture
+                             decode; LiveFrame.kt is the pure placement maths (property-tested);
+                             LiveWallpaper.kt says which screens the engine owns and opens the chooser
   screensaver/GroupDreamService.kt   Android Screen saver (DreamService) playing a group; KenBurns.kt and
                              DreamPlan.kt are the pure drift maths and play order (property-tested)
   wallpaper/WallpaperCrop.kt, Displays.kt   pure crop maths (property-tested), panel sizes

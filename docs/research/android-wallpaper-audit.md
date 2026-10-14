@@ -168,7 +168,12 @@ display frames of the current device (sizes from `WindowMetricsCalculator` per
 display; on a foldable the app can only measure the display it is on, so store
 both as the user folds/unfolds, or ship a small device table).
 
-### Decision
+### Decision (updated 2026-10-14)
+
+Built as 0.2.0: `wallpaper/live/PhotoWallpaperService` draws the group's photo
+with cross-fade, parallax (`onOffsetsChanged`), zoom (`onZoomChanged`) and a
+per-posture decode (`onSurfaceChanged`); the static path stays for screens the
+engine does not own. Measurements are in `docs/perf.md`. The original reasoning:
 
 Keep the static path as the working v1 (it exists, it is cheap, and it proves
 photo access and scheduling). Treat the live wallpaper engine as the v2

@@ -7,6 +7,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dev.fengine.wallpaper.FengineApp
 import dev.fengine.wallpaper.wallpaper.WallpaperApplier
+import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 import java.text.DateFormat
 import java.util.Date
 
@@ -32,13 +33,18 @@ class RotateWallpaperWorker(appContext: Context, params: WorkerParameters) :
         val applier = WallpaperApplier(applicationContext)
         val failures = mutableListOf<String>()
         val advanced = mutableMapOf<String, Int>()
+        // Screens the live engine draws itself only need the cursor to move; it watches the settings.
+        val liveHome = LiveWallpaper.activeOnHome(applicationContext)
+        val liveLock = LiveWallpaper.activeOnLock(applicationContext)
         for (step in steps) {
             val group = settings.group(step.groupId) ?: continue
             val pool = group.allPhotos
             val index = advanced[group.id]
                 ?: RotationPlan.nextIndex(pool.size, group.cursor, settings.shuffle)
             advanced[group.id] = index
-            when (val outcome = applier.apply(pool[index].toUri(), step.which)) {
+            val which = RotationPlan.staticFlags(step.which, liveHome, liveLock)
+            if (which == 0) { Log.i(TAG, "${group.name}: photo ${index + 1} -> live engine (which=${step.which})"); continue }
+            when (val outcome = applier.apply(pool[index].toUri(), which)) {
                 is WallpaperApplier.Result.Applied ->
                     Log.i(TAG, "${group.name}: photo ${index + 1} -> which=${step.which}, ids ${outcome.wallpaperIds}")
                 is WallpaperApplier.Result.Failed -> {

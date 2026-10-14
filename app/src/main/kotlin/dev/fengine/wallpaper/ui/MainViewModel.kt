@@ -19,6 +19,7 @@ import dev.fengine.wallpaper.smart.AiReadiness
 import dev.fengine.wallpaper.smart.MediaLibrary
 import dev.fengine.wallpaper.smart.NanoMatcher
 import dev.fengine.wallpaper.smart.SmartGroupWorker
+import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.Dispatchers
@@ -206,6 +207,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** The group the screen saver plays; off means the home group plays. */
     fun setDreamGroup(groupId: String, on: Boolean) =
         update { it.copy(dreamGroupId = if (on) groupId else it.dreamGroupId.takeUnless { d -> d == groupId }) }
+
+    /** Which screens the live engine draws right now. */
+    fun motion(): Pair<Boolean, Boolean> {
+        val app = getApplication<Application>()
+        return runCatching { LiveWallpaper.activeOnHome(app) to LiveWallpaper.activeOnLock(app) }.getOrDefault(false to false)
+    }
 
     /** True when the user has chosen this app in Settings > Display > Screen saver. */
     fun dreamConfigured(): Boolean {
