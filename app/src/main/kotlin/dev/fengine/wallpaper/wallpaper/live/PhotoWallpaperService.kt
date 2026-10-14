@@ -10,6 +10,8 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
 import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
@@ -35,13 +37,21 @@ import kotlinx.coroutines.withContext
  * (one short animation), an offset or zoom event (one frame each), a surface or visibility change.
  * There is no render loop. Bitmaps are decoded once per surface size at the largest size any frame
  * can need, on the IO dispatcher, as hardware bitmaps when the surface gives a hardware canvas.
+ *
+ * Threading: every state change and every draw happens on one render thread, never on the main
+ * thread. A GPU stall in a canvas post (seen on emulators) then costs frames, not the process:
+ * the main thread stays free for WorkManager jobs and binder calls. The engine callbacks arrive
+ * on the main thread and are handed over with a post.
  */
 class PhotoWallpaperService : WallpaperService() {
 
     override fun onCreateEngine(): Engine = PhotoEngine()
 
     inner class PhotoEngine : Engine() {
+        private val renderThread = HandlerThread("feels-render", android.os.Process.THREAD_PRIORITY_DISPLAY).apply { start() }
+        private val render = Handler(renderThread.looper)
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        /** Touched only on the render thread. */
         private val state = LiveEngineState()
         private var watch: Job? = null
         private var load: Job? = null
@@ -50,6 +60,7 @@ class PhotoWallpaperService : WallpaperService() {
         private var fade: ValueAnimator? = null
         private var fadeAlpha = 1f
         private var softwareOnly = false
+        private var slowPosts = 0
         private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
         private val matrix = Matrix()
         private var frames = 0L
@@ -60,7 +71,10 @@ class PhotoWallpaperService : WallpaperService() {
             super.onCreate(holder)
             setOffsetNotificationsEnabled(true)
             watch = scope.launch {
-                (application as FengineApp).settings.settings.collectLatest { settings -> act(state.onPhoto(photoFor(settings))) }
+                (application as FengineApp).settings.settings.collectLatest { settings ->
+                    val uri = photoFor(settings)
+                    render.post { act(state.onPhoto(uri)) }
+                }
             }
         }
 
@@ -76,24 +90,44 @@ class PhotoWallpaperService : WallpaperService() {
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
             super.onSurfaceChanged(holder, format, w, h)
-            if (w != state.width || h != state.height) Log.i(TAG, "surface ${w}x$h")
-            act(state.onSurface(w, h))
+            render.post { if (w != state.width || h != state.height) Log.i(TAG, "surface ${w}x$h"); act(state.onSurface(w, h)) }
         }
 
-        override fun onOffsetsChanged(xOff: Float, yOff: Float, xStep: Float, yStep: Float, xPx: Int, yPx: Int) = act(state.onOffset(xOff))
+        override fun onSurfaceDestroyed(holder: SurfaceHolder) {
+            // Finish any draw in flight before the surface goes away.
+            val done = java.util.concurrent.CountDownLatch(1)
+            render.post { act(state.onVisibility(false)); done.countDown() }
+            done.await(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+            super.onSurfaceDestroyed(holder)
+        }
 
-        override fun onZoomChanged(z: Float) = act(state.onZoom(z))
+        override fun onOffsetsChanged(xOff: Float, yOff: Float, xStep: Float, yStep: Float, xPx: Int, yPx: Int) {
+            render.post { act(state.onOffset(xOff)) }
+        }
 
-        override fun onVisibilityChanged(v: Boolean) = act(state.onVisibility(v))
+        override fun onZoomChanged(z: Float) {
+            render.post { act(state.onZoom(z)) }
+        }
+
+        override fun onVisibilityChanged(v: Boolean) {
+            render.post { act(state.onVisibility(v)) }
+        }
 
         override fun onWallpaperFlagsChanged(which: Int) {
             super.onWallpaperFlagsChanged(which)
-            scope.launch { act(state.onPhoto(photoFor((application as FengineApp).settings.read()))) }
+            scope.launch {
+                val uri = photoFor((application as FengineApp).settings.read())
+                render.post { act(state.onPhoto(uri)) }
+            }
         }
 
         override fun onDestroy() {
-            fade?.cancel(); load?.cancel(); watch?.cancel(); scope.cancel()
-            current?.recycle(); previous?.recycle(); current = null; previous = null
+            watch?.cancel(); scope.cancel()
+            render.post {
+                fade?.cancel(); load?.cancel()
+                current?.recycle(); previous?.recycle(); current = null; previous = null
+            }
+            renderThread.quitSafely()
             super.onDestroy()
         }
 
@@ -108,17 +142,19 @@ class PhotoWallpaperService : WallpaperService() {
         private fun decodeThen(uri: String, keepOld: Boolean) {
             load?.cancel()
             val w = state.width; val h = state.height
-            load = scope.launch {
-                val bitmap = withContext(Dispatchers.IO) { decode(uri, w, h) } ?: return@launch
-                val decision = state.onDecoded(uri, keepOld)
-                if (decision == LiveEngineState.Decision.NONE && state.shown != uri) { bitmap.recycle(); return@launch } // stale
-                fade?.cancel()
-                previous?.recycle()
-                previous = if (decision.startFade) current else null
-                if (!decision.startFade) current?.recycle()
-                current = bitmap
-                if (!decision.startFade) fadeAlpha = 1f
-                act(decision)
+            load = scope.launch(Dispatchers.IO) {
+                val bitmap = decode(uri, w, h) ?: return@launch
+                render.post {
+                    val decision = state.onDecoded(uri, keepOld)
+                    if (decision == LiveEngineState.Decision.NONE && state.shown != uri) { bitmap.recycle(); return@post } // stale
+                    fade?.cancel()
+                    previous?.recycle()
+                    previous = if (decision.startFade) current else null
+                    if (!decision.startFade) current?.recycle()
+                    current = bitmap
+                    if (!decision.startFade) fadeAlpha = 1f
+                    act(decision)
+                }
             }
         }
 
@@ -161,6 +197,7 @@ class PhotoWallpaperService : WallpaperService() {
             val holder = surfaceHolder
             val canvas = (if (softwareOnly) null else runCatching { holder.lockHardwareCanvas() }.getOrNull())
                 ?: run { softwareOnly = true; holder.lockCanvas() } ?: return
+            val started = android.os.SystemClock.elapsedRealtime()
             try {
                 canvas.drawColor(Color.BLACK)
                 previous?.let { if (fadeAlpha < 1f) drawPhoto(canvas, it, 255) }
@@ -169,6 +206,13 @@ class PhotoWallpaperService : WallpaperService() {
                 if (fade != null) fadeFrames++ else Log.d(TAG, "frame ${frames}: offset=${state.xOffset} zoom=${state.zoom}")
             } finally {
                 holder.unlockCanvasAndPost(canvas)
+            }
+            // A GPU path that stalls (emulators, some drivers) is worse than software drawing: after
+            // two slow posts the engine switches to the software canvas for the rest of its life.
+            if (!softwareOnly) {
+                val ms = android.os.SystemClock.elapsedRealtime() - started
+                if (ms > SLOW_POST_MS) { if (++slowPosts >= 2) { softwareOnly = true; Log.w(TAG, "hardware canvas stalled ${ms} ms twice; using software from now on") } }
+                else slowPosts = 0
             }
         }
 
@@ -184,5 +228,6 @@ class PhotoWallpaperService : WallpaperService() {
     companion object {
         const val TAG = "PhotoWallpaper"
         const val FADE_MS = 900L
+        const val SLOW_POST_MS = 500L
     }
 }

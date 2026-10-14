@@ -6,11 +6,19 @@ windows: idle, launcher page swipes, and photo changes.
 
 ## Live engine, Pixel 8 emulator, API 36, host GPU emulation (2026-10-14)
 
+Two rounds. The first drew on the main thread; a hardware canvas post stalled
+for nine seconds in the emulator's GPU path during a fade, WorkManager's job
+could not start, and the system killed the process (ANR "No response to
+onStartJob"). Every state change and draw now runs on a dedicated render
+thread, and after two canvas posts over 500 ms the engine switches itself to
+the software canvas. Second round, same windows, zero ANRs; the emulator still
+stalled two fades (6.4 s and 7.0 s) and that cost frames and nothing else.
+
 | Window | CPU | Frames |
 |---|---|---|
 | idle, 30 s, launcher visible | 0 ms | 0 |
 | 20 page swipes | 40 ms | one frame per offset event |
-| 5 photo changes (worker + decode + 900 ms cross-fade) | 1,340 ms total, 268 ms each | 8 to 35 frames per fade |
+| 5 photo changes (worker + decode + 900 ms cross-fade) | 1,340 ms total, 268 ms each (round 1); 1,960 ms (round 2, two stalled fades) | 19 to 40 frames per fade |
 
 Memory after the run: native heap 25 MB (two decoded photos alive during a
 fade, one otherwise), Java heap 5 MB.
