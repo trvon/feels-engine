@@ -6,6 +6,7 @@
 | `build.md` | Build, test, install, the device loop, Samsung foldables, screen saver preview |
 | `privacy.md` | What the app reads, writes and asks permission for; what never leaves the phone |
 | `design-system.md` | Tokens, components, layout rules, copy voice; enforced by a test |
+| `perf.md` | Measured cost of the live engine and the indexer, and how to measure again |
 | `release.md` | Tagged releases with a signed APK on GitHub, signing secrets, versioning |
 | `../site/` | The GitHub Pages site: landing page and the public privacy policy |
 | `screenshots/` | The README screenshots, taken with free-licence demo photos |
