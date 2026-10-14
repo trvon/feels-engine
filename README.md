@@ -10,7 +10,7 @@ A local first android app that turns a group of photos into a wallpaper, lock sc
 |---|---|---|
 | ![Lock screen with a photo](docs/screenshots/1-lock.png) | ![Home screen with a photo](docs/screenshots/2-home.png) | ![A group page](docs/screenshots/3-group.png) |
 
-Taken on a Pixel 8 with demo photos from picsum.photos.
+Taken on a Pixel 8 and a Pixel 8 emulator with demo photos from picsum.photos. On a tablet the same page widens to six columns: `docs/screenshots/6-tablet.png`.
 
 ## Install
 
