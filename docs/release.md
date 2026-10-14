@@ -8,9 +8,10 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-`.github/workflows/release.yml` runs the tests, builds `assembleRelease`
-signed with the keystore from the repository secrets, and attaches
-`feels-engine-v0.2.0.apk` and its SHA-256 to the release. `ci.yml` runs
+`.github/workflows/release.yml` runs the tests, builds `assembleRelease` and
+`bundleRelease` signed with the keystore from the repository secrets, and
+attaches `feels-engine-v0.2.0.apk` (sideload), `feels-engine-v0.2.0.aab` (the
+file Play Console takes) and their SHA-256 to the release. `ci.yml` runs
 tests, lint and a debug build on every push and pull request.
 
 ## Signing
