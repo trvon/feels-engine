@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 (2026-10-14)
+
+First tagged release: github.com/trvon/feels-engine/releases/tag/v0.1.0.
 
 - Website and privacy policy on GitHub Pages (`site/`, Pages workflow).
 - CI on every push (tests, lint, debug APK) and signed APKs attached to
@@ -21,7 +23,7 @@
   picked and found copies of one photo are shown once.
 - Group page: photos before settings, visible pool, honest scan notes.
 
-## 0.1.0 (2026-10-13)
+Earlier in the same version, 2026-10-13:
 
 - Picked groups, home and lock assignment, interval and time-of-day
   rotation, shuffle.
