@@ -5,8 +5,7 @@
 - CI on every push (tests, lint, debug APK) and signed APKs attached to
   tagged GitHub Releases (`docs/release.md`).
 - Android 9: thumbnails fall back to a small decode (lint NewApi).
-- Store kit in `docs/store`: listing texts, icon, feature graphic, framed
-  screenshots.
+- README screenshots in `docs/screenshots`.
 - Dependencies: AGP 9.4.1, Gradle 9.6, Compose BOM 2026.09.00, lifecycle
   2.11, WorkManager 2.12, DataStore 1.2.1, JUnit 6.1, jqwik 1.10.
 - Rename to Feels Engine; Apache License 2.0.

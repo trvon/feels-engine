@@ -8,7 +8,7 @@ A local first android app that turns a group of photos into a wallpaper, lock sc
 
 | Lock screen | Home screen | A group |
 |---|---|---|
-| ![Lock screen with a photo](docs/store/assets/1-lock.png) | ![Home screen with a photo](docs/store/assets/2-home.png) | ![A group page](docs/store/assets/3-group.png) |
+| ![Lock screen with a photo](docs/screenshots/1-lock.png) | ![Home screen with a photo](docs/screenshots/2-home.png) | ![A group page](docs/screenshots/3-group.png) |
 
 Taken on a Pixel 8 with demo photos from picsum.photos.
 

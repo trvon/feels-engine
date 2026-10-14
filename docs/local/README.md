@@ -9,3 +9,6 @@ the commands in `../build.md`:
 ```bash
 source docs/local/devices.sh
 ```
+
+The Play Store listing (texts, icon, feature graphic, screenshots and the
+console walkthrough) lives in `store/` here, not in the repo.
