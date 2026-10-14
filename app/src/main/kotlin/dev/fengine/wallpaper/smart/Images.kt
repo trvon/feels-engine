@@ -10,10 +10,12 @@ object Images {
     fun decode(context: Context, uri: Uri, longEdge: Int): Bitmap {
         val source = ImageDecoder.createSource(context.contentResolver, uri)
         return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+            // Exact target: a sample size alone can leave the bitmap up to 2x larger than asked.
             val edge = maxOf(info.size.width, info.size.height)
-            var sample = 1
-            while (edge / (sample * 2) >= longEdge) sample *= 2
-            decoder.setTargetSampleSize(sample)
+            if (edge > longEdge) {
+                val scale = longEdge.toFloat() / edge
+                decoder.setTargetSize(maxOf(1, (info.size.width * scale).toInt()), maxOf(1, (info.size.height * scale).toInt()))
+            }
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
             decoder.isMutableRequired = false
         }

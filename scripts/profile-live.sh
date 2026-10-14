@@ -8,7 +8,12 @@ cpu(){ adb -s $S shell cat /proc/$(pid)/stat | awk '{print $14+$15}'; }   # utim
 frames(){ adb -s $S logcat -d -s PhotoWallpaper | grep -c "frame" ; }
 W_=$(adb -s $S shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1); WX=${W_%x*}; WY=${W_#*x}
 echo "pid $(pid) screen $W_"
-adb -s $S shell input keyevent KEYCODE_HOME; sleep 2
+adb -s $S shell input keyevent KEYCODE_WAKEUP; adb -s $S shell input keyevent KEYCODE_HOME; sleep 3
+# The engine must be visible or every number below is zero for the wrong reason.
+VIS=$(adb -s $S logcat -d -s WallpaperService | grep -oE "onVisibilityChanged\((true|false)\): dev.fengine" | tail -1)
+ENG=$(adb -s $S shell dumpsys wallpaper | grep -c "dev.fengine.wallpaper.wallpaper.live.PhotoWallpaperService")
+echo "engine bound: $ENG, last visibility: ${VIS:-unknown}"
+case "$VIS" in *false*) echo "ABORT: engine invisible (lock screen, picker or another app in front)"; exit 2;; esac
 # 1. idle: screen on, launcher visible, no input
 adb -s $S logcat -c; c0=$(cpu); sleep $W; c1=$(cpu)
 echo "idle ${W}s: cpu $(( (c1-c0)*10 )) ms, frames $(adb -s $S logcat -d -s PhotoWallpaper | grep -c 'frames')"

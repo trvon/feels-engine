@@ -69,6 +69,7 @@ class PhotoWallpaperService : WallpaperService() {
 
         override fun onCreate(holder: SurfaceHolder) {
             super.onCreate(holder)
+            Log.i(TAG, "engine ${System.identityHashCode(this)} created, preview=$isPreview")
             setOffsetNotificationsEnabled(true)
             watch = scope.launch {
                 (application as FengineApp).settings.settings.collectLatest { settings ->
@@ -122,6 +123,7 @@ class PhotoWallpaperService : WallpaperService() {
         }
 
         override fun onDestroy() {
+            Log.i(TAG, "engine ${System.identityHashCode(this)} destroyed")
             watch?.cancel(); scope.cancel()
             render.post {
                 fade?.cancel(); load?.cancel()
@@ -158,11 +160,17 @@ class PhotoWallpaperService : WallpaperService() {
             }
         }
 
+        /**
+         * Decode at exactly the size the frames need: a 12 MP photo on a 2448x1848 panel becomes
+         * a 2803x2116 bitmap (24 MB as a hardware bitmap), not the 49 MB a power-of-two sample
+         * size would leave. The sample size does the cheap part, the target size the rest.
+         */
         private fun decode(uri: String, w: Int, h: Int): Bitmap? = runCatching {
             val (tw, th) = LiveFrame.decodeTarget(w, h)
             val source = ImageDecoder.createSource(contentResolver, Uri.parse(uri))
             ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                decoder.setTargetSampleSize(WallpaperCrop.sampleSize(info.size.width, info.size.height, tw, th))
+                val (dw, dh) = LiveFrame.decodeSize(info.size.width, info.size.height, tw, th)
+                decoder.setTargetSize(dw, dh)
                 decoder.allocator = if (softwareOnly) ImageDecoder.ALLOCATOR_SOFTWARE else ImageDecoder.ALLOCATOR_DEFAULT
             }
         }.onFailure { Log.w(TAG, "decode failed for $uri", it) }.getOrNull()
@@ -173,8 +181,13 @@ class PhotoWallpaperService : WallpaperService() {
             fade = ValueAnimator.ofFloat(0f, 1f).apply {
                 duration = FADE_MS
                 interpolator = LinearInterpolator()
+                var lastFrame = 0L
                 addUpdateListener { a ->
                     val t = a.animatedValue as Float
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    // 120 Hz panels tick twice as often; a 900 ms fade needs no more than 60 fps.
+                    if (t < 1f && now - lastFrame < MIN_FRAME_MS) return@addUpdateListener
+                    lastFrame = now
                     fadeAlpha = LiveFrame.fadeAlpha(t)
                     act(state.onFadeFrame(t))
                 }
@@ -229,5 +242,6 @@ class PhotoWallpaperService : WallpaperService() {
         const val TAG = "PhotoWallpaper"
         const val FADE_MS = 900L
         const val SLOW_POST_MS = 500L
+        const val MIN_FRAME_MS = 15L
     }
 }

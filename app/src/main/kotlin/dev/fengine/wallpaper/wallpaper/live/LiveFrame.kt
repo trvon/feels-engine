@@ -52,6 +52,18 @@ object LiveFrame {
         return ceil(surfaceW * f).toInt().coerceAtLeast(1) to ceil(surfaceH * f).toInt().coerceAtLeast(1)
     }
 
+    /**
+     * The size to decode a [imageW] x [imageH] photo at so it just covers [targetW] x [targetH]:
+     * never larger than the photo, never smaller than the target on either axis (unless the photo
+     * itself is smaller), aspect kept.
+     */
+    fun decodeSize(imageW: Int, imageH: Int, targetW: Int, targetH: Int): Pair<Int, Int> {
+        val scale = maxOf(targetW.toDouble() / imageW, targetH.toDouble() / imageH).coerceAtMost(1.0)
+        val w = ceil(imageW * scale).toInt().coerceIn(1, imageW)
+        val h = ceil(imageH * scale).toInt().coerceIn(1, imageH)
+        return w to h
+    }
+
     /** Cross-fade alpha for progress [t] in 0..1: ease in and out, 0 at the start, 1 at the end. */
     fun fadeAlpha(t: Float): Float {
         val x = t.coerceIn(0f, 1f)

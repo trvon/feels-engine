@@ -76,6 +76,21 @@ class LiveFrameProperties {
         assertTrue("frame upscales decoded pixels: scale ${f.scale}", f.scale <= 1.0001f)
     }
 
+    @Property(tries = 2000)
+    fun decodeSizeCoversTheTargetWithoutUpscalingOrDistorting(
+        @ForAll @IntRange(min = 1, max = 12000) iw: Int, @ForAll @IntRange(min = 1, max = 12000) ih: Int,
+        @ForAll @IntRange(min = 1, max = 4000) tw: Int, @ForAll @IntRange(min = 1, max = 4000) th: Int,
+    ) {
+        val (w, h) = LiveFrame.decodeSize(iw, ih, tw, th)
+        assertTrue(w in 1..iw && h in 1..ih)
+        if (iw >= tw && ih >= th) assertTrue("too small: ${w}x$h for ${tw}x$th", w >= tw && h >= th)
+        if (iw <= tw && ih <= th) assertEquals(iw to ih, w to h)
+        // Each axis within one pixel of the exact scaled size: aspect kept, nothing wasted.
+        val need = maxOf(tw.toDouble() / iw, th.toDouble() / ih).coerceAtMost(1.0)
+        assertTrue("w=$w for ${iw * need}", kotlin.math.abs(w - iw * need) <= 1.0)
+        assertTrue("h=$h for ${ih * need}", kotlin.math.abs(h - ih * need) <= 1.0)
+    }
+
     @Property(tries = 500)
     fun fadeIsMonotoneAndBounded(@ForAll @FloatRange(min = -1f, max = 2f) a: Float, @ForAll @FloatRange(min = -1f, max = 2f) b: Float) {
         val lo = minOf(a, b); val hi = maxOf(a, b)
