@@ -4,6 +4,10 @@ package dev.fengine.wallpaper.wallpaper.live
  * The live engine's decisions, free of Android types: which event leads to a draw, a decode or a
  * fade. [PhotoWallpaperService] feeds it events and performs the I/O it asks for. Keeping the
  * rules here is what lets the invariant suite prove "zero frames at rest" instead of measuring it.
+ *
+ * Battery rule: nothing is decoded for a screen nobody sees. A photo change that arrives while the
+ * wallpaper is invisible (screen off, another app in front) is remembered and decoded when the
+ * wallpaper becomes visible again, so eight hours of hourly changes overnight cost one decode.
  */
 class LiveEngineState {
     /** What the engine should do in response to one event. */
@@ -32,13 +36,29 @@ class LiveEngineState {
     var fading = false; private set
     /** True when the last state change happened while invisible and nothing has been drawn since. */
     var dirty = true; private set
+    /** A decode that is owed but deferred because nobody can see the result yet. */
+    var pendingDecode: Boolean = false; private set
+    /** The photo a decode was issued for and has not come back yet. */
+    var requested: String? = null; private set
 
     fun onSurface(w: Int, h: Int): Decision {
         if (w == width && h == height) return Decision.NONE
         width = w; height = h
-        // Everything decoded so far is for the old size.
-        shown = null
-        return wanted?.let { Decision(decode = it, keepOld = true) } ?: Decision.NONE
+        // Everything decoded so far, or in flight, is for the old size.
+        shown = null; requested = null
+        return decodeWanted(keepOld = true)
+    }
+
+    /** Decode the wanted photo now if the screen is visible, otherwise owe it until it is. */
+    private fun decodeWanted(keepOld: Boolean): Decision {
+        val uri = wanted ?: return Decision.NONE
+        if (width == 0 || height == 0) return Decision.NONE
+        if (shown == uri) { pendingDecode = false; return Decision.NONE } // already decoded for this surface
+        if (!visible) { pendingDecode = true; return Decision.NONE }
+        pendingDecode = false
+        if (requested == uri) return Decision.NONE // already in flight for this surface; its result will draw
+        requested = uri
+        return Decision(decode = uri, keepOld = keepOld)
     }
 
     fun onOffset(x: Float): Decision {
@@ -62,6 +82,8 @@ class LiveEngineState {
             fading = false; hasPrevious = false
             return Decision(cancelFade = cancel)
         }
+        // Visible again: a deferred decode comes first (its result draws), else a dirty redraw.
+        if (pendingDecode) { val d = decodeWanted(keepOld = shown == null); if (d != Decision.NONE) return d }
         return if (dirty) draw() else Decision.NONE
     }
 
@@ -69,13 +91,13 @@ class LiveEngineState {
     fun onPhoto(uri: String?): Decision {
         if (uri == wanted) return Decision.NONE
         wanted = uri
-        if (uri == null) { shown = null; hasPrevious = false; fading = false; return drawOrMarkDirty() }
-        if (width == 0 || height == 0) return Decision.NONE // decode once the surface exists
-        return Decision(decode = uri)
+        if (uri == null) { shown = null; hasPrevious = false; fading = false; pendingDecode = false; requested = null; return drawOrMarkDirty() }
+        return decodeWanted(keepOld = false)
     }
 
     /** A decode finished. Stale results (for a photo no longer wanted) are dropped. */
     fun onDecoded(uri: String, keepOld: Boolean): Decision {
+        if (uri == requested) requested = null
         if (uri != wanted) return Decision.NONE
         val hadPhoto = shown != null && !keepOld
         shown = uri

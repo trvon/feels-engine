@@ -39,7 +39,11 @@ class RotationScheduler(private val context: Context) {
             Mode.INTERVAL -> {
                 cancelAlarm()
                 val minutes = settings.intervalMinutes.coerceAtLeast(Settings.MIN_INTERVAL_MINUTES).toLong()
-                val request = PeriodicWorkRequestBuilder<RotateWallpaperWorker>(minutes, TimeUnit.MINUTES).build()
+                // A wallpaper change is not worth a wake-up on a low battery; the system batches the
+                // rest within the period's flex window and defers it in Doze.
+                val request = PeriodicWorkRequestBuilder<RotateWallpaperWorker>(minutes, TimeUnit.MINUTES)
+                    .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
+                    .build()
                 WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                     RotateWallpaperWorker.PERIODIC_NAME,
                     ExistingPeriodicWorkPolicy.UPDATE,

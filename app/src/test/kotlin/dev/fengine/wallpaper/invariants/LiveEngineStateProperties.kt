@@ -104,18 +104,38 @@ class LiveEngineStateProperties {
         val s = LiveEngineState(); val keep = HashMap<String, Boolean>()
         events.forEach { apply(s, it, keep) }
         s.onVisibility(false)
-        val wasDirty = s.dirty
+        val wasDirty = s.dirty; val owedDecode = s.pendingDecode
         val d = s.onVisibility(true)
-        assertEquals(wasDirty, d.draw)
+        // An owed decode comes first (its result will draw); otherwise a dirty state redraws once.
+        // An owed decode is issued, unless the photo turned out to be decoded already, in which case
+        // a dirty state redraws once.
+        if (owedDecode) assertTrue(d.decode != null || d.draw == wasDirty) else assertEquals(wasDirty, d.draw)
         assertEquals(LiveEngineState.Decision.NONE, s.onVisibility(true))
     }
 
     @Property(tries = 500)
     fun surfaceBeforePhotoStillDecodes(@ForAll uri: String) {
         val s = LiveEngineState()
+        s.onVisibility(true)
         assertNull(s.onPhoto(uri).decode)          // no surface yet: remembered, not decoded
         assertEquals(uri, s.onSurface(1080, 2400).decode)
-        s.onVisibility(true)
         assertTrue(s.onDecoded(uri, keepOld = true).draw)
+    }
+
+    @Property(tries = 3000)
+    fun neverDecodesWhileInvisibleAndOwesExactlyOneDecodeWhenVisibleAgain(@ForAll("events") events: List<Ev>) {
+        val s = LiveEngineState(); val keep = HashMap<String, Boolean>()
+        for (e in events) {
+            val d = apply(s, e, keep)
+            if (d.decode != null) assertTrue("decode while invisible after $e", s.visible)
+        }
+        // Whatever happened, going invisible then visible again decodes at most once, and only if
+        // the wanted photo is not the one already decoded for this surface.
+        s.onVisibility(false)
+        // Decide what is owed before the transition: a decode already in flight is not re-issued.
+        val owed = s.wanted != null && s.width > 0 && s.height > 0 && s.shown != s.wanted && s.requested != s.wanted
+        val d = s.onVisibility(true)
+        assertEquals("owed=$owed state=${s.wanted}/${s.shown}/${s.requested}", owed, d.decode != null)
+        assertEquals(LiveEngineState.Decision.NONE, s.onVisibility(true))
     }
 }
