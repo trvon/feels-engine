@@ -1,0 +1,72 @@
+package dev.fengine.wallpaper.data
+
+import androidx.datastore.preferences.core.MutablePreferences
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+
+/**
+ * The mapping between [Settings] and DataStore preferences, free of Android types so the JVM
+ * invariant suite can round-trip it. [SettingsStore] owns the file; this owns the shape.
+ */
+object SettingsCodec {
+    object Keys {
+        val groups = stringPreferencesKey("groups")
+        val homeGroupId = stringPreferencesKey("home_group_id")
+        val lockGroupId = stringPreferencesKey("lock_group_id")
+        val mode = stringPreferencesKey("mode")
+        val intervalMinutes = intPreferencesKey("interval_minutes")
+        val timesOfDay = stringPreferencesKey("times_of_day")
+        val shuffle = booleanPreferencesKey("shuffle")
+        val enabled = booleanPreferencesKey("enabled")
+        val lastResult = stringPreferencesKey("last_result")
+        val dreamGroupId = stringPreferencesKey("dream_group_id")
+
+        /** Pre-groups schema (v0.1): a flat photo list. Migrated into a group on first read. */
+        val legacyPhotos = stringPreferencesKey("photos")
+    }
+
+    fun write(prefs: MutablePreferences, next: Settings) {
+        prefs[Keys.groups] = Group.encode(next.groups)
+        next.homeGroupId?.let { prefs[Keys.homeGroupId] = it } ?: prefs.remove(Keys.homeGroupId)
+        next.lockGroupId?.let { prefs[Keys.lockGroupId] = it } ?: prefs.remove(Keys.lockGroupId)
+        prefs[Keys.mode] = next.mode.name
+        prefs[Keys.intervalMinutes] = next.intervalMinutes
+        prefs[Keys.timesOfDay] = next.timesOfDay.joinToString("\n")
+        prefs[Keys.shuffle] = next.shuffle
+        prefs[Keys.enabled] = next.enabled
+        prefs[Keys.lastResult] = next.lastResult
+        next.dreamGroupId?.let { prefs[Keys.dreamGroupId] = it } ?: prefs.remove(Keys.dreamGroupId)
+        prefs.remove(Keys.legacyPhotos)
+    }
+
+    /**
+     * Never throws: unknown modes, dangling group ids and unparsable slots fall back to defaults,
+     * because a bad preference must not brick the app at startup.
+     */
+    fun read(prefs: Preferences): Settings {
+        val defaults = Settings()
+        var groups = prefs[Keys.groups]?.let(Group::decode) ?: emptyList()
+        var home = prefs[Keys.homeGroupId]
+        var lock = prefs[Keys.lockGroupId]
+        val legacy = prefs[Keys.legacyPhotos]?.lines()?.filter { it.isNotBlank() }.orEmpty()
+        if (groups.isEmpty() && legacy.isNotEmpty()) {
+            val g = Group(name = "My photos", photos = legacy)
+            groups = listOf(g); home = g.id; lock = g.id
+        }
+        return Settings(
+            groups = groups,
+            homeGroupId = home?.takeIf { id -> groups.any { it.id == id } },
+            lockGroupId = lock?.takeIf { id -> groups.any { it.id == id } },
+            mode = prefs[Keys.mode]?.let { runCatching { Mode.valueOf(it) }.getOrNull() } ?: defaults.mode,
+            intervalMinutes = prefs[Keys.intervalMinutes] ?: defaults.intervalMinutes,
+            timesOfDay = prefs[Keys.timesOfDay]?.lines()?.mapNotNull { it.toIntOrNull() }?.sorted()
+                ?: defaults.timesOfDay,
+            shuffle = prefs[Keys.shuffle] ?: defaults.shuffle,
+            enabled = prefs[Keys.enabled] ?: defaults.enabled,
+            lastResult = prefs[Keys.lastResult] ?: defaults.lastResult,
+            dreamGroupId = prefs[Keys.dreamGroupId]?.takeIf { id -> groups.any { it.id == id } },
+        )
+    }
+}

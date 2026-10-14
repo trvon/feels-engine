@@ -1,0 +1,8 @@
+Feels Engine
+Copyright 2026 Trevon (trvon)
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This product bundles no third-party source. It depends at build time on
+AndroidX, Jetpack Compose, ML Kit image labeling and the ML Kit GenAI Prompt
+API, each under its own license.
