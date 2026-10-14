@@ -35,9 +35,9 @@ a { color: var(--navy); text-decoration-thickness: 1px; text-underline-offset: 3
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
 .button { display: inline-block; padding: 12px 22px; border-radius: 999px; background: var(--navy); color: #FBF6F1; text-decoration: none; font-weight: 600; }
 .button.tonal { background: var(--sand); color: var(--ink); }
-.rail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
-.rail img { width: 100%; height: auto; border-radius: var(--radius-tile); display: block; background: var(--card); }
-@media (max-width: 480px) { .rail { grid-template-columns: repeat(3, 1fr); gap: 8px; } h1 { font-size: 34px; } }
+.rail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.rail img { width: 100%; min-width: 0; height: auto; border-radius: var(--radius-tile); display: block; background: var(--card); box-shadow: 0 1px 0 var(--rule); }
+@media (max-width: 480px) { .rail { gap: 8px; } h1 { font-size: 34px; } }
 .mark { width: 72px; height: 72px; border-radius: 18px; display: block; margin-bottom: 20px; }
 table { border-collapse: collapse; width: 100%; font-size: 15px; margin-top: 8px; }
 th, td { text-align: left; vertical-align: top; padding: 10px 8px 10px 0; border-bottom: 1px solid var(--rule); }
