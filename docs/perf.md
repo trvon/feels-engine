@@ -13,12 +13,19 @@ onStartJob"). Every state change and draw now runs on a dedicated render
 thread, and after two canvas posts over 500 ms the engine switches itself to
 the software canvas. Second round, same windows, zero ANRs; the emulator still
 stalled two fades (6.4 s and 7.0 s) and that cost frames and nothing else.
+Third round with the fallback in place: five fades at 909 to 931 ms, 38 to 42
+frames each, no stalls, no ANRs. Idle at steady state is 0 ms of CPU and 0
+frames over 30 s; the one second of CPU seen right after an install is
+WorkManager rescheduling and JIT, not the engine. Thread totals over the whole
+run: the engine's render thread 30 ms, HWUI's own render thread 960 ms, the
+garbage collector 1,030 ms (bitmap churn, which hardware bitmaps avoid on
+phones).
 
 | Window | CPU | Frames |
 |---|---|---|
 | idle, 30 s, launcher visible | 0 ms | 0 |
 | 20 page swipes | 40 ms | one frame per offset event |
-| 5 photo changes (worker + decode + 900 ms cross-fade) | 1,340 ms total, 268 ms each (round 1); 1,960 ms (round 2, two stalled fades) | 19 to 40 frames per fade |
+| 5 photo changes (worker + decode + 900 ms cross-fade) | 1,230 ms total, 246 ms each (round 3) | 38 to 42 frames per fade |
 
 Memory after the run: native heap 25 MB (two decoded photos alive during a
 fade, one otherwise), Java heap 5 MB.
