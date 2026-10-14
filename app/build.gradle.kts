@@ -1,6 +1,19 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+}
+
+// Release signing: environment variables on CI, docs/local/signing.properties (ignored by git) on a
+// developer machine. With neither, assembleRelease is unsigned and says so. See docs/release.md.
+val signing = Properties().apply {
+    val f = rootProject.file("docs/local/signing.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun signingValue(env: String, key: String): String? = System.getenv(env) ?: signing.getProperty(key)
+val releaseStore = signingValue("FENGINE_KEYSTORE", "storeFile")?.let { path ->
+    if (File(path).isAbsolute) File(path) else rootProject.file(path)
 }
 
 android {
@@ -15,11 +28,24 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        if (releaseStore != null) {
+            create("release") {
+                storeFile = releaseStore
+                storePassword = signingValue("FENGINE_KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signingValue("FENGINE_KEY_ALIAS", "keyAlias")
+                keyPassword = signingValue("FENGINE_KEY_PASSWORD", "keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseStore != null) signingConfig = signingConfigs.getByName("release")
+            else logger.warn("No release signing configured; assembleRelease will be unsigned (docs/release.md).")
         }
     }
 
@@ -62,5 +88,5 @@ dependencies {
     testImplementation(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
     // Real org.json for JVM tests; android.jar ships stubs that throw.
-    testImplementation("org.json:json:20260814")
+    testImplementation(libs.org.json)
 }

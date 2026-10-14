@@ -4,9 +4,17 @@ Built to see photos of my kids on my phone.
 
 A local first android app that turns a group of photos into a wallpaper, lock screen and screen saver. Pick photos, or describe a group ("the kids at the beach") and the phone finds them.
 
+## Screenshots
+
+| Lock screen | Home screen | A group |
+|---|---|---|
+| ![Lock screen with a photo](docs/store/assets/1-lock.png) | ![Home screen with a photo](docs/store/assets/2-home.png) | ![A group page](docs/store/assets/3-group.png) |
+
+Taken on a Pixel 8 with demo photos from picsum.photos.
+
 ## Install
 
-Requires JDK 17 or newer and the Android SDK (compileSdk 36). No Android Studio needed.
+Requires JDK 17 or newer and the Android SDK (compileSdk 37). No Android Studio needed.
 
 ```bash
 ./gradlew :app:assembleDebug
@@ -40,6 +48,8 @@ A described group looks through the photos on the phone and the ones you add fro
 ./gradlew :app:testDebugUnitTest   # unit tests + properties
 ./gradlew :app:lintDebug
 ```
+
+CI runs both plus a debug build on every push. Tagged releases carry a signed APK; see `docs/release.md` and the Releases page.
 
 Device notes, including Samsung foldables and the screen saver preview, are in `docs/build.md`.
 

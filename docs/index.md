@@ -6,6 +6,8 @@
 | `build.md` | Build, test, install, the device loop, Samsung foldables, screen saver preview |
 | `privacy.md` | What the app reads, writes and asks permission for; what never leaves the phone |
 | `design-system.md` | Tokens, components, layout rules, copy voice; enforced by a test |
+| `release.md` | Tagged releases with a signed APK on GitHub, signing secrets, versioning |
+| `store/listing.md` | Play Store texts, assets and the forms' answers |
 | `roadmap.md` | What is next and what is decided against |
 | `research/android-wallpaper-audit.md` | The platform evidence: wallpaper APIs, Samsung display bits, photo picker ceilings, ML Kit and Gemini Nano findings, with file and line references |
 | `product/2026-10-13-product-review.md` | Graded evidence, ranked backlog, research ledger |

@@ -2,6 +2,7 @@ package dev.fengine.wallpaper.ui.design
 
 import android.content.ContentResolver
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import android.util.Size as AndroidSize
 import dev.fengine.wallpaper.smart.Images
@@ -342,5 +343,7 @@ fun PhotoImage(uri: String, modifier: Modifier = Modifier, contentDescription: S
 
 private const val THUMB_EDGE = 320
 
-private fun loadThumbnail(resolver: ContentResolver, uri: Uri): ImageBitmap? =
-    runCatching { resolver.loadThumbnail(uri, AndroidSize(THUMB_EDGE, THUMB_EDGE), null).asImageBitmap() }.getOrNull()
+private fun loadThumbnail(resolver: ContentResolver, uri: Uri): ImageBitmap? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null // Android 9: the decode fallback below handles it
+    return runCatching { resolver.loadThumbnail(uri, AndroidSize(THUMB_EDGE, THUMB_EDGE), null).asImageBitmap() }.getOrNull()
+}

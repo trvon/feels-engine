@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- CI on every push (tests, lint, debug APK) and signed APKs attached to
+  tagged GitHub Releases (`docs/release.md`).
+- Android 9: thumbnails fall back to a small decode (lint NewApi).
 - Store kit in `docs/store`: listing texts, icon, feature graphic, framed
   screenshots.
 - Dependencies: AGP 9.4.1, Gradle 9.6, Compose BOM 2026.09.00, lifecycle
