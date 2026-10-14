@@ -7,6 +7,7 @@
 | `privacy.md` | What the app reads, writes and asks permission for; what never leaves the phone |
 | `design-system.md` | Tokens, components, layout rules, copy voice; enforced by a test |
 | `release.md` | Tagged releases with a signed APK on GitHub, signing secrets, versioning |
+| `../site/` | The GitHub Pages site: landing page and the public privacy policy |
 | `screenshots/` | The README screenshots, taken with free-licence demo photos |
 | `roadmap.md` | What is next and what is decided against |
 | `research/android-wallpaper-audit.md` | The platform evidence: wallpaper APIs, Samsung display bits, photo picker ceilings, ML Kit and Gemini Nano findings, with file and line references |

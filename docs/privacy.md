@@ -1,6 +1,8 @@
 # Privacy
 
-The app has no network permission. Nothing it reads leaves the phone.
+The app has no network permission. Nothing it reads leaves the phone. This is
+the developer's view; the policy users and the store see is `site/privacy.html`,
+published at https://trvon.github.io/feels-engine/privacy.html.
 
 ## Permissions
 

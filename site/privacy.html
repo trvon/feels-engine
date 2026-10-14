@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feels Engine privacy policy</title>
+<meta name="description" content="Privacy policy for the Feels Engine Android app. The app has no network permission; nothing leaves the phone.">
+<link rel="icon" href="assets/icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <p class="eyebrow"><a href="index.html">Feels Engine</a></p>
+  <h1>Privacy policy</h1>
+  <p class="caption">Effective 14 October 2026. Applies to the Feels Engine Android app (package <code>dev.fengine.wallpaper</code>), published by trvon.</p>
+
+  <section>
+    <h2>The short version</h2>
+    <p>Feels Engine has no network permission. It cannot send anything anywhere. Your photos, the labels the app computes for them, and your settings stay in the app's private storage on your phone and are deleted when you uninstall the app. The app collects no personal data, shows no ads, and has no accounts.</p>
+  </section>
+
+  <section>
+    <h2>What the app accesses</h2>
+    <table>
+      <tr><th>Access</th><th>When</th><th>Why</th></tr>
+      <tr><td>Photos you pick</td><td>when you tap Add photos or Add from Google Photos</td><td>to show them as your wallpaper or screen saver; the system photo picker grants access to each photo you choose and to nothing else</td></tr>
+      <tr><td>Your photo library (Android permission "Photos and videos")</td><td>only after you create a described group and tap Find photos</td><td>so the description can be matched against the photos on the phone</td></tr>
+      <tr><td>Wallpaper</td><td>whenever a rotation runs</td><td>to set the home and lock screen image</td></tr>
+      <tr><td>Boot completed</td><td>after a restart</td><td>to re-arm time-of-day changes</td></tr>
+    </table>
+    <p>The app never reads your current wallpaper, contacts, location, messages or anything else.</p>
+  </section>
+
+  <section>
+    <h2>What the app stores on your phone</h2>
+    <ul>
+      <li>Group names, descriptions, the list of photo references, the schedule and the screen saver choice.</li>
+      <li>For each photo the app has looked at, the labels produced by on-device image labeling (for example "Beach" or "Dog") and, for each description, a yes or no verdict.</li>
+    </ul>
+    <p>No photo is copied. The app reads the original each time it needs it. All of this lives in the app's private storage, which other apps cannot read, and is removed when you uninstall the app or clear its data.</p>
+  </section>
+
+  <section>
+    <h2>On-device models</h2>
+    <p>Image labeling uses Google ML Kit with a model bundled inside the app; it runs on the phone. On phones that support it, matching a description uses Gemini Nano through Google AICore, a system component that also runs on the phone: the app hands AICore a photo and a short question, and gets one word back. Neither the photo nor the answer leaves the device as part of this app's processing. AICore is provided by Google and governed by your device's Google terms.</p>
+  </section>
+
+  <section>
+    <h2>What the app shares</h2>
+    <p>Nothing. There is no network access, no analytics, no crash reporting, no advertising identifiers and no third-party SDK that transmits data. The only other app that sees your photos is the system photo picker you used to choose them.</p>
+  </section>
+
+  <section>
+    <h2>Children</h2>
+    <p>The app is not directed at children and does not knowingly collect information from anyone; it collects no information at all.</p>
+  </section>
+
+  <section>
+    <h2>Your choices</h2>
+    <ul>
+      <li>Remove a photo from a group with the X on its tile; the app releases its access to that photo.</li>
+      <li>Revoke the photo library permission in Android settings at any time; described groups then stop finding new photos.</li>
+      <li>Uninstall the app or clear its data to delete everything it stored.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Changes</h2>
+    <p>If this policy changes, the new version will be published at this address with a new effective date. The source of this page and of the app are public at <a href="https://github.com/trvon/feels-engine">github.com/trvon/feels-engine</a>, so every change is visible.</p>
+  </section>
+
+  <section>
+    <h2>Contact</h2>
+    <p>Questions about privacy: <a href="mailto:me@trevon.dev">me@trevon.dev</a>.</p>
+  </section>
+
+  <footer>
+    <p><a href="index.html">Feels Engine</a> · Apache License 2.0</p>
+  </footer>
+</main>
+</body>
+</html>

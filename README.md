@@ -59,6 +59,10 @@ Device notes, including Samsung foldables and the screen saver preview, are in `
 - Described groups without Gemini Nano match label words, not meaning.
 - The app cannot read the current wallpaper back on Android 14+, so a rotation cannot be undone from inside the app.
 
+## Website and privacy policy
+
+https://trvon.github.io/feels-engine/ is the landing page; the privacy policy is at https://trvon.github.io/feels-engine/privacy.html. Both are built from `site/` by the Pages workflow.
+
 ## Documentation
 
 `docs/index.md` lists everything. Start with `docs/architecture.md` and

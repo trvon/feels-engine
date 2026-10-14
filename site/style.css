@@ -1,0 +1,47 @@
+/* Feels Engine site: the app's design language on the web. Editorial, calm, photos first.
+   Tokens mirror ui/design/Tokens.kt: 24 px page gutter, 32 px between sections, one serif headline. */
+:root {
+  --bg: #FBF6F1;
+  --ink: #1C1B1A;
+  --muted: #5E5A55;
+  --eyebrow: #7A5C3A;
+  --navy: #1F3A5F;
+  --sun: #F2C14E;
+  --sand: #E8D9B5;
+  --card: #F3EBE2;
+  --rule: #E6DDD2;
+  --radius-card: 20px;
+  --radius-tile: 12px;
+  --page: 24px;
+  --section: 32px;
+  --max: 720px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #141312; --ink: #F3EEE8; --muted: #B5ADA3; --eyebrow: #D9B98A; --card: #1F1D1B; --rule: #2C2926; --sand: #3A3128; }
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); color: var(--ink); -webkit-text-size-adjust: 100%; }
+body { margin: 0; font: 17px/1.55 -apple-system, "Roboto", "Segoe UI", system-ui, sans-serif; }
+main { max-width: var(--max); margin: 0 auto; padding: 56px var(--page) 80px; }
+.eyebrow { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--eyebrow); margin: 0 0 8px; font-weight: 600; }
+h1 { font-family: Georgia, "Times New Roman", "Noto Serif", serif; font-weight: 400; font-size: 40px; line-height: 1.15; margin: 0 0 12px; }
+h2 { font-family: Georgia, "Times New Roman", "Noto Serif", serif; font-weight: 400; font-size: 26px; line-height: 1.2; margin: var(--section) 0 10px; }
+p, li { color: var(--ink); }
+.muted { color: var(--muted); }
+.caption { font-size: 14px; color: var(--muted); }
+section { margin-top: var(--section); }
+a { color: var(--navy); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+@media (prefers-color-scheme: dark) { a { color: #A9C1E8; } }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.button { display: inline-block; padding: 12px 22px; border-radius: 999px; background: var(--navy); color: #FBF6F1; text-decoration: none; font-weight: 600; }
+.button.tonal { background: var(--sand); color: var(--ink); }
+.rail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+.rail img { width: 100%; height: auto; border-radius: var(--radius-tile); display: block; background: var(--card); }
+@media (max-width: 480px) { .rail { grid-template-columns: repeat(3, 1fr); gap: 8px; } h1 { font-size: 34px; } }
+.mark { width: 72px; height: 72px; border-radius: 18px; display: block; margin-bottom: 20px; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; margin-top: 8px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 8px 10px 0; border-bottom: 1px solid var(--rule); }
+th { color: var(--muted); font-weight: 600; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: var(--section) 0; }
+footer { margin-top: 56px; font-size: 14px; color: var(--muted); }
+footer a { color: inherit; }

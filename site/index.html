@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feels Engine</title>
+<meta name="description" content="Your own photos on the home screen, the lock screen and the screen saver. Nothing leaves the phone.">
+<link rel="icon" href="assets/icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <img class="mark" src="assets/icon.png" alt="">
+  <p class="eyebrow">Feels Engine</p>
+  <h1>Your photos, on every screen.</h1>
+  <p>An Android app that puts your own photos on the home screen, the lock screen and the screen saver, and changes them on a rhythm you set. Pick the photos yourself, or describe a group and the phone finds them. Nothing leaves the device.</p>
+  <p class="muted">I built it to see my kids during the day without opening a gallery.</p>
+  <div class="actions">
+    <a class="button" href="https://github.com/trvon/feels-engine/releases/latest">Download the APK</a>
+    <a class="button tonal" href="https://github.com/trvon/feels-engine">Source on GitHub</a>
+  </div>
+
+  <section>
+    <p class="eyebrow">What it looks like</p>
+    <div class="rail">
+      <img src="screenshots/1-lock.png" alt="A lock screen showing a photo of a jellyfish">
+      <img src="screenshots/4-app.png" alt="The app's one page: a group called Weekend, the rhythm chips and the screen saver line">
+      <img src="screenshots/3-group.png" alt="A group page with six photos and the screens it shows on">
+    </div>
+    <p class="caption">Demo photos from picsum.photos. Yours stay yours.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">How it works</p>
+    <h2>Groups, not folders.</h2>
+    <p>A group is a few photos you picked, or a description like "the kids at the beach". Described groups are matched on the phone: ML Kit labels each photo once, and on phones with Gemini Nano the model looks at each candidate and answers yes or no. Give a group to the home screen, the lock screen, both, or the screen saver.</p>
+    <h2>Foldables, properly.</h2>
+    <p>On Galaxy Z Fold phones the inner and cover screens each get their own crop, also while the phone is closed.</p>
+    <h2>Private by construction.</h2>
+    <p>The app has no network permission. Photos, labels and verdicts stay in private storage on the phone. <a href="privacy.html">Read the privacy policy.</a></p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Limits worth knowing</p>
+    <p>Android's photo picker hands over 100 photos per pick and keeps at most 512 picked photos readable per app, so a big collection should live on the phone. Without Gemini Nano, described groups match label words rather than meaning. Android does not let apps read the current wallpaper, so a change cannot be undone from inside the app.</p>
+  </section>
+
+  <footer>
+    <p>Feels Engine is open source under the Apache License 2.0. Runs on Android 9 and up. <a href="privacy.html">Privacy policy</a> · <a href="https://github.com/trvon/feels-engine/issues">Issues</a> · <a href="mailto:me@trevon.dev">Contact</a></p>
+  </footer>
+</main>
+</body>
+</html>
