@@ -45,6 +45,30 @@ Not measured yet: a real phone (the Pixel was locked during this pass), battery
 per hour against the static path, and hardware-bitmap memory, which the
 emulator reports as zero graphics memory because it decodes to software.
 
+## Wake-ups with the screen off, Pixel 8 emulator (2026-10-14)
+
+`scripts/profile-wake.sh <serial> 20`: device "on battery", battery stats
+reset, screen off for the window, rhythm set to 15 minutes, live engine on
+both screens.
+
+| What | Result |
+|---|---|
+| Wake-ups of the process | 2, the rotation worker at 15:18:55 and 15:33:55, 15 minutes apart to the second |
+| CPU over 20 minutes | 140 ms, about 70 ms per rotation (cursor advance and the settings write; no decode) |
+| Wake locks held by the app | none |
+| Alarms | none in interval mode; time-of-day mode arms one inexact alarm |
+| Frames drawn | 0 |
+
+Deferred decode, verified after this run: three rotations with the screen
+off produced no decode and no frame; waking the screen produced exactly one
+fade, to the latest photo. The engine's state machine proves the rule in the
+JVM suite (never decodes while invisible, owes exactly one decode when visible
+again); this is the on-device confirmation.
+
+What a phone adds: Doze. WorkManager's periodic work is deferred into Doze
+maintenance windows, so overnight the two-per-half-hour count above becomes a
+handful per night, and the rotation now requires the battery not to be low.
+
 ## Library indexing, Pixel 8 (2026-10-14)
 
 1,503 synthetic 640x480 photos labeled in three slices, about 90 ms per photo,
