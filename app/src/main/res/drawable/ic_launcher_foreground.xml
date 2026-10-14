@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Two photo cards: the one just shown tucked behind, the next one in front. All art sits
+         inside the 66 dp safe zone (21..87) so every launcher mask shows the whole card. -->
+    <group android:rotation="-10" android:pivotX="54" android:pivotY="54">
+        <path
+            android:fillColor="#E8D9B5"
+            android:pathData="M35,29h38a5,5 0 0 1 5,5v38a5,5 0 0 1 -5,5h-38a5,5 0 0 1 -5,-5v-38a5,5 0 0 1 5,-5z" />
+    </group>
+    <path
+        android:fillColor="#FBF6F1"
+        android:pathData="M39,36h38a5,5 0 0 1 5,5v38a5,5 0 0 1 -5,5h-38a5,5 0 0 1 -5,-5v-38a5,5 0 0 1 5,-5z" />
+    <path
+        android:fillColor="#F2C14E"
+        android:pathData="M48,43a6,6 0 1 0 0.1,0z" />
+    <group>
+        <clip-path android:pathData="M39,36h38a5,5 0 0 1 5,5v38a5,5 0 0 1 -5,5h-38a5,5 0 0 1 -5,-5v-38a5,5 0 0 1 5,-5z" />
+        <path
+            android:fillColor="#1F3A5F"
+            android:pathData="M34,84l16,-20l8,9l7,-7l17,18z" />
+    </group>
+</vector>

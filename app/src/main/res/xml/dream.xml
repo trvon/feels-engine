@@ -2,4 +2,4 @@
 <!-- Android "Screen saver" metadata: the settings link opens the app, where a group is chosen. -->
 <dream xmlns:android="http://schemas.android.com/apk/res/android"
     android:settingsActivity="dev.fengine.wallpaper/.MainActivity"
-    android:previewImage="@drawable/ic_launcher" />
+    android:previewImage="@mipmap/ic_launcher" />
