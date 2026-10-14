@@ -42,19 +42,13 @@ class PhotoWallpaperService : WallpaperService() {
 
     inner class PhotoEngine : Engine() {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        private val state = LiveEngineState()
         private var watch: Job? = null
         private var load: Job? = null
         private var current: Bitmap? = null
         private var previous: Bitmap? = null
-        private var currentUri: String? = null
         private var fade: ValueAnimator? = null
         private var fadeAlpha = 1f
-        private var xOffset = 0.5f
-        private var zoom = 0f
-        private var width = 0
-        private var height = 0
-        private var visible = false
-        private var dirty = true
         private var softwareOnly = false
         private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
         private val matrix = Matrix()
@@ -66,10 +60,7 @@ class PhotoWallpaperService : WallpaperService() {
             super.onCreate(holder)
             setOffsetNotificationsEnabled(true)
             watch = scope.launch {
-                (application as FengineApp).settings.settings.collectLatest { settings ->
-                    val uri = photoFor(settings)
-                    if (uri != currentUri) show(uri)
-                }
+                (application as FengineApp).settings.settings.collectLatest { settings -> act(state.onPhoto(photoFor(settings))) }
             }
         }
 
@@ -85,33 +76,19 @@ class PhotoWallpaperService : WallpaperService() {
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
             super.onSurfaceChanged(holder, format, w, h)
-            if (w == width && h == height) return
-            width = w; height = h
-            Log.i(TAG, "surface ${w}x$h")
-            // A new size needs a decode at that size; the old bitmap bridges the gap.
-            currentUri?.let { show(it, keepOld = true) }
+            if (w != state.width || h != state.height) Log.i(TAG, "surface ${w}x$h")
+            act(state.onSurface(w, h))
         }
 
-        override fun onOffsetsChanged(xOff: Float, yOff: Float, xStep: Float, yStep: Float, xPx: Int, yPx: Int) {
-            if (xOff == xOffset) return
-            xOffset = xOff
-            draw()
-        }
+        override fun onOffsetsChanged(xOff: Float, yOff: Float, xStep: Float, yStep: Float, xPx: Int, yPx: Int) = act(state.onOffset(xOff))
 
-        override fun onZoomChanged(z: Float) {
-            if (z == zoom) return
-            zoom = z
-            draw()
-        }
+        override fun onZoomChanged(z: Float) = act(state.onZoom(z))
 
-        override fun onVisibilityChanged(v: Boolean) {
-            visible = v
-            if (!v) { fade?.cancel(); finishFade() } else if (dirty) draw()
-        }
+        override fun onVisibilityChanged(v: Boolean) = act(state.onVisibility(v))
 
         override fun onWallpaperFlagsChanged(which: Int) {
             super.onWallpaperFlagsChanged(which)
-            scope.launch { show(photoFor((application as FengineApp).settings.read())) }
+            scope.launch { act(state.onPhoto(photoFor((application as FengineApp).settings.read()))) }
         }
 
         override fun onDestroy() {
@@ -120,24 +97,33 @@ class PhotoWallpaperService : WallpaperService() {
             super.onDestroy()
         }
 
-        /** Decode [uri] for the current surface off the main thread, then cross-fade to it. */
-        private fun show(uri: String?, keepOld: Boolean = false) {
+        /** Perform what the state asked for: the only place I/O happens. */
+        private fun act(d: LiveEngineState.Decision) {
+            if (d.cancelFade) { fade?.cancel(); finishFade() }
+            d.decode?.let { uri -> decodeThen(uri, d.keepOld) }
+            if (d.startFade) startFade()
+            if (d.draw) draw()
+        }
+
+        private fun decodeThen(uri: String, keepOld: Boolean) {
             load?.cancel()
-            if (uri == null) { currentUri = null; current = null; draw(); return }
-            if (width == 0 || height == 0) { currentUri = uri; return }
+            val w = state.width; val h = state.height
             load = scope.launch {
-                val bitmap = withContext(Dispatchers.IO) { decode(uri) } ?: return@launch
+                val bitmap = withContext(Dispatchers.IO) { decode(uri, w, h) } ?: return@launch
+                val decision = state.onDecoded(uri, keepOld)
+                if (decision == LiveEngineState.Decision.NONE && state.shown != uri) { bitmap.recycle(); return@launch } // stale
                 fade?.cancel()
                 previous?.recycle()
-                previous = if (keepOld) null else current
+                previous = if (decision.startFade) current else null
+                if (!decision.startFade) current?.recycle()
                 current = bitmap
-                currentUri = uri
-                if (previous != null && visible) startFade() else { fadeAlpha = 1f; draw() }
+                if (!decision.startFade) fadeAlpha = 1f
+                act(decision)
             }
         }
 
-        private fun decode(uri: String): Bitmap? = runCatching {
-            val (tw, th) = LiveFrame.decodeTarget(width, height)
+        private fun decode(uri: String, w: Int, h: Int): Bitmap? = runCatching {
+            val (tw, th) = LiveFrame.decodeTarget(w, h)
             val source = ImageDecoder.createSource(contentResolver, Uri.parse(uri))
             ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                 decoder.setTargetSampleSize(WallpaperCrop.sampleSize(info.size.width, info.size.height, tw, th))
@@ -151,7 +137,11 @@ class PhotoWallpaperService : WallpaperService() {
             fade = ValueAnimator.ofFloat(0f, 1f).apply {
                 duration = FADE_MS
                 interpolator = LinearInterpolator()
-                addUpdateListener { a -> fadeAlpha = LiveFrame.fadeAlpha(a.animatedValue as Float); draw() }
+                addUpdateListener { a ->
+                    val t = a.animatedValue as Float
+                    fadeAlpha = LiveFrame.fadeAlpha(t)
+                    act(state.onFadeFrame(t))
+                }
                 addListener(object : android.animation.AnimatorListenerAdapter() {
                     override fun onAnimationEnd(animation: android.animation.Animator) = finishFade()
                 })
@@ -166,9 +156,8 @@ class PhotoWallpaperService : WallpaperService() {
             previous?.recycle(); previous = null
         }
 
-        /** One frame. Skipped while invisible; the next visibility change draws the pending state. */
+        /** One frame. The state already decided it is wanted and the surface is visible. */
         private fun draw() {
-            if (!visible) { dirty = true; return }
             val holder = surfaceHolder
             val canvas = (if (softwareOnly) null else runCatching { holder.lockHardwareCanvas() }.getOrNull())
                 ?: run { softwareOnly = true; holder.lockCanvas() } ?: return
@@ -177,16 +166,15 @@ class PhotoWallpaperService : WallpaperService() {
                 previous?.let { if (fadeAlpha < 1f) drawPhoto(canvas, it, 255) }
                 current?.let { drawPhoto(canvas, it, (fadeAlpha * 255).toInt()) }
                 frames++
-                if (fade != null) fadeFrames++ else Log.d(TAG, "frame ${frames}: offset=$xOffset zoom=$zoom")
+                if (fade != null) fadeFrames++ else Log.d(TAG, "frame ${frames}: offset=${state.xOffset} zoom=${state.zoom}")
             } finally {
                 holder.unlockCanvasAndPost(canvas)
             }
-            dirty = false
         }
 
         private fun drawPhoto(canvas: Canvas, bitmap: Bitmap, alpha: Int) {
             if (bitmap.isRecycled) return
-            val f = LiveFrame.frame(bitmap.width, bitmap.height, width, height, xOffset, zoom)
+            val f = LiveFrame.frame(bitmap.width, bitmap.height, state.width, state.height, state.xOffset, state.zoom)
             matrix.reset(); matrix.postScale(f.scale, f.scale); matrix.postTranslate(f.dx, f.dy)
             paint.alpha = alpha
             canvas.drawBitmap(bitmap, matrix, paint)

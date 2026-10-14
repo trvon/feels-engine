@@ -21,32 +21,32 @@ class RotateWallpaperWorker(appContext: Context, params: WorkerParameters) :
     override suspend fun doWork(): Result {
         val store = (applicationContext as FengineApp).settings
         val settings = store.read()
-        val steps = RotationPlan.steps(settings.homeGroupId, settings.lockGroupId) { id ->
-            settings.group(id)?.allPhotos.isNullOrEmpty()
-        }
         val stamp = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date())
-        if (steps.isEmpty()) {
+        // Screens the live engine draws itself only need the cursor to move; it watches the settings.
+        val plan = RotationPlan.advance(
+            settings.homeGroupId, settings.lockGroupId,
+            photos = { id -> settings.group(id)?.allPhotos.orEmpty() },
+            cursor = { id -> settings.group(id)?.cursor ?: -1 },
+            shuffle = settings.shuffle,
+            liveHome = LiveWallpaper.activeOnHome(applicationContext),
+            liveLock = LiveWallpaper.activeOnLock(applicationContext),
+        )
+        if (plan.cursors.isEmpty()) {
             store.update { it.copy(lastResult = "Nothing to show yet") }
             return Result.success()
         }
 
         val applier = WallpaperApplier(applicationContext)
         val failures = mutableListOf<String>()
-        val advanced = mutableMapOf<String, Int>()
-        // Screens the live engine draws itself only need the cursor to move; it watches the settings.
-        val liveHome = LiveWallpaper.activeOnHome(applicationContext)
-        val liveLock = LiveWallpaper.activeOnLock(applicationContext)
-        for (step in steps) {
-            val group = settings.group(step.groupId) ?: continue
-            val pool = group.allPhotos
-            val index = advanced[group.id]
-                ?: RotationPlan.nextIndex(pool.size, group.cursor, settings.shuffle)
-            advanced[group.id] = index
-            val which = RotationPlan.staticFlags(step.which, liveHome, liveLock)
-            if (which == 0) { Log.i(TAG, "${group.name}: photo ${index + 1} -> live engine (which=${step.which})"); continue }
-            when (val outcome = applier.apply(pool[index].toUri(), which)) {
+        val advanced = plan.cursors
+        for ((id, index) in plan.cursors) if (plan.writes.none { it.groupId == id }) {
+            Log.i(TAG, "${settings.group(id)?.name}: photo ${index + 1} -> live engine")
+        }
+        for (write in plan.writes) {
+            val group = settings.group(write.groupId) ?: continue
+            when (val outcome = applier.apply(write.uri.toUri(), write.which)) {
                 is WallpaperApplier.Result.Applied ->
-                    Log.i(TAG, "${group.name}: photo ${index + 1} -> which=${step.which}, ids ${outcome.wallpaperIds}")
+                    Log.i(TAG, "${group.name}: photo ${write.index + 1} -> which=${write.which}, ids ${outcome.wallpaperIds}")
                 is WallpaperApplier.Result.Failed -> {
                     Log.w(TAG, "${group.name}: ${outcome.reason}")
                     failures += "${group.name}: ${outcome.reason}"

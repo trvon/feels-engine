@@ -9,6 +9,8 @@
   draw.
 - Debug builds take `dev.fengine.wallpaper.ROTATE_NOW` from adb for the device
   loop.
+- The engine's event rules and the rotation decision are pure and property
+  tested; the SQLite index and DataStore have on-device tests.
 
 ## 0.1.0 (2026-10-14)
 

@@ -36,8 +36,14 @@ it). Use a test device or expect to reset the wallpaper by hand.
   thumbnail loading outside `ui/design/`.
 
 Android classes (`SettingsStore`, workers, `WallpaperApplier`,
-`GroupDreamService`) are thin over the pure cores and are verified on
-devices, not in JVM tests.
+`GroupDreamService`, `PhotoWallpaperService`) are thin over the pure cores.
+The two stores have on-device tests in `app/src/androidTest/`:
+
+```bash
+ANDROID_SERIAL=emulator-5580 ./gradlew :app:connectedDebugAndroidTest
+```
+
+The rest is verified on devices by hand or with the scripts below.
 
 ## Device loop
 
@@ -72,6 +78,17 @@ adb -s $FOLD shell cmd device_state print-state   # 0 closed
 ```
 
 Samsung Auto Blocker must be off for adb installs.
+
+## Live engine
+
+```bash
+adb shell am start -a android.service.wallpaper.CHANGE_LIVE_WALLPAPER \
+  --ecn android.service.wallpaper.extra.LIVE_WALLPAPER_COMPONENT dev.fengine.wallpaper/.wallpaper.live.PhotoWallpaperService
+adb shell dumpsys wallpaper | grep -E "mWallpaperComponent|mWhich="
+adb shell am broadcast -a dev.fengine.wallpaper.ROTATE_NOW -p dev.fengine.wallpaper   # debug builds: one rotation
+adb logcat -s PhotoWallpaper   # one line per frame, one per fade
+scripts/profile-live.sh <serial> 30
+```
 
 ## Screen saver
 

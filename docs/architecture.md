@@ -12,7 +12,7 @@ ui/            MainActivity, HomeScreen, GroupScreen, MainViewModel, design/ (to
 data/          Settings, Group, PhotoId, SettingsCodec (pure), SettingsStore (DataStore)
 schedule/      RotationPlan (pure), RotationScheduler, RotateWallpaperWorker, alarm + boot receivers
 wallpaper/     WallpaperCrop (pure), Displays, SamsungDisplays (pure), WallpaperApplier
-wallpaper/live/ LiveFrame (pure), LiveWallpaper, PhotoWallpaperService (the live engine)
+wallpaper/live/ LiveFrame (pure), LiveEngineState (pure), LiveWallpaper, PhotoWallpaperService
 smart/         MediaLibrary, Labeler (ML Kit), PhotoIndex (SQLite), DescriptionMatcher (Nano, keywords),
                ScanPlan (pure), SmartGroupWorker, IndexLibraryWorker, AiReadiness
 screensaver/   KenBurns (pure), DreamPlan (pure), GroupDreamService
@@ -45,8 +45,10 @@ its own crop.
 
 ## Live engine
 
-`PhotoWallpaperService` is a `WallpaperService`. Its engine watches the
-settings flow and shows its screen's group at the group's cursor; the rotation
+`PhotoWallpaperService` is a `WallpaperService`. Every decision (draw, decode,
+fade, cancel) comes from `LiveEngineState`, a pure state machine fed with the
+engine's events; the service only performs the I/O it is told to. The engine
+watches the settings flow and shows its screen's group at the group's cursor; the rotation
 worker keeps advancing cursors and only writes a static bitmap for screens the
 engine does not own (`RotationPlan.staticFlags`). The engine draws nothing at
 rest. It draws once per launcher page offset (parallax over an 8 % overscan),
@@ -85,4 +87,12 @@ round trips and never-crash on garbage; layout monotonic in width; settings
 file round trip, dangling ids dropped, v0.1 migration; scan pass returns only
 candidates, never excluded or seen photos, judge calls within budget, cached
 verdicts verbatim; photo identity unifies picker and library URIs only;
-drift covers the view and is continuous; play order is a permutation.
+drift covers the view and is continuous; play order is a permutation; the
+live engine never draws while invisible or for a no-op event and decodes only
+on a photo or size change; one rotation advances each feeding group once and
+writes nothing to a screen the engine owns.
+
+On-device tests (`app/src/androidTest/`) exercise the SQLite index and
+DataStore on an emulator: identity sharing between picker and library URIs,
+verdict keys, the legacy JSON import, batched writes, and a settings round
+trip through the file.

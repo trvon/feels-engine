@@ -50,6 +50,7 @@ app/src/main/kotlin/dev/fengine/wallpaper/
   data/         Settings, Group, PhotoId, SettingsCodec (pure), SettingsStore
   schedule/     RotationPlan (pure), RotationScheduler, workers, receivers
   wallpaper/    WallpaperCrop (pure), Displays, SamsungDisplays (pure), WallpaperApplier
+  wallpaper/live/ LiveFrame (pure), LiveEngineState (pure), LiveWallpaper, PhotoWallpaperService
   smart/        MediaLibrary, Labeler, PhotoIndex, DescriptionMatcher, ScanPlan (pure),
                 SmartGroupWorker, IndexLibraryWorker, AiReadiness
   screensaver/  KenBurns (pure), DreamPlan (pure), GroupDreamService

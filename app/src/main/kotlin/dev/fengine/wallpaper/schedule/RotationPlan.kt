@@ -37,6 +37,34 @@ object RotationPlan {
         return out
     }
 
+    /** One static write the worker must make: [uri] to the screens in [which]. */
+    data class Write(val groupId: String, val index: Int, val uri: String, val which: Int)
+
+    /** Everything one rotation decides: the writes to make and the new cursor per group. */
+    data class Advance(val writes: List<Write>, val cursors: Map<String, Int>)
+
+    /**
+     * One rotation, decided in full: each group that feeds a screen advances its cursor exactly
+     * once (also when it feeds both screens), the live engine's screens get no write, and the
+     * remaining screens get the group's new photo.
+     */
+    fun advance(
+        homeGroupId: String?, lockGroupId: String?,
+        photos: (String) -> List<String>, cursor: (String) -> Int,
+        shuffle: Boolean, liveHome: Boolean, liveLock: Boolean, random: Random = Random.Default,
+    ): Advance {
+        val steps = steps(homeGroupId, lockGroupId) { photos(it).isEmpty() }
+        val cursors = LinkedHashMap<String, Int>()
+        val writes = ArrayList<Write>()
+        for (step in steps) {
+            val pool = photos(step.groupId)
+            val index = cursors.getOrPut(step.groupId) { nextIndex(pool.size, cursor(step.groupId), shuffle, random) }
+            val which = staticFlags(step.which, liveHome, liveLock)
+            if (which != 0) writes += Write(step.groupId, index, pool[index], which)
+        }
+        return Advance(writes, cursors)
+    }
+
     fun nextIndex(count: Int, cursor: Int, shuffle: Boolean, random: Random = Random.Default): Int {
         if (count <= 0) return -1
         if (!shuffle || count == 1) return (cursor + 1).mod(count)

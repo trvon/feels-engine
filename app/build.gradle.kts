@@ -26,6 +26,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -89,4 +90,8 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
     // Real org.json for JVM tests; android.jar ships stubs that throw.
     testImplementation(libs.org.json)
+    // On-device tests for the two stores the JVM cannot host: SQLite and DataStore.
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }
