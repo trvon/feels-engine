@@ -45,6 +45,32 @@ Not measured yet: a real phone (the Pixel was locked during this pass), battery
 per hour against the static path, and hardware-bitmap memory, which the
 emulator reports as zero graphics memory because it decodes to software.
 
+## Live engine, Galaxy Z Fold 8, inner screen 2448x1848 at 120 Hz (2026-10-14)
+
+Real cloud photos from Google Photos, 12 MP originals, the owner's Family
+group, engine applied through Samsung's chooser.
+
+| Window | Round 1 | Round 2 (exact-size decode, 60 fps fade cap) |
+|---|---|---|
+| idle, 30 s | 0 ms, 0 frames | 40 ms, 0 frames |
+| 20 page swipes | 90 ms | 90 ms |
+| 5 photo changes | 684 ms each, 110 frames per fade | 418 ms each, 55 frames per fade |
+| graphics memory after | 461 MB | 219 MB |
+
+What the Fold taught: a power-of-two sample size left 12 MP photos at full
+size, 49 MB per hardware bitmap, and Samsung keeps several engine instances
+alive, so memory multiplied. Decoding to exactly the frame's needs halved it;
+the remaining 219 MB is the instance count, which the engine now logs so the
+next round can say how many there are and whether invisible ones should drop
+their bitmaps. The 120 Hz panel doubled fade frames for no visible gain; the
+fade is capped at 60 per second.
+
+Samsung's lock screen does not show a live wallpaper. One UI keeps a static
+image there (`mWhich=11` stays `ImageWallpaper`), the app detects that the
+engine does not own the lock screen, and the rotation keeps writing static
+photos to it. The home screen is the engine's. The cover screen keeps the
+static image too; the chooser applies the engine to the active display only.
+
 ## Wake-ups with the screen off, Pixel 8 emulator (2026-10-14)
 
 `scripts/profile-wake.sh <serial> 20`: device "on battery", battery stats
