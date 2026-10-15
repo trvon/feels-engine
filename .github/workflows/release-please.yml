@@ -1,0 +1,36 @@
+name: Release Please
+
+# Conventional commits on main keep a release PR open (version, CHANGELOG.md,
+# app/build.gradle.kts). Merging it tags vX.Y.Z and creates the GitHub Release;
+# the signed APK and Play bundle are then built and attached by release.yml.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.rp.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # A tag pushed with GITHUB_TOKEN does not start other workflows, so the build
+  # is called from here with the new tag.
+  build:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag }}
+    secrets: inherit

@@ -16,6 +16,11 @@ val releaseStore = signingValue("FENGINE_KEYSTORE", "storeFile")?.let { path ->
     if (File(path).isAbsolute) File(path) else rootProject.file(path)
 }
 
+// release-please rewrites this line from the release PR; versionCode follows it
+// (major*10000 + minor*100 + patch), so 0.2.2 is 202 and every release is higher.
+val appVersion = "0.2.1" // x-release-please-version
+val appVersionCode = appVersion.split('.').map(String::toInt).let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
+
 android {
     namespace = "dev.fengine.wallpaper"
     compileSdk = 37
@@ -24,8 +29,8 @@ android {
         applicationId = "dev.fengine.wallpaper"
         minSdk = 28
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.2.1"
+        versionCode = appVersionCode
+        versionName = appVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
