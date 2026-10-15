@@ -283,6 +283,16 @@ changed with the phone still folded.
   The cover panel stays static whatever the chooser option, so a rotation with
   the engine on both inner screens writes exactly one still photo, to
   `which=19`.
+- One UI does not always report a live engine visible. Engine created while
+  the phone was closed (inner panel off), phone opened: the window was on
+  screen (`dumpsys window windows`: isVisible=true, HAS_DRAWN, 2448x1848
+  surface) while the framework's own Engine said `mVisible=false
+  mReportedVisible=false` (`dumpsys activity service <engine>`), so
+  `onVisibilityChanged(true)` never came and a visibility-gated engine drew
+  nothing: black inner screen (Fold 8, 2026-10-15). The system still calls
+  `onSurfaceRedrawNeeded` before showing the surface, so the engine treats
+  that request as visibility and always answers it with a frame
+  (`LiveEngineState.onRedrawNeeded`, property redrawRequestAlwaysEndsInAFrame).
 - Where the chooser puts the engine is routing, not policy (decompiled
   One UI 9 picker and WallpaperManagerService, 2026-10-14). The picker sends
   `which` 1, 2 or 3 with no display bits; the service fills the mode from the

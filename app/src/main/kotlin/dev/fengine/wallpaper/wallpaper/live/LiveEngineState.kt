@@ -103,15 +103,20 @@ class LiveEngineState {
     }
 
     /**
-     * The system is about to show the surface and wants its content now (a new surface after a
-     * sleep, or a visibility change the system would rather not flash black on). Draw whatever
-     * is decoded, visible flag or not: this is the one draw for a screen nobody sees yet, and it
-     * is the system asking. Nothing decoded yet means nothing to draw; the decode follows visibility.
+     * The system is about to show the surface and wants its content now. That is visibility,
+     * whatever the visibility callback said: One UI opens a folded phone without ever reporting
+     * the engine visible (framework dump: mVisible=false while the window is on screen, Fold 8,
+     * 2026-10-15), so a redraw request is treated as "visible from here". It always ends in a
+     * frame: now if a photo is decoded, otherwise after the one decode it issues.
      */
     fun onRedrawNeeded(): Decision {
         dirty = true
-        return if (shown != null) draw() else Decision.NONE
+        if (!visible) return onVisibility(true)
+        return if (shown != null) draw() else decodeWanted(keepOld = true)
     }
+
+    /** A draw was asked for but the surface gave no canvas: the frame is still owed. */
+    fun onDrawFailed(): Decision { dirty = true; return Decision.NONE }
 
     /** The settings say this screen should show [uri] (or nothing). */
     fun onPhoto(uri: String?): Decision {

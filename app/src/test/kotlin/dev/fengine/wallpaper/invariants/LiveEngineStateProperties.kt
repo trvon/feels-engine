@@ -70,8 +70,7 @@ class LiveEngineStateProperties {
             val visibleBefore = s.visible
             val offsetBefore = s.xOffset; val zoomBefore = s.zoom
             val d = apply(s, e, keep)
-            // The one draw allowed for a screen nobody sees yet is the system asking for the surface's content.
-            if (d.draw) assertTrue("draw while invisible after $e", s.visible || e is Ev.Redraw)
+            if (d.draw) assertTrue("draw while invisible after $e", s.visible)
             if (e is Ev.Offset && e.x == offsetBefore) assertEquals("no-op offset drew", LiveEngineState.Decision.NONE, d)
             if (e is Ev.Zoom && e.z == zoomBefore) assertEquals("no-op zoom drew", LiveEngineState.Decision.NONE, d)
             if (e is Ev.Visible && e.v == visibleBefore) assertEquals(LiveEngineState.Decision.NONE, d)
@@ -119,6 +118,38 @@ class LiveEngineStateProperties {
         // a dirty state redraws once.
         if (owedDecode) assertTrue(d.decode != null || d.draw == wasDirty) else assertEquals(wasDirty, d.draw)
         assertEquals(LiveEngineState.Decision.NONE, s.onVisibility(true))
+    }
+
+    /**
+     * A redraw request is the system about to show the surface, so it always ends in a frame: now,
+     * or after the one decode it issues (which is then the only decode in flight). The visibility
+     * callback is not needed for it; One UI skips that callback when a folded phone opens.
+     */
+    @Property(tries = 3000)
+    fun redrawRequestAlwaysEndsInAFrame(@ForAll("events") events: List<Ev>) {
+        val s = LiveEngineState(); val keep = HashMap<String, Boolean>()
+        events.forEach { apply(s, it, keep) }
+        if (s.wanted == null || s.width == 0 || s.height == 0) return  // nothing to show: covered by surfaceBeforePhotoStillDecodes
+        val inFlight = s.requested
+        val d = s.onRedrawNeeded()
+        assertTrue("redraw request left the engine invisible", s.visible)
+        when {
+            d.draw -> Unit
+            d.decode != null -> assertTrue("decode result did not draw", s.onDecoded(d.decode!!, d.keepOld).let { it.draw || it.startFade })
+            inFlight != null -> assertTrue("in-flight decode result did not draw", s.onDecoded(inFlight, true).let { it.draw || it.startFade })
+            else -> throw AssertionError("redraw request produced nothing: $d wanted=${s.wanted} shown=${s.shown}")
+        }
+    }
+
+    /** A draw the surface refused is owed again: the next visibility or redraw request draws. */
+    @Property(tries = 1000)
+    fun refusedDrawIsOwedAgain(@ForAll("events") events: List<Ev>) {
+        val s = LiveEngineState(); val keep = HashMap<String, Boolean>()
+        events.forEach { apply(s, it, keep) }
+        if (s.shown == null) return
+        s.onDrawFailed()
+        assertTrue(s.dirty)
+        assertTrue(s.onRedrawNeeded().draw || s.onRedrawNeeded().decode != null)
     }
 
     /** A surface that went away comes back with a frame: through the redraw request, or on visibility. */

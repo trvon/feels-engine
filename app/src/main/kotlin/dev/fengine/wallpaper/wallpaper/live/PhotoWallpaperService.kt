@@ -126,6 +126,7 @@ class PhotoWallpaperService : WallpaperService() {
         }
 
         override fun onVisibilityChanged(v: Boolean) {
+            Log.i(TAG, "visible=$v")
             render.post { act(state.onVisibility(v)) }
         }
 
@@ -224,7 +225,8 @@ class PhotoWallpaperService : WallpaperService() {
         private fun draw() {
             val holder = surfaceHolder
             val canvas = (if (softwareOnly) null else runCatching { holder.lockHardwareCanvas() }.getOrNull())
-                ?: run { softwareOnly = true; holder.lockCanvas() } ?: return
+                ?: run { softwareOnly = true; holder.lockCanvas() }
+            if (canvas == null) { Log.w(TAG, "no canvas; frame still owed"); act(state.onDrawFailed()); return }
             val started = android.os.SystemClock.elapsedRealtime()
             try {
                 canvas.drawColor(Color.BLACK)
