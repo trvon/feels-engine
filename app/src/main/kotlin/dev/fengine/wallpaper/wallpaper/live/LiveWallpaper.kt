@@ -24,13 +24,16 @@ object LiveWallpaper {
     fun state(context: Context, samsung: Boolean = SamsungDisplays.hasDisplayBits()): State {
         val wm = WallpaperManager.getInstance(context)
         val mine = component(context)
-        fun home(panel: Int) = runCatching { wm.getWallpaperInfo(WallpaperManager.FLAG_SYSTEM or panel)?.component == mine }.getOrDefault(false)
-        fun lock(panel: Int): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        fun home(panel: Int): Boolean = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) wm.getWallpaperInfo(WallpaperManager.FLAG_SYSTEM or panel)?.component == mine
+            else wm.wallpaperInfo?.component == mine   // one answer for every panel before Android 14
+        }.getOrDefault(false)
+        fun lock(panel: Int): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             // The lock screen shows the home wallpaper when it has none of its own.
             val info = runCatching { wm.getWallpaperInfo(WallpaperManager.FLAG_LOCK or panel) }.getOrNull()
             if (info != null) info.component == mine
             else runCatching { wm.getWallpaperId(WallpaperManager.FLAG_LOCK or panel) }.getOrDefault(0) <= 0 && home(panel)
-        } else home(panel)   // before Android 13 a live wallpaper always covers both screens
+        } else home(panel)   // before Android 14 the API cannot answer per screen; the engine covers both
         if (!samsung) {
             val h = home(0); val l = lock(0)
             return State(h, l, h, l)

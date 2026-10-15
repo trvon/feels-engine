@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -116,8 +117,9 @@ fun GroupScreen(
         )
     }
 
+    val focus = LocalFocusManager.current
     Page {
-        ActionBar("Done" to onBack, "Delete group" to onDelete)
+        ActionBar("Done" to { focus.clearFocus(); onBack() }, "Delete group" to onDelete)
         Spacer(Modifier.height(Space.sm))
         BasicTextField(
             value = name,
@@ -125,6 +127,8 @@ fun GroupScreen(
             textStyle = MaterialTheme.typography.displaySmall.copy(color = MaterialTheme.colorScheme.onSurface),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
             modifier = Modifier.fillMaxWidth(),
         )
         Caption(if (showSaved) "Saved" else "Tap the name to rename. Changes save as you make them.")
@@ -199,7 +203,7 @@ fun GroupScreen(
                     placeholder = { Text("my dog at the beach, sunsets, the kids playing") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { commitRule() }),
+                    keyboardActions = KeyboardActions(onDone = { commitRule(); focus.clearFocus() }),
                     modifier = Modifier
                         .fillMaxWidth()
                         .onFocusChanged { if (!it.isFocused) commitRule() },

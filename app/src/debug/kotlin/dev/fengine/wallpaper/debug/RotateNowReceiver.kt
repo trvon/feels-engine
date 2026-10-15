@@ -4,6 +4,7 @@ import android.app.WallpaperManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import dev.fengine.wallpaper.schedule.RotationScheduler
 import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
@@ -20,6 +21,7 @@ class RotateNowReceiver : BroadcastReceiver() {
     }
 
     private fun probe(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { Log.i("Probe", "per-screen queries need Android 14"); return }
         val wm = WallpaperManager.getInstance(context)
         val mine = LiveWallpaper.component(context)
         for (which in listOf(1, 2, 3, 5, 6, 9, 10, 17, 18)) {

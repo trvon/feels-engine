@@ -49,6 +49,9 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -68,9 +71,17 @@ import kotlinx.coroutines.withContext
 @Composable
 fun Page(content: @Composable ColumnScope.() -> Unit) {
     val spec = currentLayoutSpec()
+    val focus = LocalFocusManager.current
     CompositionLocalProvider(LocalLayout provides spec) {
         Scaffold { padding ->
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+            // A tap on empty page space ends editing, which also puts the keyboard away.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .pointerInput(Unit) { detectTapGestures(onTap = { focus.clearFocus() }) },
+                contentAlignment = Alignment.TopCenter,
+            ) {
                 Column(
                     modifier = Modifier
                         .widthIn(max = spec.maxContentWidth)

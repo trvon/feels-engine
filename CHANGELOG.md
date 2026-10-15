@@ -1,16 +1,31 @@
 # Changelog
 
-## Unreleased (0.2.0)
+## 0.2.0 (2026-10-14)
 
 - Live wallpaper engine: motion over your photos. Cross-fade on change,
   parallax with the home screen pages, the system zoom on transitions, a
-  fresh crop per posture on foldables. Zero frames at rest. Turn it on from
-  the Motion section; the static path stays for screens the engine does not
-  draw.
-- Debug builds take `dev.fengine.wallpaper.ROTATE_NOW` from adb for the device
-  loop.
-- The engine's event rules and the rotation decision are pure and property
-  tested; the SQLite index and DataStore have on-device tests.
+  fresh crop per posture on foldables. Zero frames at rest; no decode while
+  the screen is off. The static path stays for screens the engine does not
+  draw. Measured in `docs/perf.md`: idle 0 frames, a fade 40 to 55 frames in
+  about 0.9 s, two wake-ups per 30 minutes with the screen off, no wake locks.
+- Look: Still or Motion, read from what the system reports. Motion opens the
+  system chooser; Still writes the current photos over the engine.
+- Set active replaces Change now: pick a group and its cover goes up on both
+  screens. Next photo advances by hand. Tap a photo in a group for Show now
+  or Make the cover.
+- Foldables: a group can take the cover screen on its own (Cover screen switch
+  on the group page, Samsung display bits). Two UX lanes: choices are a bottom
+  sheet on phones and a centred card on an unfolded phone or tablet.
+- One UI: the live state is read per panel. The chooser puts the engine on
+  whichever panel is active when you tap Set, and the app writes still photos
+  only to the panels the engine does not draw. Before this a rotation on a
+  closed Fold could replace the engine with a still photo (issue #1).
+- Rotation waits on a low battery. Group names are trimmed.
+- Debug builds take `dev.fengine.wallpaper.ROTATE_NOW` and `PROBE` from adb
+  for the device loop.
+- The engine's event rules, the placement maths and the rotation decision are
+  pure and property tested; the SQLite index and DataStore have on-device
+  tests.
 
 ## 0.1.0 (2026-10-14)
 
