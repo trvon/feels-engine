@@ -274,6 +274,15 @@ changed with the phone still folded.
   made the worker write a still photo over the engine once the phone was
   closed; `LiveWallpaper.state` now asks per panel. `getWallpaperInfo(3)`
   throws IllegalArgumentException: one flag per call.
+- One UI does draw a third-party live wallpaper on the lock screen. The chooser
+  offers Home screen, Lock screen, and Home screen and lock screen; the last
+  creates one engine with `getWallpaperFlags() == 3`, record `which=6` (lock,
+  inner) points at the engine with id -1 (it shares the home one), and with the
+  keyguard showing `dumpsys window windows` lists the engine's window
+  `isVisible=true` and ImageWallpaper `isVisible=false` (Fold 8, 2026-10-14).
+  The cover panel stays static whatever the chooser option, so a rotation with
+  the engine on both inner screens writes exactly one still photo, to
+  `which=19`.
 - `ContentResolver.loadThumbnail` fails for Google Photos cloud picker URIs
   (`content://media/picker/0/com.google.android.apps.photos.cloudpicker/media/...`)
   while `ImageDecoder` on the same URI works; the UI falls back to a small decode.
