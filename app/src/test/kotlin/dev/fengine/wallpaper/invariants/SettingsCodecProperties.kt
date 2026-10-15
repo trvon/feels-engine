@@ -1,5 +1,6 @@
 package dev.fengine.wallpaper.invariants
 
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.fengine.wallpaper.data.Group
@@ -104,5 +105,16 @@ class SettingsCodecProperties {
         prefs[SettingsCodec.Keys.legacyPhotos] = legacy
         val out = SettingsCodec.read(prefs)
         if (s.groups.isNotEmpty()) assertEquals(s.groups, out.groups)
+    }
+
+    /** New installs default to wireless-or-dock only; installs from before the setting keep playing on any charger. */
+    @Property(tries = 300)
+    fun screenSaverDefaultRespectsExistingInstalls(@ForAll("validSettings") s: Settings) {
+        val prefs = mutablePreferencesOf()
+        SettingsCodec.write(prefs, s)
+        prefs.remove(booleanPreferencesKey("dream_wireless_only"))   // as written before the setting existed
+        val back = SettingsCodec.read(prefs)
+        assertEquals(s.groups.isEmpty(), back.dreamWirelessOnly)
+        assertEquals(true, SettingsCodec.read(mutablePreferencesOf()).dreamWirelessOnly)  // a fresh install
     }
 }

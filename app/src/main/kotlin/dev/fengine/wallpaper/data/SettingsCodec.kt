@@ -68,7 +68,9 @@ object SettingsCodec {
             timesOfDay = prefs[Keys.timesOfDay]?.lines()?.mapNotNull { it.toIntOrNull() }?.sorted()
                 ?: defaults.timesOfDay,
             shuffle = prefs[Keys.shuffle] ?: defaults.shuffle,
-            dreamWirelessOnly = prefs[Keys.dreamWirelessOnly] ?: defaults.dreamWirelessOnly,
+            // Never written: a new install gets the default; an install that already had groups
+            // played on any charger before this setting existed and keeps doing so.
+            dreamWirelessOnly = prefs[Keys.dreamWirelessOnly] ?: (defaults.dreamWirelessOnly && groups.isEmpty()),
             enabled = prefs[Keys.enabled] ?: defaults.enabled,
             lastResult = prefs[Keys.lastResult] ?: defaults.lastResult,
             dreamGroupId = prefs[Keys.dreamGroupId]?.takeIf { id -> groups.any { it.id == id } },
