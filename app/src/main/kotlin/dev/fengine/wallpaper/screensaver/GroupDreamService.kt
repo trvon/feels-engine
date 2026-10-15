@@ -1,5 +1,12 @@
 package dev.fengine.wallpaper.screensaver
 
+import android.app.UiModeManager
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.res.Configuration
+import android.os.BatteryManager
+import dev.fengine.wallpaper.data.Screen
+import dev.fengine.wallpaper.data.Screens
 import android.animation.ValueAnimator
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -69,9 +76,16 @@ class GroupDreamService : DreamService() {
 
     private suspend fun play() {
         val settings = (application as FengineApp).settings.read()
-        val group = settings.dreamGroup ?: settings.homeGroup ?: settings.groups.firstOrNull()
+        val group = Screens.effective(settings, Screen.SCREEN_SAVER)
         val photos = group?.allPhotos.orEmpty()
-        if (photos.isEmpty()) { Log.i(TAG, "nothing to play"); return }
+        val carMode = (getSystemService(UI_MODE_SERVICE) as UiModeManager).currentModeType == Configuration.UI_MODE_TYPE_CAR
+        val plugged = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+        val verdict = DreamGate.decide(carMode, plugged, settings.dreamWirelessOnly, photos.isNotEmpty())
+        if (verdict != DreamGate.Verdict.PLAY) {
+            // finish() lets the phone sleep as if no screen saver were set.
+            Log.i(TAG, "not playing: $verdict (plugged=$plugged)")
+            finish(); return
+        }
         val order = DreamPlan.order(photos, settings.shuffle, group!!.cursor, System.nanoTime())
         Log.i(TAG, "playing ${group.name}: ${order.size} photos")
         var i = 0

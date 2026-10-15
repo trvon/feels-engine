@@ -113,6 +113,9 @@ private fun FengineApp(vm: MainViewModel) {
             onChangeNow = vm::rotateNow,
             onSetActive = vm::setActive,
             onSetStill = vm::setStill,
+            hasCoverScreen = vm.hasCoverScreen(),
+            onAssignScreen = vm::assignScreen,
+            onSetDreamWirelessOnly = vm::setDreamWirelessOnly,
             dreamConfigured = vm.dreamConfigured(),
             motion = vm.motion(),
             onTurnOnMotion = {

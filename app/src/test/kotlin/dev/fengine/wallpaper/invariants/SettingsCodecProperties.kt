@@ -39,7 +39,7 @@ class SettingsCodecProperties {
             Arbitraries.integers().between(0, 24 * 60 - 1).list().ofMaxSize(6), Arbitraries.of(true, false),
             Arbitraries.of(true, false), text,
         ).`as` { home: String?, lock: String?, mode: Mode, interval: Int, times: List<Int>, shuffle: Boolean, enabled: Boolean, last: String ->
-            Settings(gs, home, lock, mode, interval, times.sorted(), shuffle, enabled, last, dreamGroupId = lock ?: home, coverGroupId = home)
+            Settings(gs, home, lock, mode, interval, times.sorted(), shuffle, enabled, last, dreamGroupId = lock ?: home, coverGroupId = home, dreamWirelessOnly = shuffle != enabled)
         }
     }
 

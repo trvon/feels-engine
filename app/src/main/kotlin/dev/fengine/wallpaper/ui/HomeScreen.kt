@@ -34,6 +34,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Mode
+import dev.fengine.wallpaper.data.Screen
+import dev.fengine.wallpaper.data.Screens
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.ui.design.Caption
 import dev.fengine.wallpaper.ui.design.ChipRow
@@ -70,7 +72,20 @@ fun HomeScreen(
     motion: LiveWallpaper.State = LiveWallpaper.State(false, false, false, false),
     onTurnOnMotion: () -> Unit = {},
     onSetStill: () -> Unit = {},
+    hasCoverScreen: Boolean = false,
+    onAssignScreen: (Screen, String?) -> Unit = { _, _ -> },
+    onSetDreamWirelessOnly: (Boolean) -> Unit = {},
 ) {
+    var choosingFor by remember { mutableStateOf<Screen?>(null) }
+    choosingFor?.let { screen ->
+        ScreenPickerSheet(
+            screen = screen,
+            groups = settings.groups,
+            current = Screens.assigned(settings, screen),
+            onPick = { id -> choosingFor = null; onAssignScreen(screen, id) },
+            onDismiss = { choosingFor = null },
+        )
+    }
     var picking by remember { mutableStateOf(false) }
     if (picking) {
         GroupPickerSheet(
@@ -128,6 +143,19 @@ fun HomeScreen(
             )
         }
 
+        Section("Screens") {
+            Caption("Each screen can show its own group. Tap one to change it.")
+            Spacer(Modifier.height(Space.sm))
+            val screens = buildList {
+                add(Screen.HOME); add(Screen.LOCK)
+                if (hasCoverScreen) add(Screen.COVER)
+                add(Screen.SCREEN_SAVER)
+            }
+            screens.forEach { screen ->
+                ScreenRow(screenLabel(screen), screenValue(settings, screen)) { choosingFor = screen }
+            }
+        }
+
         Section("Screen saver") {
             val dream = settings.dreamGroup ?: settings.homeGroup
             Caption(
@@ -138,6 +166,12 @@ fun HomeScreen(
                 },
             )
             TextAction(if (dreamConfigured) "Screen saver settings" else "Set up in Settings", onOpenDreamSettings)
+            Spacer(Modifier.height(Space.sm))
+            ToggleRow("Wireless charging or dock only", settings.dreamWirelessOnly, onSetDreamWirelessOnly)
+            Caption(
+                if (settings.dreamWirelessOnly) "A cable, like a car charger, does not start it. It never plays while the phone is in car mode."
+                else "Plays on any charger. It never plays while the phone is in car mode; turn this on if it starts in the car anyway.",
+            )
         }
         Spacer(Modifier.height(Space.section))
 
@@ -253,5 +287,76 @@ fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, enab
     ) {
         Text(label, style = MaterialTheme.typography.titleMedium)
         Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+    }
+}
+
+private fun screenLabel(screen: Screen) = when (screen) {
+    Screen.HOME -> "Home screen"
+    Screen.LOCK -> "Lock screen"
+    Screen.COVER -> "Cover screen"
+    Screen.SCREEN_SAVER -> "Screen saver"
+}
+
+/** What the row says: the group, or what happens when the screen has none of its own. */
+private fun screenValue(s: Settings, screen: Screen): String {
+    Screens.assigned(s, screen)?.let { id -> return s.group(id)?.name ?: "Not set" }
+    return when (screen) {
+        Screen.HOME, Screen.LOCK -> "Left alone"
+        Screen.COVER -> "Same as home"
+        Screen.SCREEN_SAVER -> Screens.effective(s, screen)?.let { "Same as home (${it.name})" } ?: "Nothing to play"
+    }
+}
+
+@Composable
+private fun ScreenRow(label: String, value: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = Space.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = MaterialTheme.typography.titleMedium)
+        Text(value, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+/** One screen's choice: any group, or none (home and lock left alone; cover and screen saver follow home). */
+@Composable
+private fun ScreenPickerSheet(screen: Screen, groups: List<Group>, current: String?, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
+    Sheet(onDismiss = onDismiss) {
+        Eyebrow(screenLabel(screen))
+        Spacer(Modifier.height(Space.lg))
+        val none = when (screen) {
+            Screen.HOME, Screen.LOCK -> "Leave alone"
+            Screen.COVER, Screen.SCREEN_SAVER -> "Same as home"
+        }
+        PickerRow(none, null, selected = current == null) { onPick(null) }
+        groups.forEach { g -> PickerRow(g.name, g.cover, selected = g.id == current, caption = coverCaption(g)) { onPick(g.id) } }
+    }
+}
+
+@Composable
+private fun PickerRow(title: String, coverUri: String?, selected: Boolean, caption: String? = null, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.md),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(Size.sheetThumb)
+                .clip(RoundedCornerShape(Radius.tile))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) { coverUri?.let { PhotoImage(it, Modifier.fillMaxSize(), contentDescription = null) } }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            caption?.let { Caption(it) }
+        }
+        if (selected) Badge("Selected")
     }
 }

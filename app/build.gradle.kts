@@ -46,6 +46,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            // JaCoCo for the JVM suite: ./gradlew :app:createDebugUnitTestCoverageReport
+            enableUnitTestCoverage = true
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

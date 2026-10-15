@@ -26,6 +26,8 @@ data class Settings(
     val dreamGroupId: String? = null,
     /** On a foldable, the group the cover screen shows instead of the inner screen's; null for the same. */
     val coverGroupId: String? = null,
+    /** Screen saver plays only on wireless charging or a dock, so a car's USB charger never starts it. */
+    val dreamWirelessOnly: Boolean = false,
 ) {
     fun group(id: String?): Group? = id?.let { g -> groups.firstOrNull { it.id == g } }
     val homeGroup: Group? get() = group(homeGroupId)

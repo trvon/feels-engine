@@ -19,6 +19,7 @@ object SettingsCodec {
         val intervalMinutes = intPreferencesKey("interval_minutes")
         val timesOfDay = stringPreferencesKey("times_of_day")
         val shuffle = booleanPreferencesKey("shuffle")
+        val dreamWirelessOnly = booleanPreferencesKey("dream_wireless_only")
         val enabled = booleanPreferencesKey("enabled")
         val lastResult = stringPreferencesKey("last_result")
         val dreamGroupId = stringPreferencesKey("dream_group_id")
@@ -36,6 +37,7 @@ object SettingsCodec {
         prefs[Keys.intervalMinutes] = next.intervalMinutes
         prefs[Keys.timesOfDay] = next.timesOfDay.joinToString("\n")
         prefs[Keys.shuffle] = next.shuffle
+        prefs[Keys.dreamWirelessOnly] = next.dreamWirelessOnly
         prefs[Keys.enabled] = next.enabled
         prefs[Keys.lastResult] = next.lastResult
         next.dreamGroupId?.let { prefs[Keys.dreamGroupId] = it } ?: prefs.remove(Keys.dreamGroupId)
@@ -66,6 +68,7 @@ object SettingsCodec {
             timesOfDay = prefs[Keys.timesOfDay]?.lines()?.mapNotNull { it.toIntOrNull() }?.sorted()
                 ?: defaults.timesOfDay,
             shuffle = prefs[Keys.shuffle] ?: defaults.shuffle,
+            dreamWirelessOnly = prefs[Keys.dreamWirelessOnly] ?: defaults.dreamWirelessOnly,
             enabled = prefs[Keys.enabled] ?: defaults.enabled,
             lastResult = prefs[Keys.lastResult] ?: defaults.lastResult,
             dreamGroupId = prefs[Keys.dreamGroupId]?.takeIf { id -> groups.any { it.id == id } },

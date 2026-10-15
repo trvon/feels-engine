@@ -13,6 +13,8 @@ import com.google.mlkit.genai.common.FeatureStatus
 import dev.fengine.wallpaper.FengineApp
 import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Mode
+import dev.fengine.wallpaper.data.Screen
+import dev.fengine.wallpaper.data.Screens
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.schedule.RotationScheduler
 import dev.fengine.wallpaper.smart.AiReadiness
@@ -139,16 +141,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteGroup(id: String) {
         val removed = settings.value.group(id)?.let { it.photos + it.pool }.orEmpty()
-        update { s ->
-            s.copy(
-                groups = s.groups.filterNot { it.id == id },
-                homeGroupId = s.homeGroupId.takeUnless { it == id },
-                lockGroupId = s.lockGroupId.takeUnless { it == id },
-            )
-        }
+        update { s -> Screens.withoutGroup(s, id) }
         val stillUsed = settings.value.groups.filterNot { it.id == id }.flatMap { it.photos + it.pool }.toSet()
         removed.filterNot { it in stillUsed }.forEach(::releaseGrant)
     }
+
+    fun setDreamWirelessOnly(on: Boolean) = update { it.copy(dreamWirelessOnly = on) }
+
+    /** Give one screen to a group, or null to leave it unassigned. Nothing else moves. */
+    fun assignScreen(screen: Screen, groupId: String?) = update { Screens.assign(it, screen, groupId) }
 
     /**
      * Photo picker grants are temporary by default. Persist each one so the background worker can

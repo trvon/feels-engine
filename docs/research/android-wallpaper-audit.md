@@ -470,6 +470,22 @@ reads `screensaver_enabled` / `screensaver_components` to say whether it has
 been chosen and deep-links to `Settings.ACTION_DREAM_SETTINGS`. Verified with
 `cmd dreams start-dreaming` on the Pixel 8 and on the Fold 8's cover screen.
 
+When it starts (API 37 settings javadoc and `dumpsys dreams`, 2026-10-15):
+the user's conditions are charging (`screensaver_activate_on_sleep`), dock
+(`_on_dock`), upright and stationary (`_on_postured`), and an optional
+wireless-only restriction (`screensaver_restrict_to_writeless_charging`, the
+typo is the real key; the Pixel 8 supports it). All are hidden settings an app
+cannot change. A car's USB charger meets "charging", which is how the owner
+got the screen saver in the car. The app's own veto is
+`screensaver/DreamGate`: never in car mode (`UiModeManager.currentModeType ==
+UI_MODE_TYPE_CAR`), optionally only on wireless charging or a dock
+(`ACTION_BATTERY_CHANGED` `EXTRA_PLUGGED` 4 or 8), never with nothing to
+show; a veto calls `finish()`, after which the phone may sleep as usual.
+`UiModeManager.getActiveProjectionTypes` (Android Auto projection) is a
+system API and out of reach. Not verified: that Android Auto switches the
+phone to car mode on API 34+; the emulator refuses `cmd uimode car yes` from
+the shell. The wireless-only switch covers the car either way.
+
 ### UX direction
 
 Editorial, clean, simple: one screen that reads like a magazine spread. Photos

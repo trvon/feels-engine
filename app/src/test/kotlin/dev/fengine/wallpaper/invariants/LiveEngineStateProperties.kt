@@ -158,7 +158,12 @@ class LiveEngineStateProperties {
         if (blendedOnScreen && !s.fading) {
             assertTrue("blended frame left on screen and no frame owed", s.dirty)
             val back = if (s.visible) s.onRedrawNeeded() else s.onVisibility(true)
-            assertTrue("owed clean frame was not drawn", back.draw || back.decode != null)
+            if (back.draw) return
+            // Not drawn now: a decode must be issued or already in flight, and its result draws.
+            val pending = back.decode ?: s.requested?.takeIf { it == s.wanted }
+            assertTrue("owed clean frame neither drawn nor on its way: $back wanted=${s.wanted} requested=${s.requested}", pending != null)
+            val result = s.onDecoded(pending!!, keepOld = true)
+            assertTrue("decode result did not draw the clean frame", result.draw || result.startFade)
         }
     }
 

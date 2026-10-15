@@ -45,6 +45,30 @@ ANDROID_SERIAL=emulator-5580 ./gradlew :app:connectedDebugAndroidTest
 
 The rest is verified on devices by hand or with the scripts below.
 
+### Coverage
+
+```bash
+./gradlew :app:createDebugUnitTestCoverageReport
+open app/build/reports/coverage/test/debug/index.html
+```
+
+Measured 2026-10-15: 18% of lines overall. The pure modules are at or near
+100% (`LiveEngineState`, `LiveFrame`, `RotationPlan`, `SettingsCodec`,
+`Group`, `ScanPlan`, `KenBurns`, `WallpaperCrop`, `Screens`, `DreamGate`);
+everything that calls Android is at 0% (services, workers, view model,
+screens). Both engine bugs shipped in 0.2.0 sat in that gap: the state
+machine was fully covered, but One UI delivered callbacks the model did not
+include (no visibility on open, a recreated surface). Rules that follow:
+
+- A decision goes in a pure object with a property; the Android class only
+  reads inputs and performs the answer (`DreamGate`, `Screens`,
+  `RotationPlan`, `LiveEngineState`).
+- A framework behaviour seen on a device becomes an event in the property
+  harness (`Lost`, `Redraw` in `LiveEngineStateProperties`), and the property
+  is checked to fail without the fix before it is committed.
+- Line coverage is a map of where to look, not a score: it says nothing about
+  events the model leaves out.
+
 ## Device loop
 
 Drive the UI from `uiautomator dump` bounds, never guessed coordinates:
