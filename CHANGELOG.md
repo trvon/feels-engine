@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.0](https://github.com/trvon/feels-engine/compare/feels-engine-v0.2.1...feels-engine-v0.3.0) (2026-10-15)
+
+
+### Features
+
+* **icon:** adaptive launcher icon ([ded36b2](https://github.com/trvon/feels-engine/commit/ded36b26c6fc782f17ed92bf19f5756646e4e498))
+* **live:** wallpaper engine with cross-fade, parallax, zoom and per-posture decode ([75579bc](https://github.com/trvon/feels-engine/commit/75579bc3d16e2dc85b86f37d4b923c8f9ea3a1e5))
+* **site:** landing page and privacy policy on GitHub Pages ([7fc191f](https://github.com/trvon/feels-engine/commit/7fc191fb8c9af5307ef48758d0da33b69c67c79c))
+
+
+### Fixes
+
+* **live:** a lost surface gets its frame back ([e9ab27d](https://github.com/trvon/feels-engine/commit/e9ab27d463c1b618349954f6783d2f1af74bde1a))
+* **live:** a redraw request counts as visibility; a refused draw stays owed ([fc18f79](https://github.com/trvon/feels-engine/commit/fc18f7911ae47284ec58fbc3d4312401832b1041))
+* **live:** render on a dedicated thread; fall back to software after two stalled canvas posts ([e2c22c2](https://github.com/trvon/feels-engine/commit/e2c22c2e776ab53ee6bfa03c42758de2f69eaeb1))
+
+
+### Performance
+
+* **live:** decode at exact size, cap fades at 60 fps, log engine instances ([41caabc](https://github.com/trvon/feels-engine/commit/41caabc5dab2ab031b828c1a1bda1a95bfb991f3))
+* **live:** no decode for a screen nobody sees; rotation waits on a low battery ([0226b89](https://github.com/trvon/feels-engine/commit/0226b89d20a36e1a59af38eb34728964f84b469d))
+
 ## 0.2.1 (2026-10-15)
 
 - Fold fix: the inner screen no longer comes back black after the phone was
