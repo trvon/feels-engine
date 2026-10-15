@@ -1,0 +1,47 @@
+name: CodeQL
+
+# Replaces GitHub's default CodeQL setup. Its autobuild ran Gradle with the build cache, so on a
+# warm cache the Kotlin compiler never ran, CodeQL saw no code and failed ("could not
+# automatically build any of it"). Here the compile is forced past the cache.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+          - language: python
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        if: matrix.language == 'java-kotlin'
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+      - name: Compile (no build cache, no configuration cache)
+        if: matrix.build-mode == 'manual'
+        run: ./gradlew :app:compileDebugKotlin :app:compileDebugUnitTestKotlin --no-daemon --no-build-cache --no-configuration-cache --rerun-tasks
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
