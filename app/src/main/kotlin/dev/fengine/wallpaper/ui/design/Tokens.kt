@@ -46,4 +46,10 @@ object Size {
     val tileIcon: Dp = 16.dp
     val progress: Dp = 20.dp
     val progressStroke: Dp = 2.dp
+    /** Group thumbnail in the Set active sheet. */
+    val sheetThumb: Dp = 56.dp
+    /** Photo preview at the top of the photo sheet. */
+    val sheetPreview: Dp = 220.dp
+    /** Widest a sheet's card gets in the wide lane. */
+    val sheetCardWidth: Dp = 440.dp
 }

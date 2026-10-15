@@ -95,6 +95,23 @@ What a phone adds: Doze. WorkManager's periodic work is deferred into Doze
 maintenance windows, so overnight the two-per-half-hour count above becomes a
 handful per night, and the rotation now requires the battery not to be low.
 
+## Wake-ups with the screen off, Pixel 8, Android 17 (2026-10-14)
+
+Same script, 20 minutes, phone on battery, live engine on both screens,
+rhythm 15 minutes.
+
+| What | Result |
+|---|---|
+| CPU over 20 minutes | 970 ms for the whole process |
+| Context switches | about 530 |
+| Wake locks held by the app | none; only system wake locks appeared |
+| Estimated drain (batterystats) | 0 mAh attributed to the app |
+| Frames drawn | 0 |
+
+The phone spends more CPU than the emulator on the same two rotations:
+WorkManager's own database and the DataStore write cost more on a real
+kernel with Doze transitions. It is still under a second per 20 minutes.
+
 ## Library indexing, Pixel 8 (2026-10-14)
 
 1,503 synthetic 640x480 photos labeled in three slices, about 90 ms per photo,

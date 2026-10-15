@@ -19,6 +19,8 @@ import dev.fengine.wallpaper.smart.AiReadiness
 import dev.fengine.wallpaper.smart.MediaLibrary
 import dev.fengine.wallpaper.smart.NanoMatcher
 import dev.fengine.wallpaper.smart.SmartGroupWorker
+import dev.fengine.wallpaper.wallpaper.Displays
+import dev.fengine.wallpaper.wallpaper.SamsungDisplays
 import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.combine
@@ -128,7 +130,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         return group.id
     }
 
-    fun renameGroup(id: String, name: String) = updateGroup(id) { it.copy(name = name.ifBlank { it.name }) }
+    fun renameGroup(id: String, name: String) = updateGroup(id) { it.copy(name = name.trim().ifBlank { it.name }) }
 
     /** Changing the description discards previous matches; the next scan rebuilds them. */
     fun setRule(id: String, rule: String) = updateGroup(id) {
@@ -276,6 +278,50 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setEnabled(enabled: Boolean) = update { it.copy(enabled = enabled) }
 
     fun rotateNow() = scheduler.rotateNow()
+
+    /**
+     * Make [groupId] the active scheme: it feeds both screens and its cover (or current photo) shows
+     * right away. The rotation then carries on from that photo.
+     */
+    fun setActive(groupId: String) {
+        val group = settings.value.group(groupId) ?: return
+        val pool = group.allPhotos
+        val index = pool.indexOf(group.cover).takeIf { it >= 0 } ?: group.cursor.coerceIn(0, (pool.size - 1).coerceAtLeast(0))
+        viewModelScope.launch {
+            store.update { it.copy(homeGroupId = groupId, lockGroupId = groupId) }
+            scheduler.sync(store.read())
+            if (pool.isNotEmpty()) scheduler.rotateNow(pinned = mapOf(groupId to index))
+        }
+    }
+
+    /** Show this photo on the screens its group feeds, now, and continue the rotation from it. */
+    fun showNow(groupId: String, uri: String) {
+        val group = settings.value.group(groupId) ?: return
+        val index = group.allPhotos.indexOf(uri).takeIf { it >= 0 } ?: return
+        scheduler.rotateNow(pinned = mapOf(groupId to index))
+    }
+
+    /**
+     * Still: write the current photos as static wallpapers, which replaces the live engine on every
+     * screen it drew. Motion is turned on through the system chooser, see MainActivity.
+     */
+    fun setStill() {
+        val s = settings.value
+        val pins = listOfNotNull(s.homeGroup, s.lockGroup).distinct()
+            .filter { it.allPhotos.isNotEmpty() }
+            .associate { it.id to it.cursor.coerceIn(0, it.allPhotos.size - 1) }
+        scheduler.rotateNow(pinned = pins, forceStatic = true)
+    }
+
+    /** On a foldable, the group the cover screen shows; off means the same photo as the inner screen. */
+    fun setCoverGroup(groupId: String, on: Boolean) =
+        update { it.copy(coverGroupId = if (on) groupId else it.coverGroupId.takeUnless { c -> c == groupId }) }
+
+    /** True when this phone has two panels that can be targeted separately (Samsung display bits). */
+    fun hasCoverScreen(): Boolean {
+        val app = getApplication<Application>()
+        return SamsungDisplays.hasDisplayBits() && runCatching { Displays(app).let { it.largest != it.smallest } }.getOrDefault(false)
+    }
 
     private fun updateGroup(id: String, transform: (Group) -> Group) =
         update { s -> s.copy(groups = s.groups.map { if (it.id == id) transform(it) else it }) }

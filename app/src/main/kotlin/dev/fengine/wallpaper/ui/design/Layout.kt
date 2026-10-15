@@ -11,7 +11,16 @@ import androidx.compose.ui.unit.dp
  * window size classes drive it: compact (phones), medium (small tablets, unfolded foldables),
  * expanded (tablets). Tokens stay fixed; only these few numbers move.
  */
+/**
+ * The two UX lanes. COMPACT is a phone or a cover screen: transient choices rise from the bottom
+ * as a sheet, under the thumb. WIDE is an unfolded foldable or a tablet: a full-width sheet would
+ * stretch across the hinge and sit far from the hand, so the same choice is a centred card.
+ */
+enum class Lane { COMPACT, WIDE }
+
 data class LayoutSpec(
+    /** Which UX lane this width belongs to. */
+    val lane: Lane,
     /** Columns in a photo grid. */
     val columns: Int,
     /** Width of a cover in the group rail. */
@@ -21,10 +30,10 @@ data class LayoutSpec(
 ) {
     companion object {
         fun forWidth(widthDp: Int): LayoutSpec = when {
-            widthDp < 360 -> LayoutSpec(columns = 3, coverWidth = 128.dp, maxContentWidth = 600.dp)   // small phones
-            widthDp < 600 -> LayoutSpec(columns = 3, coverWidth = 150.dp, maxContentWidth = 600.dp)   // phones, cover screens
-            widthDp < 840 -> LayoutSpec(columns = 4, coverWidth = 170.dp, maxContentWidth = 720.dp)   // unfolded foldables, small tablets
-            else -> LayoutSpec(columns = 6, coverWidth = 190.dp, maxContentWidth = 840.dp)            // tablets
+            widthDp < 360 -> LayoutSpec(Lane.COMPACT, columns = 3, coverWidth = 128.dp, maxContentWidth = 600.dp)   // small phones
+            widthDp < 600 -> LayoutSpec(Lane.COMPACT, columns = 3, coverWidth = 150.dp, maxContentWidth = 600.dp)   // phones, cover screens
+            widthDp < 840 -> LayoutSpec(Lane.WIDE, columns = 4, coverWidth = 170.dp, maxContentWidth = 720.dp)      // unfolded foldables, small tablets
+            else -> LayoutSpec(Lane.WIDE, columns = 6, coverWidth = 190.dp, maxContentWidth = 840.dp)               // tablets
         }
     }
 }

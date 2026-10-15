@@ -27,8 +27,11 @@ class WallpaperApplier(private val context: Context) {
         data class Failed(val reason: String) : Result
     }
 
-    /** [which] is a WallpaperManager FLAG_* combination; Samsung display bits are added here. */
-    fun apply(uri: Uri, which: Int): Result {
+    /**
+     * [which] is a WallpaperManager FLAG_* combination; Samsung display bits are added here, or
+     * taken from [panels] (4 inner, 16 cover) when the caller wants one panel only.
+     */
+    fun apply(uri: Uri, which: Int, panels: Int = 0): Result {
         val wm = WallpaperManager.getInstance(context)
         if (!wm.isWallpaperSupported) return Result.Failed("wallpaper not supported for this user")
         if (!wm.isSetWallpaperAllowed) return Result.Failed("setting the wallpaper is disallowed by policy")
@@ -44,7 +47,8 @@ class WallpaperApplier(private val context: Context) {
 
         try {
             val displays = Displays(context)
-            val ids = SamsungDisplays.expand(which).map { expanded ->
+            val targets = if (panels != 0 && SamsungDisplays.hasDisplayBits()) listOf(which or panels) else SamsungDisplays.expand(which)
+            val ids = targets.map { expanded ->
                 val target = displays.forWhich(expanded)
                 val crop = WallpaperCrop.fit(bitmap.width, bitmap.height, target.width, target.height)
                 val hint = Rect(crop.left, crop.top, crop.right, crop.bottom)

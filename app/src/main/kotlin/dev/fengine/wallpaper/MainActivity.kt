@@ -83,6 +83,12 @@ private fun FengineApp(vm: MainViewModel) {
             onRemoveFromPool = { vm.removeFromPool(openGroup.id, it) },
             onSetCover = { vm.setCover(openGroup.id, it) },
             onSetDream = { vm.setDreamGroup(openGroup.id, it) },
+            onShowNow = { uri ->
+                if (settings.homeGroupId != openGroup.id && settings.lockGroupId != openGroup.id) vm.setActive(openGroup.id)
+                vm.showNow(openGroup.id, uri)
+            },
+            hasCoverScreen = vm.hasCoverScreen(),
+            onSetCoverScreen = { vm.setCoverGroup(openGroup.id, it) },
             pickerMax = vm.pickerMax(),
             scanning = scanning,
             indexing = indexing,
@@ -111,6 +117,8 @@ private fun FengineApp(vm: MainViewModel) {
             onSetShuffle = vm::setShuffle,
             onSetEnabled = vm::setEnabled,
             onChangeNow = vm::rotateNow,
+            onSetActive = vm::setActive,
+            onSetStill = vm::setStill,
             dreamConfigured = vm.dreamConfigured(),
             motion = vm.motion(),
             onTurnOnMotion = {

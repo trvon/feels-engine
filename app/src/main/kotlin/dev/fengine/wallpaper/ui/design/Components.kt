@@ -32,7 +32,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -53,6 +55,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -260,6 +263,33 @@ fun PhotoTile(
                 ) {
                     Icon(Icons.Default.Close, contentDescription = "Remove photo", tint = Color.White, modifier = Modifier.size(Size.tileIcon))
                 }
+            }
+        }
+    }
+}
+
+/**
+ * A transient choice. COMPACT lane: a bottom sheet. WIDE lane: a centred card of at most
+ * [Size.sheetCardWidth], so an unfolded phone never shows a choice stretched across the hinge.
+ * Content lays itself out in a column with the page gutter; it must not add its own.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    when (currentLayoutSpec().lane) {
+        Lane.COMPACT -> ModalBottomSheet(onDismissRequest = onDismiss) {
+            Column(modifier = Modifier.padding(horizontal = Space.page)) {
+                content()
+                Spacer(Modifier.height(Space.xl))
+            }
+        }
+        Lane.WIDE -> Dialog(onDismissRequest = onDismiss) {
+            Surface(
+                shape = RoundedCornerShape(Radius.card),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.widthIn(max = Size.sheetCardWidth).fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.padding(horizontal = Space.page, vertical = Space.xl)) { content() }
             }
         }
     }

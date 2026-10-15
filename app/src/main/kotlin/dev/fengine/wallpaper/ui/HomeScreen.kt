@@ -1,6 +1,19 @@
 package dev.fengine.wallpaper.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import dev.fengine.wallpaper.ui.design.Badge
+import dev.fengine.wallpaper.ui.design.PhotoImage
+import dev.fengine.wallpaper.ui.design.Radius
+import dev.fengine.wallpaper.ui.design.Size
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,6 +45,7 @@ import dev.fengine.wallpaper.ui.design.NewCoverCard
 import dev.fengine.wallpaper.ui.design.Page
 import dev.fengine.wallpaper.ui.design.RailPadding
 import dev.fengine.wallpaper.ui.design.Section
+import dev.fengine.wallpaper.ui.design.Sheet
 import dev.fengine.wallpaper.ui.design.Space
 import dev.fengine.wallpaper.ui.design.TextAction
 
@@ -50,12 +64,23 @@ fun HomeScreen(
     onSetShuffle: (Boolean) -> Unit,
     onSetEnabled: (Boolean) -> Unit,
     onChangeNow: () -> Unit,
+    onSetActive: (String) -> Unit = {},
     dreamConfigured: Boolean = false,
     onOpenDreamSettings: () -> Unit = {},
     motion: Pair<Boolean, Boolean> = false to false,
     onTurnOnMotion: () -> Unit = {},
+    onSetStill: () -> Unit = {},
 ) {
     var chooser by remember { mutableStateOf(false) }
+    var picking by remember { mutableStateOf(false) }
+    if (picking) {
+        GroupPickerSheet(
+            groups = settings.groups.filter { it.allPhotos.isNotEmpty() },
+            activeId = settings.homeGroupId.takeIf { it == settings.lockGroupId },
+            onPick = { picking = false; onSetActive(it) },
+            onDismiss = { picking = false },
+        )
+    }
     if (chooser) {
         AlertDialog(
             onDismissRequest = { chooser = false },
@@ -87,18 +112,22 @@ fun HomeScreen(
             }
         }
 
-        Section("Motion") {
+        Section("Look") {
             val (home, lock) = motion
+            ChipRow(
+                options = listOf(Look.STILL to "Still", Look.MOTION to "Motion"),
+                selected = if (home) Look.MOTION else Look.STILL,
+                onSelect = { if (it == Look.MOTION) onTurnOnMotion() else onSetStill() },
+            )
+            Spacer(Modifier.height(Space.sm))
             Caption(
                 when {
-                    home && lock -> "On. Photos cross-fade, drift with the home screen and settle on the lock screen."
-                    home -> "On for the home screen. The lock screen keeps the still photo."
-                    else -> "Off. Turn it on and photos cross-fade and move with the home screen, at no cost while nothing moves."
+                    home && lock -> "Photos cross-fade and drift with the home screen, and settle on the lock screen. Costs nothing while nothing moves."
+                    home -> "Photos cross-fade and drift with the home screen. The lock screen stays still on this phone."
+                    else -> "Each photo is set once and stays put. Motion cross-fades between photos and moves them with the home screen."
                 },
             )
-            TextAction(if (home) "Motion settings" else "Turn on motion", onTurnOnMotion)
         }
-        Spacer(Modifier.height(Space.section))
 
         Section("Screen saver") {
             val dream = settings.dreamGroup ?: settings.homeGroup
@@ -136,9 +165,48 @@ fun HomeScreen(
         Spacer(Modifier.height(Space.lg))
         ToggleRow(if (settings.enabled) "Rotation on" else "Rotation off", settings.enabled, onSetEnabled, enabled = settings.canRotate)
         Spacer(Modifier.height(Space.lg))
-        Button(onClick = onChangeNow, enabled = settings.canRotate, modifier = Modifier.fillMaxWidth()) {
-            Text("Change now")
+        Button(onClick = { picking = true }, enabled = settings.groups.any { it.allPhotos.isNotEmpty() }, modifier = Modifier.fillMaxWidth()) {
+            Text("Set active")
         }
+        Spacer(Modifier.height(Space.sm))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            TextAction("Next photo", onChangeNow)
+        }
+    }
+}
+
+private enum class Look { STILL, MOTION }
+
+/** Pick the group that both screens show from now on. Its cover goes up right away. */
+@Composable
+private fun GroupPickerSheet(groups: List<Group>, activeId: String?, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    Sheet(onDismiss = onDismiss) {
+            Eyebrow("Set active")
+            Spacer(Modifier.height(Space.sm))
+            Text("Both screens show this group, starting with its cover.", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(Space.lg))
+            groups.forEach { g ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPick(g.id) }
+                        .padding(vertical = Space.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Space.md),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(Size.sheetThumb)
+                            .clip(RoundedCornerShape(Radius.tile))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    ) { g.cover?.let { PhotoImage(it, Modifier.fillMaxSize(), contentDescription = null) } }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(g.name, style = MaterialTheme.typography.titleMedium)
+                        Caption(coverCaption(g))
+                    }
+                    if (g.id == activeId) Badge("Active")
+                }
+            }
     }
 }
 

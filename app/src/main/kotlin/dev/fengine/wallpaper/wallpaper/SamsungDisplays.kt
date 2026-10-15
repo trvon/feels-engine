@@ -23,6 +23,9 @@ object SamsungDisplays {
 
     val isSamsung: Boolean = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
 
+    /** True where the display bits mean something (One UI). */
+    fun hasDisplayBits(samsung: Boolean = isSamsung): Boolean = samsung
+
     /** The `which` values to pass to setBitmap, in order, for one logical rotation. */
     fun expand(which: Int, samsung: Boolean = isSamsung): List<Int> =
         if (samsung) listOf(which or FLAG_DISPLAY_PHONE, which or FLAG_DISPLAY_SUB) else listOf(which)

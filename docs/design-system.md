@@ -50,8 +50,20 @@ foldable) and `Displays` supplies the sizes, so the system never guesses.
   card) and the on-device AI card last.
 - One photo, one tile: the picker and the library name the same file with
   different URIs; `PhotoId.identity` unifies them (`data/PhotoId.kt`).
-- One filled button per page ("Change now"). Secondary actions are tonal
+- One filled button per page ("Set active"). Secondary actions are tonal
   buttons inside a section header or text actions. Destructive actions are text.
+- Two UX lanes (`LayoutSpec.lane`). COMPACT (under 600 dp: phones, cover
+  screens) puts a transient choice in a bottom sheet, under the thumb. WIDE
+  (unfolded foldables, tablets) puts the same choice in a centred card at most
+  440 dp wide, because a full-width sheet stretches across the hinge and sits
+  far from either hand. `Sheet` in `ui/design/Components.kt` picks the lane;
+  screens never call `ModalBottomSheet` or `Dialog` directly.
+- Choices that change the wallpaper are explicit and immediate. "Set active"
+  lists the groups and puts the chosen group's cover up on both screens. A
+  photo's sheet offers "Show now" (that photo, now, rotation continues from it)
+  and "Make the cover". The Look row (Still, Motion) reflects what the system
+  reports, not a stored preference: Motion opens the system chooser, Still
+  writes the current photos as still wallpapers, which replaces the engine.
 - Status and guidance are `StatusCard`s: title, body, at most one text action.
   Tone: primary container when ready, secondary container when something is in
   progress or available, surface variant otherwise.

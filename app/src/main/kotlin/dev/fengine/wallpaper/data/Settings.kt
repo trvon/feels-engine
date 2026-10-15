@@ -24,11 +24,14 @@ data class Settings(
     val lastResult: String = "",
     /** Group the screen saver plays, or null for the home group. */
     val dreamGroupId: String? = null,
+    /** On a foldable, the group the cover screen shows instead of the inner screen's; null for the same. */
+    val coverGroupId: String? = null,
 ) {
     fun group(id: String?): Group? = id?.let { g -> groups.firstOrNull { it.id == g } }
     val homeGroup: Group? get() = group(homeGroupId)
     val lockGroup: Group? get() = group(lockGroupId)
     val dreamGroup: Group? get() = group(dreamGroupId)
+    val coverGroup: Group? get() = group(coverGroupId)
 
     /** True when at least one screen has a group with photos: the precondition for rotating. */
     val canRotate: Boolean

@@ -25,7 +25,9 @@ class KenBurnsProperties {
         val f = KenBurns.frame(imageW, imageH, viewW, viewH, t, zoomFrom, zoomTo, KenBurns.Focal(fx, fy), KenBurns.Focal(tx, ty))
         val w = imageW * f.scale
         val h = imageH * f.scale
-        val eps = 0.01f
+        // Float cannot place a 1 px photo scaled to 16 million px to better than its ulp; the
+        // tolerance follows the scaled size so the check stays at one hundredth of a pixel elsewhere.
+        val eps = 0.01f + 2 * Math.ulp(maxOf(w, h))
         assertTrue("left edge visible", f.dx <= eps)
         assertTrue("top edge visible", f.dy <= eps)
         assertTrue("right edge visible", f.dx + w >= viewW - eps)

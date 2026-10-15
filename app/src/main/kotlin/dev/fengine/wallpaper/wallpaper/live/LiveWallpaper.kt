@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import dev.fengine.wallpaper.wallpaper.SamsungDisplays
 
 /** Whether this app's live engine is the active wallpaper, per screen; and the intent that offers it. */
 object LiveWallpaper {
@@ -19,6 +20,10 @@ object LiveWallpaper {
      * that a live wallpaper always covers both, so the home answer stands for the lock screen too.
      */
     fun activeOnLock(context: Context): Boolean {
+        // One UI keeps the lock screen on its own ImageWallpaper record even while it reports the
+        // live component for FLAG_LOCK (Galaxy Z Fold 8, One UI 9: record which=11 stays
+        // ImageWallpaper, see dumpsys wallpaper). The engine never draws the lock screen there.
+        if (SamsungDisplays.hasDisplayBits()) return false
         val wm = WallpaperManager.getInstance(context)
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             // The lock screen shows the home wallpaper when it has none of its own.

@@ -1,6 +1,16 @@
 package dev.fengine.wallpaper.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import dev.fengine.wallpaper.ui.design.PhotoImage
+import dev.fengine.wallpaper.ui.design.Radius
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,6 +47,7 @@ import dev.fengine.wallpaper.ui.design.Page
 import dev.fengine.wallpaper.ui.design.PhotoGrid
 import dev.fengine.wallpaper.ui.design.PhotoGridLimit
 import dev.fengine.wallpaper.ui.design.Section
+import dev.fengine.wallpaper.ui.design.Sheet
 import dev.fengine.wallpaper.ui.design.Size
 import dev.fengine.wallpaper.ui.design.Space
 import dev.fengine.wallpaper.ui.design.StatusCard
@@ -76,6 +87,9 @@ fun GroupScreen(
     onAiAction: (AiReadiness.Action) -> Unit = {},
     onSetCover: (String) -> Unit = {},
     onSetDream: (Boolean) -> Unit = {},
+    onShowNow: (String) -> Unit = {},
+    hasCoverScreen: Boolean = false,
+    onSetCoverScreen: (Boolean) -> Unit = {},
 ) {
     val feedsHome = settings.homeGroupId == group.id
     val feedsLock = settings.lockGroupId == group.id
@@ -90,6 +104,17 @@ fun GroupScreen(
     }
     LaunchedEffect(group) { if (group != settings.group(group.id)) savedTick++ }
     val saved = { savedTick++ }
+    var chosen by remember(group.id) { mutableStateOf<String?>(null) }
+    chosen?.let { uri ->
+        PhotoSheet(
+            uri = uri,
+            isCover = uri == group.cover,
+            feeds = feedsHome || feedsLock,
+            onShowNow = { onShowNow(uri); chosen = null },
+            onMakeCover = { onSetCover(uri); saved(); chosen = null },
+            onDismiss = { chosen = null },
+        )
+    }
 
     Page {
         ActionBar("Done" to onBack, "Delete group" to onDelete)
@@ -119,6 +144,14 @@ fun GroupScreen(
             Spacer(Modifier.height(Space.md))
             SwitchRow("Screen saver", checked = settings.dreamGroupId == group.id, onChange = { onSetDream(it); saved() })
             Caption(if (settings.dreamGroupId == group.id) "Plays while the phone charges, once Feels Engine photos is chosen under Screen saver in Settings." else "Off: the home screen's group plays instead.")
+            if (hasCoverScreen) {
+                Spacer(Modifier.height(Space.md))
+                SwitchRow("Cover screen", checked = settings.coverGroupId == group.id, onChange = { onSetCoverScreen(it); saved() })
+                Caption(
+                    if (settings.coverGroupId == group.id) "The cover screen shows this group; the inner screen shows its own."
+                    else "Off: the cover screen shows the same photo as the inner screen.",
+                )
+            }
         }
 
         val shown = group.allPhotos
@@ -134,13 +167,13 @@ fun GroupScreen(
             } else {
                 val found = group.matched.toSet()
                 val cover = group.cover
-                Caption("Tap a photo to make it the cover on the home screen.")
+                Caption("Tap a photo to show it now or make it the cover.")
                 Spacer(Modifier.height(Space.sm))
                 PhotoGrid(
                     uris = shown,
                     badge = { uri -> when { uri == cover -> "Cover"; uri in found -> "Found"; else -> null } },
                     onRemove = { uri -> if (uri in found) onExcludePhoto(uri) else onRemovePhoto(uri) },
-                    onClick = { uri -> onSetCover(uri); saved() },
+                    onClick = { uri -> chosen = uri },
                 )
                 if (shown.size > PhotoGridLimit) Caption("And ${"%,d".format(shown.size - PhotoGridLimit)} more. The rotation uses all of them.")
             }
@@ -220,5 +253,44 @@ fun GroupScreen(
             }
         }
 
+    }
+}
+
+/** What one photo can do: go up on the screens now, or stand for the group on the home rail. */
+@Composable
+private fun PhotoSheet(uri: String, isCover: Boolean, feeds: Boolean, onShowNow: () -> Unit, onMakeCover: () -> Unit, onDismiss: () -> Unit) {
+    Sheet(onDismiss = onDismiss) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(Size.sheetPreview)
+                    .clip(RoundedCornerShape(Radius.card))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            ) { PhotoImage(uri, Modifier.fillMaxSize(), contentDescription = "Photo") }
+            Spacer(Modifier.height(Space.lg))
+            SheetAction(
+                if (feeds) "Show now" else "Show now on both screens",
+                if (feeds) "Goes up on the screens this group feeds. The rotation carries on from here." else "Makes this group active and puts this photo up.",
+                onShowNow,
+            )
+            SheetAction(
+                if (isCover) "This is the cover" else "Make the cover",
+                "The photo that stands for the group on the home rail, and the first one up when the group is set active.",
+                onMakeCover,
+                enabled = !isCover,
+            )
+    }
+}
+
+@Composable
+private fun SheetAction(title: String, caption: String, onClick: () -> Unit, enabled: Boolean = true) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(vertical = Space.md),
+    ) {
+        Text(title, style = MaterialTheme.typography.titleMedium, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+        Caption(caption)
     }
 }

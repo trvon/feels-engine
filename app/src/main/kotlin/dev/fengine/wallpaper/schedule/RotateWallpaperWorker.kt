@@ -6,6 +6,7 @@ import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dev.fengine.wallpaper.FengineApp
+import dev.fengine.wallpaper.wallpaper.SamsungDisplays
 import dev.fengine.wallpaper.wallpaper.WallpaperApplier
 import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 import java.text.DateFormat
@@ -22,14 +23,23 @@ class RotateWallpaperWorker(appContext: Context, params: WorkerParameters) :
         val store = (applicationContext as FengineApp).settings
         val settings = store.read()
         val stamp = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date())
+        // "Show this one now" pins an index per group; "Still" forces static writes over a live engine
+        // (setBitmap replaces it, which is how the look switches back without the system chooser).
+        val pinned = inputData.keyValueMap
+            .filterKeys { it.startsWith(KEY_PIN_PREFIX) }
+            .map { (k, v) -> k.removePrefix(KEY_PIN_PREFIX) to (v as Int) }.toMap()
+        val forceStatic = inputData.getBoolean(KEY_FORCE_STATIC, false)
         // Screens the live engine draws itself only need the cursor to move; it watches the settings.
         val plan = RotationPlan.advance(
             settings.homeGroupId, settings.lockGroupId,
             photos = { id -> settings.group(id)?.allPhotos.orEmpty() },
             cursor = { id -> settings.group(id)?.cursor ?: -1 },
             shuffle = settings.shuffle,
-            liveHome = LiveWallpaper.activeOnHome(applicationContext),
-            liveLock = LiveWallpaper.activeOnLock(applicationContext),
+            liveHome = !forceStatic && LiveWallpaper.activeOnHome(applicationContext),
+            liveLock = !forceStatic && LiveWallpaper.activeOnLock(applicationContext),
+            pinned = pinned,
+            coverGroupId = settings.coverGroupId,
+            coverStatic = SamsungDisplays.hasDisplayBits(),
         )
         if (plan.cursors.isEmpty()) {
             store.update { it.copy(lastResult = "Nothing to show yet") }
@@ -44,9 +54,9 @@ class RotateWallpaperWorker(appContext: Context, params: WorkerParameters) :
         }
         for (write in plan.writes) {
             val group = settings.group(write.groupId) ?: continue
-            when (val outcome = applier.apply(write.uri.toUri(), write.which)) {
+            when (val outcome = applier.apply(write.uri.toUri(), write.which, write.panels)) {
                 is WallpaperApplier.Result.Applied ->
-                    Log.i(TAG, "${group.name}: photo ${write.index + 1} -> which=${write.which}, ids ${outcome.wallpaperIds}")
+                    Log.i(TAG, "${group.name}: photo ${write.index + 1} -> which=${write.which} panels=${write.panels}, ids ${outcome.wallpaperIds}")
                 is WallpaperApplier.Result.Failed -> {
                     Log.w(TAG, "${group.name}: ${outcome.reason}")
                     failures += "${group.name}: ${outcome.reason}"
@@ -69,5 +79,9 @@ class RotateWallpaperWorker(appContext: Context, params: WorkerParameters) :
         const val TAG = "RotateWallpaperWorker"
         const val PERIODIC_NAME = "rotate-wallpaper-periodic"
         const val ONE_SHOT_NAME = "rotate-wallpaper-once"
+        /** Input key prefix: "$KEY_PIN_PREFIX<groupId>" -> index to show instead of advancing. */
+        const val KEY_PIN_PREFIX = "pin:"
+        /** Input key: write static photos even where the live engine is active. */
+        const val KEY_FORCE_STATIC = "force_static"
     }
 }

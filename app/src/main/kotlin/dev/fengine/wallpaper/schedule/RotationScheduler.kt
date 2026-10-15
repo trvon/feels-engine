@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.work.Constraints
+import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -88,12 +89,17 @@ class RotationScheduler(private val context: Context) {
         )
     }
 
-    /** Runs one rotation immediately through WorkManager so the worker path is exercised. */
-    fun rotateNow() {
+    /**
+     * Runs one rotation immediately through WorkManager so the worker path is exercised. [pinned]
+     * shows those indexes instead of advancing; [forceStatic] writes still photos over a live engine.
+     */
+    fun rotateNow(pinned: Map<String, Int> = emptyMap(), forceStatic: Boolean = false) {
+        val data = Data.Builder().putBoolean(RotateWallpaperWorker.KEY_FORCE_STATIC, forceStatic)
+        for ((id, index) in pinned) data.putInt(RotateWallpaperWorker.KEY_PIN_PREFIX + id, index)
         WorkManager.getInstance(context).enqueueUniqueWork(
             RotateWallpaperWorker.ONE_SHOT_NAME,
             ExistingWorkPolicy.REPLACE,
-            OneTimeWorkRequestBuilder<RotateWallpaperWorker>().build(),
+            OneTimeWorkRequestBuilder<RotateWallpaperWorker>().setInputData(data.build()).build(),
         )
     }
 

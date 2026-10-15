@@ -22,6 +22,7 @@ object SettingsCodec {
         val enabled = booleanPreferencesKey("enabled")
         val lastResult = stringPreferencesKey("last_result")
         val dreamGroupId = stringPreferencesKey("dream_group_id")
+        val coverGroupId = stringPreferencesKey("cover_group_id")
 
         /** Pre-groups schema (v0.1): a flat photo list. Migrated into a group on first read. */
         val legacyPhotos = stringPreferencesKey("photos")
@@ -38,6 +39,7 @@ object SettingsCodec {
         prefs[Keys.enabled] = next.enabled
         prefs[Keys.lastResult] = next.lastResult
         next.dreamGroupId?.let { prefs[Keys.dreamGroupId] = it } ?: prefs.remove(Keys.dreamGroupId)
+        next.coverGroupId?.let { prefs[Keys.coverGroupId] = it } ?: prefs.remove(Keys.coverGroupId)
         prefs.remove(Keys.legacyPhotos)
     }
 
@@ -67,6 +69,7 @@ object SettingsCodec {
             enabled = prefs[Keys.enabled] ?: defaults.enabled,
             lastResult = prefs[Keys.lastResult] ?: defaults.lastResult,
             dreamGroupId = prefs[Keys.dreamGroupId]?.takeIf { id -> groups.any { it.id == id } },
+            coverGroupId = prefs[Keys.coverGroupId]?.takeIf { id -> groups.any { it.id == id } },
         )
     }
 }

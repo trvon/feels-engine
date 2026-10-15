@@ -26,9 +26,9 @@ Minimum Android 9 (API 28). Gemini Nano judging needs a phone on Google's Prompt
 ## Use
 
 1. Open the app. Tap New group, then Pick photos or Describe it.
-2. Choose which screen the group shows on: home, lock, both, or the screen saver switch.
-3. Set the rhythm: every so often (15 minutes to a day) or at set times.
-4. Turn rotation on. Change now applies the next photo immediately.
+2. Tap Set active to put a group on both screens, or open a group and choose home, lock, both, or the screen saver switch. On a foldable, a group can take the cover screen on its own.
+3. Set the rhythm: every so often (15 minutes to a day) or at set times. Pick Still or Motion under Look.
+4. Turn rotation on. Next photo advances right away; tap a photo in a group for Show now.
 
 A described group looks through the photos on the phone and the ones you add from the picker. Matches get a Found badge; tap X to keep one out for good. The screen saver plays under Settings > Display > Screen saver once Feels Engine is chosen there.
 
