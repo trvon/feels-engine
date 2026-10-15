@@ -15,6 +15,9 @@ import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Ledger
 import dev.fengine.wallpaper.data.LedgerStore
 import dev.fengine.wallpaper.data.Mode
+import dev.fengine.wallpaper.data.PhotoId
+import dev.fengine.wallpaper.wallpaper.ClockLegibility
+import dev.fengine.wallpaper.wallpaper.WallpaperCrop
 import dev.fengine.wallpaper.data.Platform
 import dev.fengine.wallpaper.data.Screen
 import dev.fengine.wallpaper.data.Screens
@@ -175,6 +178,31 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (!stillUsed) releaseGrant(uri)
     }
 
+    /** Keep a photo in the group but out of rotation, or bring it back. */
+    fun setSkipped(groupId: String, uri: String, skip: Boolean) = updateGroup(groupId) { g ->
+        val rest = g.skipped.filterNot { PhotoId.identity(it) == PhotoId.identity(uri) }
+        g.copy(skipped = if (skip) rest + uri else rest, cursor = -1)
+    }
+
+    /** Whether the lock-screen clock will read well over this photo (null when it cannot be read). */
+    suspend fun clockCheck(uri: String): ClockLegibility.Verdict? = withContext(Dispatchers.IO) {
+        runCatching {
+            val app = getApplication<Application>()
+            val target = Displays(app).largest
+            val bmp = android.graphics.ImageDecoder.decodeBitmap(android.graphics.ImageDecoder.createSource(app.contentResolver, uri.toUri())) { d, info, _ ->
+                val scale = 360f / maxOf(info.size.width, info.size.height)
+                if (scale < 1f) d.setTargetSize((info.size.width * scale).toInt().coerceAtLeast(1), (info.size.height * scale).toInt().coerceAtLeast(1))
+                d.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+            }
+            val crop = WallpaperCrop.fit(bmp.width, bmp.height, target.width, target.height)
+            val zone = ClockLegibility.zone(crop.left, crop.top, crop.right, crop.bottom)
+            val lum = ArrayList<Double>()
+            for (y in zone.top until zone.bottom step 2) for (x in zone.left until zone.right step 2) lum += ClockLegibility.relativeLuminance(bmp.getPixel(x, y))
+            bmp.recycle()
+            ClockLegibility.judge(lum.toDoubleArray())
+        }.getOrNull()
+    }
+
     /** The photo that represents the group on the home rail. */
     fun setCover(groupId: String, uri: String) = updateGroup(groupId) { it.copy(coverUri = uri) }
 
@@ -292,7 +320,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun setActive(groupId: String, photo: String? = null) {
         val group = settings.value.group(groupId) ?: return
-        val pool = group.allPhotos
+        val pool = group.rotation
         val index = photo?.let { pool.indexOf(it) }?.takeIf { it >= 0 }
             ?: pool.indexOf(group.cover).takeIf { it >= 0 }
             ?: group.cursor.coerceIn(0, (pool.size - 1).coerceAtLeast(0))
@@ -306,7 +334,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Show this photo on the screens its group feeds, now, and continue the rotation from it. */
     fun showNow(groupId: String, uri: String) {
         val group = settings.value.group(groupId) ?: return
-        val index = group.allPhotos.indexOf(uri).takeIf { it >= 0 } ?: return
+        val index = group.rotation.indexOf(uri).takeIf { it >= 0 } ?: return
         scheduler.rotateNow(pinned = mapOf(groupId to index), source = Ledger.Source.SHOW_NOW)
     }
 
@@ -317,8 +345,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setStill() {
         val s = settings.value
         val pins = listOfNotNull(s.homeGroup, s.lockGroup).distinct()
-            .filter { it.allPhotos.isNotEmpty() }
-            .associate { it.id to it.cursor.coerceIn(0, it.allPhotos.size - 1) }
+            .filter { it.rotation.isNotEmpty() }
+            .associate { it.id to it.cursor.coerceIn(0, it.rotation.size - 1) }
         scheduler.rotateNow(pinned = pins, forceStatic = true, source = Ledger.Source.STILL)
     }
 

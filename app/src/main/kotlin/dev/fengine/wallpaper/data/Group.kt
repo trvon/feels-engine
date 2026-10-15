@@ -35,6 +35,8 @@ data class Group(
     val scanNote: String = "",
     /** The photo shown on the home rail; falls back to the first photo. */
     val coverUri: String? = null,
+    /** Photos kept in the group but left out of rotation (a busy area behind the clock, say). */
+    val skipped: List<String> = emptyList(),
 ) {
     /** Everything the rotation may show: picked first, then found, one entry per photo (see [PhotoId]). */
     val allPhotos: List<String>
@@ -42,6 +44,21 @@ data class Group(
             val out = excluded.map(PhotoId::identity).toHashSet()
             return PhotoId.distinct((photos + matched).filterNot { PhotoId.identity(it) in out })
         }
+    /**
+     * What the wallpaper, the live engine and the screen saver cycle through: every photo except
+     * the skipped ones. If every photo is skipped the group still shows them all, so a screen
+     * given to it never goes empty. The cursor indexes this list.
+     */
+    val rotation: List<String>
+        get() {
+            val all = allPhotos
+            if (skipped.isEmpty()) return all
+            val out = skipped.map(PhotoId::identity).toHashSet()
+            return all.filterNot { PhotoId.identity(it) in out }.ifEmpty { all }
+        }
+
+    fun isSkipped(uri: String): Boolean = skipped.any { PhotoId.identity(it) == PhotoId.identity(uri) }
+
     val cover: String?
         get() {
             val all = allPhotos
@@ -62,6 +79,7 @@ data class Group(
         .put("pool", JSONArray(pool))
         .put("coverUri", coverUri ?: JSONObject.NULL)
         .put("scanNote", scanNote)
+        .put("skipped", JSONArray(skipped))
 
     companion object {
         private fun JSONObject.strings(key: String): List<String> =
@@ -78,6 +96,7 @@ data class Group(
             pool = o.strings("pool"),
             coverUri = if (o.isNull("coverUri")) null else o.optString("coverUri"),
             scanNote = o.optString("scanNote", ""),
+            skipped = o.strings("skipped"),
         )
 
         fun encode(groups: List<Group>): String = JSONArray(groups.map(Group::toJson)).toString()

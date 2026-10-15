@@ -41,6 +41,7 @@ import kotlinx.coroutines.delay
 import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.smart.AiReadiness
+import dev.fengine.wallpaper.wallpaper.ClockLegibility
 import dev.fengine.wallpaper.ui.design.ActionBar
 import dev.fengine.wallpaper.ui.design.BodyMuted
 import dev.fengine.wallpaper.ui.design.Caption
@@ -89,6 +90,8 @@ fun GroupScreen(
     onSetCover: (String) -> Unit = {},
     onSetDream: (Boolean) -> Unit = {},
     onShowNow: (String) -> Unit = {},
+    onSetSkipped: (String, Boolean) -> Unit = { _, _ -> },
+    clockCheck: suspend (String) -> ClockLegibility.Verdict? = { null },
     hasCoverScreen: Boolean = false,
     onSetCoverScreen: (Boolean) -> Unit = {},
 ) {
@@ -126,12 +129,22 @@ fun GroupScreen(
         )
     }
     chosen?.let { uri ->
+        var verdict by remember(uri) { mutableStateOf<ClockLegibility.Verdict?>(null) }
+        var checked by remember(uri) { mutableStateOf(false) }
+        LaunchedEffect(uri) { verdict = clockCheck(uri); checked = true }
         PhotoSheet(
             uri = uri,
             isCover = uri == group.cover,
             feeds = feedsHome || feedsLock,
+            skipped = group.isSkipped(uri),
+            clock = if (!checked) "Checking the area behind the clock..." else when (verdict?.legible) {
+                true -> "The clock reads well on this photo."
+                false -> "The area behind the clock is busy, so the time may be hard to read. You can keep the photo and leave it out of rotation."
+                null -> null
+            },
             onShowNow = { onShowNow(uri); chosen = null },
             onMakeCover = { onSetCover(uri); saved(); chosen = null },
+            onSetSkipped = { onSetSkipped(uri, it); saved() },
             onDismiss = { chosen = null },
         )
     }
@@ -193,7 +206,7 @@ fun GroupScreen(
                 Spacer(Modifier.height(Space.sm))
                 PhotoGrid(
                     uris = shown,
-                    badge = { uri -> when { uri == cover -> "Cover"; uri in found -> "Found"; else -> null } },
+                    badge = { uri -> when { group.isSkipped(uri) -> "Skipped"; uri == cover -> "Cover"; uri in found -> "Found"; else -> null } },
                     onRemove = { uri -> if (uri in found) onExcludePhoto(uri) else onRemovePhoto(uri) },
                     onClick = { uri -> chosen = uri },
                 )
@@ -270,7 +283,10 @@ fun GroupScreen(
 
 /** What one photo can do: go up on the screens now, or stand for the group on the home rail. */
 @Composable
-private fun PhotoSheet(uri: String, isCover: Boolean, feeds: Boolean, onShowNow: () -> Unit, onMakeCover: () -> Unit, onDismiss: () -> Unit) {
+private fun PhotoSheet(
+    uri: String, isCover: Boolean, feeds: Boolean, skipped: Boolean, clock: String?,
+    onShowNow: () -> Unit, onMakeCover: () -> Unit, onSetSkipped: (Boolean) -> Unit, onDismiss: () -> Unit,
+) {
     Sheet(onDismiss = onDismiss) {
             Box(
                 modifier = Modifier
@@ -279,8 +295,10 @@ private fun PhotoSheet(uri: String, isCover: Boolean, feeds: Boolean, onShowNow:
                     .clip(RoundedCornerShape(Radius.card))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             ) { PhotoImage(uri, Modifier.fillMaxSize(), contentDescription = "Photo") }
-            Spacer(Modifier.height(Space.lg))
-            SheetAction(
+            clock?.let { Spacer(Modifier.height(Space.sm)); Caption(it) }
+            Spacer(Modifier.height(Space.md))
+            SwitchRow("Use in rotation", checked = !skipped, onChange = { onSetSkipped(!it) })
+            if (!skipped) SheetAction(
                 if (feeds) "Show now" else "Show now on both screens",
                 if (feeds) "Goes up on the screens this group feeds. The rotation carries on from here." else "Makes this group active and puts this photo up.",
                 onShowNow,

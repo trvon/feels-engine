@@ -90,6 +90,8 @@ private fun FengineApp(vm: MainViewModel) {
                 if (settings.homeGroupId != openGroup.id && settings.lockGroupId != openGroup.id) vm.setActive(openGroup.id, uri)
                 else vm.showNow(openGroup.id, uri)
             },
+            onSetSkipped = { uri, skip -> vm.setSkipped(openGroup.id, uri, skip) },
+            clockCheck = vm::clockCheck,
             hasCoverScreen = vm.hasCoverScreen(),
             onSetCoverScreen = { vm.setCoverGroup(openGroup.id, it) },
             scanning = scanning,

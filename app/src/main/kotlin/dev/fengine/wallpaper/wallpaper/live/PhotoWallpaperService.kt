@@ -92,7 +92,7 @@ class PhotoWallpaperService : WallpaperService() {
             val lock = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
                 wallpaperFlags and WallpaperManager.FLAG_LOCK != 0 && wallpaperFlags and WallpaperManager.FLAG_SYSTEM == 0
             val group = (if (lock) settings.lockGroup else settings.homeGroup) ?: settings.homeGroup ?: settings.groups.firstOrNull()
-            val photos = group?.allPhotos.orEmpty()
+            val photos = group?.rotation.orEmpty()
             if (photos.isEmpty()) return null
             return photos[group!!.cursor.coerceIn(0, photos.size - 1)]
         }

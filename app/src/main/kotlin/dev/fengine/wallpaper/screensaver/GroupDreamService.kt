@@ -79,7 +79,7 @@ class GroupDreamService : DreamService() {
     private suspend fun play() {
         val settings = (application as FengineApp).settings.read()
         val group = Screens.effective(settings, Screen.SCREEN_SAVER)
-        val photos = group?.allPhotos.orEmpty()
+        val photos = group?.rotation.orEmpty()
         val carMode = (getSystemService(UI_MODE_SERVICE) as UiModeManager).currentModeType == Configuration.UI_MODE_TYPE_CAR
         val plugged = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
         val verdict = DreamGate.decide(carMode, plugged, settings.dreamWirelessOnly, photos.isNotEmpty())

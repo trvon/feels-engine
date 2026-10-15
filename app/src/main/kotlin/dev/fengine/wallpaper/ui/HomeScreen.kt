@@ -287,16 +287,8 @@ private fun TimesEditor(current: List<Int>, onChange: (List<Int>) -> Unit) {
 }
 
 @Composable
-fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label, style = MaterialTheme.typography.titleMedium)
-        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
-    }
-}
+fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) =
+    dev.fengine.wallpaper.ui.design.SwitchRow(label, checked, onChange, enabled)
 
 private fun screenLabel(screen: Screen) = when (screen) {
     Screen.HOME -> "Home screen"

@@ -49,6 +49,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalFocusManager
@@ -157,13 +159,17 @@ fun TextAction(label: String, onClick: () -> Unit) {
 /** A labelled switch on one line: title on the left, the control on the right. */
 @Composable
 fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
+    // The whole row is the tap target (label included), announced as one switch.
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+            .padding(vertical = Space.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, style = MaterialTheme.typography.titleMedium)
-        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 

@@ -37,7 +37,7 @@ class RotateWallpaperWorker(appContext: Context, params: WorkerParameters) :
         // Screens the live engine draws itself only need the cursor to move; it watches the settings.
         val plan = RotationPlan.advance(
             settings.homeGroupId, settings.lockGroupId,
-            photos = { id -> settings.group(id)?.allPhotos.orEmpty() },
+            photos = { id -> settings.group(id)?.rotation.orEmpty() },
             cursor = { id -> settings.group(id)?.cursor ?: -1 },
             shuffle = settings.shuffle,
             liveHome = live.innerHome, liveLock = live.innerLock,
