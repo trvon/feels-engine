@@ -37,7 +37,7 @@ data class Settings(
     val canRotate: Boolean
         get() = listOfNotNull(homeGroup, lockGroup).any { it.allPhotos.isNotEmpty() }
 
-    val hasDescribedGroups: Boolean get() = groups.any { it.isDescribed }
+    val hasDescribedGroups: Boolean get() = groups.any { it.hasDescription }
 
     companion object {
         const val MIN_INTERVAL_MINUTES = 15

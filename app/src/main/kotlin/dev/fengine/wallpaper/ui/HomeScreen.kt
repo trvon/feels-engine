@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -58,7 +57,7 @@ import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 fun HomeScreen(
     settings: Settings,
     onOpenGroup: (String) -> Unit,
-    onNewGroup: (described: Boolean) -> Unit,
+    onNewGroup: () -> Unit,
     onSetMode: (Mode) -> Unit,
     onSetInterval: (Int) -> Unit,
     onSetTimes: (List<Int>) -> Unit,
@@ -72,7 +71,6 @@ fun HomeScreen(
     onTurnOnMotion: () -> Unit = {},
     onSetStill: () -> Unit = {},
 ) {
-    var chooser by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf(false) }
     if (picking) {
         GroupPickerSheet(
@@ -80,15 +78,6 @@ fun HomeScreen(
             activeId = settings.homeGroupId.takeIf { it == settings.lockGroupId },
             onPick = { picking = false; onSetActive(it) },
             onDismiss = { picking = false },
-        )
-    }
-    if (chooser) {
-        AlertDialog(
-            onDismissRequest = { chooser = false },
-            title = { Text("New group") },
-            text = { Text("Pick photos yourself, or describe what you want and let the phone find them.") },
-            confirmButton = { TextAction("Describe it") { chooser = false; onNewGroup(true) } },
-            dismissButton = { TextAction("Pick photos") { chooser = false; onNewGroup(false) } },
         )
     }
     Page {
@@ -109,7 +98,7 @@ fun HomeScreen(
                         onClick = { onOpenGroup(g.id) },
                     )
                 }
-                item { NewCoverCard("New group") { chooser = true } }
+                item { NewCoverCard("New group", onNewGroup) }
             }
         }
 
@@ -221,10 +210,10 @@ private fun GroupPickerSheet(groups: List<Group>, activeId: String?, onPick: (St
 }
 
 private fun coverCaption(g: Group): String = when {
-    g.isDescribed && g.allPhotos.isEmpty() -> "Looks for: ${g.rule?.ifBlank { "..." }}"
-    g.isDescribed -> "${photos(g.allPhotos.size)}, updates itself"
-    g.photos.isEmpty() -> "No photos yet"
-    else -> photos(g.photos.size)
+    g.hasDescription && g.allPhotos.isEmpty() -> "Looks for: ${g.rule}"
+    g.hasDescription -> "${photos(g.allPhotos.size)}, finds more"
+    g.allPhotos.isEmpty() -> "No photos yet"
+    else -> photos(g.allPhotos.size)
 }
 
 private fun roleOf(s: Settings, g: Group): String? = when {

@@ -116,7 +116,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // Groups
 
-    /** Creates a group; a non-null [rule] makes it a described group. First group feeds both screens. */
+    /** Creates a group, optionally with a description. The first group feeds both screens. */
     fun createGroup(name: String, rule: String? = null): String {
         val group = Group(name = name.ifBlank { "Untitled" }, rule = rule)
         update { s ->
@@ -138,7 +138,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteGroup(id: String) {
-        val removed = settings.value.group(id)?.photos.orEmpty()
+        val removed = settings.value.group(id)?.let { it.photos + it.pool }.orEmpty()
         update { s ->
             s.copy(
                 groups = s.groups.filterNot { it.id == id },
@@ -146,7 +146,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 lockGroupId = s.lockGroupId.takeUnless { it == id },
             )
         }
-        val stillUsed = settings.value.groups.filterNot { it.id == id }.flatMap { it.photos }.toSet()
+        val stillUsed = settings.value.groups.filterNot { it.id == id }.flatMap { it.photos + it.pool }.toSet()
         removed.filterNot { it in stillUsed }.forEach(::releaseGrant)
     }
 
@@ -167,29 +167,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun removePhoto(groupId: String, uri: String) {
         updateGroup(groupId) { it.copy(photos = it.photos - uri, cursor = -1) }
-        val stillUsed = settings.value.groups.any { g -> g.id != groupId && uri in g.photos }
+        val stillUsed = settings.value.groups.any { g -> g.id != groupId && (uri in g.photos || uri in g.pool) }
         if (!stillUsed) releaseGrant(uri)
-    }
-
-    /** Photos a described group should look through (cloud photos via the picker). Grants are persisted. */
-    fun addToPool(groupId: String, uris: List<Uri>) {
-        if (uris.isEmpty()) return
-        val resolver = getApplication<Application>().contentResolver
-        val kept = uris.filter { uri ->
-            runCatching { resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }.isSuccess
-        }.map(Uri::toString)
-        updateGroup(groupId) { it.copy(pool = (it.pool + kept).distinct()) }
-        scheduler.scanNow()
     }
 
     /** The photo that represents the group on the home rail. */
     fun setCover(groupId: String, uri: String) = updateGroup(groupId) { it.copy(coverUri = uri) }
-
-    fun removeFromPool(groupId: String, uri: String) {
-        updateGroup(groupId) { it.copy(pool = it.pool - uri, matched = it.matched - uri, cursor = -1) }
-        val stillUsed = settings.value.groups.any { g -> g.id != groupId && (uri in g.photos || uri in g.pool) }
-        if (!stillUsed) releaseGrant(uri)
-    }
 
     companion object {
         /** UriGrantsManagerService.MAX_PERSISTED_URI_GRANTS on Android 11+. */

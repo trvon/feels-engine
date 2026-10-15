@@ -78,10 +78,7 @@ fun GroupScreen(
     onFindPhotos: () -> Unit = {},
     /** True once the app may read the library; false means [onFindPhotos] will ask the system first. */
     hasLibraryAccess: Boolean = true,
-    onAddToPool: () -> Unit = {},
-    onRemoveFromPool: (String) -> Unit = {},
     onExcludePhoto: (String) -> Unit = {},
-    pickerMax: Int = 100,
     scanning: Boolean = false,
     indexing: Boolean = false,
     indexProgress: Pair<Int, Int>? = null,
@@ -125,7 +122,7 @@ fun GroupScreen(
                 )
             },
             confirmButton = { TextAction("Allow") { askLibrary = false; onFindPhotos() } },
-            dismissButton = { TextAction("Add photos instead") { askLibrary = false; onAddToPool() } },
+            dismissButton = { TextAction("Add photos instead") { askLibrary = false; onAddPhotos() } },
         )
     }
     chosen?.let { uri ->
@@ -187,8 +184,7 @@ fun GroupScreen(
         ) {
             if (shown.isEmpty()) {
                 BodyMuted(
-                    if (group.isDescribed) "Found photos will appear here. You can also add specific photos by hand."
-                    else "Pick a few photos you would be happy to see all day. Portraits with the subject low in the frame leave room for the clock.",
+                    "Add photos you would be happy to see all day, or describe below what the phone should find. Portraits with the subject low in the frame leave room for the clock.",
                 )
             } else {
                 val found = group.matched.toSet()
@@ -210,13 +206,13 @@ fun GroupScreen(
             StatusCard(
                 title = "Close to Android's limit for picked photos",
                 body = "Android lets an app keep access to ${MainViewModel.GRANT_CEILING} picked photos at most, and quietly drops the oldest after that. " +
-                    "This app holds ${"%,d".format(persistedGrants)}. For a large collection, keep the photos on this phone instead: a described group looks through all of them.",
+                    "This app holds ${"%,d".format(persistedGrants)}. For a large collection, keep the photos on this phone and describe them instead: the description looks through all of them.",
                 tone = MaterialTheme.colorScheme.errorContainer,
             )
         }
 
-        if (group.isDescribed) {
-            Section("Looks for") {
+        run {
+            Section("Also find") {
                 var rule by remember(group.id) { mutableStateOf(group.rule.orEmpty()) }
                 val commitRule = { if (rule.trim() != group.rule) { onSetRule(rule.trim()); saved() } }
                 OutlinedTextField(
@@ -238,8 +234,8 @@ fun GroupScreen(
                     if (scanning) CircularProgressIndicator(modifier = Modifier.size(Size.progress), strokeWidth = Size.progressStroke)
                 }
                 Spacer(Modifier.height(Space.sm))
-                Caption(aiStatus ?: group.scanNote.ifBlank { null } ?: "Runs on this phone only. Nothing leaves the device.")
-                indexProgress?.let { (done, total) ->
+                Caption(aiStatus ?: group.scanNote.ifBlank { null } ?: "Describe what to look for and the phone adds matching photos to this group, now and as new ones arrive. Runs on this phone only.")
+                if (group.hasDescription) indexProgress?.let { (done, total) ->
                     if (total > 0) Caption(
                         when {
                             done < total -> "Labeled ${"%,d".format(done)} of ${"%,d".format(total)} photos on this phone" + (if (indexing) ", still going." else ".")
@@ -247,17 +243,7 @@ fun GroupScreen(
                         },
                     )
                 }
-                Spacer(Modifier.height(Space.lg))
-                // Where it looks: one caption, not a card. The scan note explains the cloud when the
-                // library turns out small; this line states the scope and offers the picker. Added photos
-                // stay visible as a small grid so a pick never seems to vanish into a count.
-                Caption(
-                    if (group.pool.isEmpty()) "Looks through the photos on this phone. If the picker shows only this phone's photos, sign in to Google Photos and turn on cloud media in the picker's settings."
-                    else "Looks through the photos on this phone and these ${group.pool.size} you added. Matches show above with a Found badge.",
-                )
-                TextAction(if (group.pool.isEmpty()) "Add from Google Photos" else "Add more (up to $pickerMax at a time)", onAddToPool)
-                if (group.pool.isNotEmpty()) PhotoGrid(group.pool, onRemove = onRemoveFromPool)
-                aiReadiness?.let {
+                if (group.hasDescription) aiReadiness?.let {
                     Spacer(Modifier.height(Space.lg))
                     StatusCard(
                         title = it.headline,

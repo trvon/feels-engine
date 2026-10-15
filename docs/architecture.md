@@ -58,7 +58,15 @@ size on a fold or rotation. Bitmaps are decoded once per surface size at the
 largest size any frame needs (`LiveFrame.decodeTarget`) as hardware bitmaps
 drawn through a hardware canvas; at most two are alive, during a fade.
 
-## Described groups
+## Descriptions
+
+Every group is one kind: `Group.photos` (added with the picker) and
+`Group.matched` (found by the description in `Group.rule`) show together in
+`allPhotos`. A group has a description when `rule` has text
+(`Group.hasDescription`); only those are scanned. `Group.pool` is search
+scope kept from 0.2.1 and earlier, when a described group took picker photos
+to look through; it never shows unless matched
+(`invariants/UnifiedGroupProperties`).
 
 1. `IndexLibraryWorker` labels the library newest first in slices and
    re-enqueues itself until every photo has a row.

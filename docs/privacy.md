@@ -10,7 +10,7 @@ published at https://trvon.github.io/feels-engine/privacy.html.
 |---|---|---|
 | `SET_WALLPAPER` | install | write the wallpaper |
 | `RECEIVE_BOOT_COMPLETED` | install | re-arm time-of-day alarms after a reboot |
-| `READ_MEDIA_IMAGES`, `READ_MEDIA_VISUAL_USER_SELECTED` (Android 13+) | the first time a described group looks for photos | read the library so the description can be matched |
+| `READ_MEDIA_IMAGES`, `READ_MEDIA_VISUAL_USER_SELECTED` (Android 13+) | the first time a group's description looks for photos (Find photos) | read the library so the description can be matched |
 | `READ_EXTERNAL_STORAGE` (Android 9 to 12) | same | same |
 
 Picked photos need no permission. The system photo picker grants read access

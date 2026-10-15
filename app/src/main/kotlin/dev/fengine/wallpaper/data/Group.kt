@@ -7,9 +7,10 @@ import java.util.UUID
 /**
  * A named set of photos that can drive one or both screens.
  *
- * Two sources feed a group: [photos] the user picked, and [matched] photos a described [rule]
- * found in the library ("my dog at the beach"). [excluded] holds photos the user removed from the
- * matched set so a rescan does not bring them back.
+ * There is one kind of group. Two sources feed it, and either may be empty: [photos] the user
+ * picked, and [matched] photos its optional description ([rule]) found on the phone ("my dog at
+ * the beach"). Both show in the same grid. [excluded] holds found photos the user removed so a
+ * rescan does not bring them back.
  */
 data class Group(
     val id: String = UUID.randomUUID().toString(),
@@ -18,16 +19,16 @@ data class Group(
     val photos: List<String> = emptyList(),
     /** Index of the photo shown last from this group; -1 before the first rotation. */
     val cursor: Int = -1,
-    /** Natural-language description, or null for a picked-only group. */
+    /** What to look for on the phone; null or blank means the group only shows picked photos. */
     val rule: String? = null,
     /** MediaStore image URIs the rule matched, newest first. */
     val matched: List<String> = emptyList(),
     /** Matched URIs the user removed. */
     val excluded: List<String> = emptyList(),
     /**
-     * Photos the user handed the rule to look through (picker URIs, persisted grants). The phone's own
-     * library is often nearly empty when Google Photos keeps everything in the cloud; this is how
-     * cloud photos reach a described group.
+     * Extra photos a description looks through besides the phone's library (picker URIs from
+     * before groups were unified, 0.2.1 and earlier). Kept so those groups match the same photos;
+     * new picks go to [photos] and show directly.
      */
     val pool: List<String> = emptyList(),
     /** Human-readable result of the last scan. */
@@ -47,7 +48,8 @@ data class Group(
             val wanted = coverUri?.let(PhotoId::identity)
             return all.firstOrNull { PhotoId.identity(it) == wanted } ?: all.firstOrNull()
         }
-    val isDescribed: Boolean get() = rule != null
+    /** True when the group also finds photos from its description. */
+    val hasDescription: Boolean get() = !rule.isNullOrBlank()
 
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)

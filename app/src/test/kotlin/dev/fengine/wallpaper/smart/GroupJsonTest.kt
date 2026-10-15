@@ -18,7 +18,7 @@ class GroupJsonTest {
     fun pickedOnlyGroupHasNoRule() {
         val back = Group.decode(Group.encode(listOf(Group(name = "Mine")))).single()
         assertEquals(null, back.rule)
-        assertEquals(false, back.isDescribed)
+        assertEquals(false, back.hasDescription)
     }
 }
 

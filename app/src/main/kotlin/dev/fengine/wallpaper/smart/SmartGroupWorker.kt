@@ -25,7 +25,7 @@ class SmartGroupWorker(appContext: Context, params: WorkerParameters) : Coroutin
         val app = applicationContext as FengineApp
         val store = app.settings
         val library = MediaLibrary(applicationContext)
-        val groups = store.read().groups.filter { it.isDescribed }
+        val groups = store.read().groups.filter { it.hasDescription }
         if (groups.isEmpty()) return Result.success()
         if (!library.hasAccess()) {
             note(groups.map { it.id }) { "Needs photo access to look through the library." }

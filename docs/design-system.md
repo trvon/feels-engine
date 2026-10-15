@@ -45,9 +45,10 @@ foldable) and `Displays` supplies the sizes, so the system never guesses.
   Covers: portrait 0.8, 20 dp radius, 150 dp wide in a horizontal rail. Badges
   are white on a scrim so they read on any photo. Remove is a 26 dp disc inside
   a 44 dp tap target in the top-right.
-- A group page shows its photos before its machinery: name, screens, photo
-  grid, then "Looks for", where it looks (one caption and a text action, not a
-  card) and the on-device AI card last.
+- There is one kind of group. Its page shows photos before machinery: name,
+  screens, one photo grid (added and found photos together, found ones
+  badged), then "Also find" with the optional description, and the on-device
+  AI card last, only once a description has text.
 - One photo, one tile: the picker and the library name the same file with
   different URIs; `PhotoId.identity` unifies them (`data/PhotoId.kt`).
 - One filled button per page ("Set active"). Secondary actions are tonal

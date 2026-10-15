@@ -43,11 +43,8 @@ private fun FengineApp(vm: MainViewModel) {
     var openGroupId by rememberSaveable { mutableStateOf<String?>(null) }
     val openGroup = settings.group(openGroupId)
 
-    val picker = rememberLauncherForActivityResult(PickMultipleVisualMedia(100)) { uris ->
+    val picker = rememberLauncherForActivityResult(PickMultipleVisualMedia(vm.pickerMax())) { uris ->
         openGroupId?.let { vm.addPhotos(it, uris) }
-    }
-    val poolPicker = rememberLauncherForActivityResult(PickMultipleVisualMedia(vm.pickerMax())) { uris ->
-        openGroupId?.let { vm.addToPool(it, uris) }
     }
     val context = LocalContext.current
     val scanning by vm.scanning.collectAsStateWithLifecycle()
@@ -56,7 +53,7 @@ private fun FengineApp(vm: MainViewModel) {
     val indexProgress by vm.indexProgress.collectAsStateWithLifecycle()
     val aiStatus by vm.aiStatus.collectAsStateWithLifecycle()
     val aiReadiness by vm.aiReadiness.collectAsStateWithLifecycle()
-    LaunchedEffect(openGroupId) { if (openGroup?.isDescribed == true) vm.refreshAi() }
+    LaunchedEffect(openGroupId, openGroup?.hasDescription) { if (openGroup?.hasDescription == true) vm.refreshAi() }
     // Library access is asked for only when a described group looks for photos.
     val mediaPermission = rememberLauncherForActivityResult(RequestMultiplePermissions()) { result ->
         if (result.values.any { it }) vm.findPhotos()
@@ -80,8 +77,6 @@ private fun FengineApp(vm: MainViewModel) {
             },
             hasLibraryAccess = vm.hasLibraryAccess(),
             onExcludePhoto = { vm.excludePhoto(openGroup.id, it) },
-            onAddToPool = { poolPicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
-            onRemoveFromPool = { vm.removeFromPool(openGroup.id, it) },
             onSetCover = { vm.setCover(openGroup.id, it) },
             onSetDream = { vm.setDreamGroup(openGroup.id, it) },
             onShowNow = { uri ->
@@ -90,7 +85,6 @@ private fun FengineApp(vm: MainViewModel) {
             },
             hasCoverScreen = vm.hasCoverScreen(),
             onSetCoverScreen = { vm.setCoverGroup(openGroup.id, it) },
-            pickerMax = vm.pickerMax(),
             scanning = scanning,
             indexing = indexing,
             persistedGrants = persistedGrants,
@@ -109,9 +103,7 @@ private fun FengineApp(vm: MainViewModel) {
         HomeScreen(
             settings = settings,
             onOpenGroup = { openGroupId = it },
-            onNewGroup = { described ->
-                openGroupId = vm.createGroup("Group ${settings.groups.size + 1}", rule = if (described) "" else null)
-            },
+            onNewGroup = { openGroupId = vm.createGroup("Group ${settings.groups.size + 1}") },
             onSetMode = vm::setMode,
             onSetInterval = vm::setIntervalMinutes,
             onSetTimes = vm::setTimesOfDay,
