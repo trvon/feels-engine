@@ -22,6 +22,9 @@ jobs:
       - id: rp
         uses: googleapis/release-please-action@v4
         with:
+          # A personal token (contents + pull requests write) makes the release PR the owner's,
+          # so its CI runs without "Approve and run". Without the secret, the bot opens it.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 

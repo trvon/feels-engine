@@ -154,6 +154,7 @@ class LiveEngineStateProperties {
             val d = apply(s, e, keep)
             if (d.draw) blendedOnScreen = s.fading
             if (e is Ev.Lost) blendedOnScreen = false  // the surface and its frame are gone
+            if (e is Ev.Surface && (e.w == 0 || e.h == 0)) blendedOnScreen = false  // nothing can be on a 0-size surface
         }
         if (blendedOnScreen && !s.fading) {
             assertTrue("blended frame left on screen and no frame owed", s.dirty)

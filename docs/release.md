@@ -29,6 +29,13 @@ git tag v0.3.0 && git push origin v0.3.0
 The repository setting "Allow GitHub Actions to create and approve pull
 requests" must stay on, or release-please cannot open its PR.
 
+A release PR opened by the github-actions bot waits for "Approve and run"
+before CI runs on it, because the repository requires approval for
+first-time contributors and the bot counts as one. To skip that, add a
+fine-grained personal token with Contents and Pull requests write access on
+this repository as the secret `RELEASE_PLEASE_TOKEN`; the workflow uses it
+when present.
+
 ## Signing
 
 The release build reads its signing from environment variables, or from
