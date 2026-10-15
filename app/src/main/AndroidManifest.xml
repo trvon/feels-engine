@@ -49,6 +49,29 @@
             </intent-filter>
         </receiver>
 
+        <!-- "Next photo" from outside the app: Quick Settings tile and a 1x1 widget. -->
+        <service
+            android:name=".shortcuts.NextPhotoTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_next_photo"
+            android:label="@string/next_photo"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <receiver
+            android:name=".shortcuts.NextPhotoWidget"
+            android:exported="true"
+            android:label="@string/next_photo">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_next_info" />
+        </receiver>
+
         <!-- Android "Screen saver" (Settings > Display) playing a group while the phone charges.
              BIND_DREAM_SERVICE is held by the system only; no runtime permission for the user. -->
         <service

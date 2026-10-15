@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">Feels Engine</string>
     <string name="dream_label">Feels Engine photos</string>
+    <string name="next_photo">Next photo</string>
+    <string name="next_photo_widget_description">Changes the wallpaper to the next photo</string>
     <string name="live_label">Feels Engine motion</string>
     <string name="live_description">Your photos with a cross-fade, parallax and depth. Groups and rhythm from the app.</string>
 </resources>
