@@ -40,13 +40,15 @@
   ],
   "packages": {
     ".": {
-      "package-name": "feels-engine",
       "extra-files": [
         {
           "type": "generic",
           "path": "app/build.gradle.kts"
         }
-      ]
+      ],
+      "component": ""
     }
-  }
+  },
+  "include-component-in-tag": false,
+  "last-release-sha": "124dab5bafaeb16ca014af560345f889a89ede5a"
 }
