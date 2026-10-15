@@ -210,11 +210,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setDreamGroup(groupId: String, on: Boolean) =
         update { it.copy(dreamGroupId = if (on) groupId else it.dreamGroupId.takeUnless { d -> d == groupId }) }
 
-    /** Which screens the live engine draws right now. */
-    fun motion(): Pair<Boolean, Boolean> {
-        val app = getApplication<Application>()
-        return runCatching { LiveWallpaper.activeOnHome(app) to LiveWallpaper.activeOnLock(app) }.getOrDefault(false to false)
-    }
+    /** Which screens the live engine draws right now, per panel. */
+    fun motion(): LiveWallpaper.State =
+        runCatching { LiveWallpaper.state(getApplication()) }.getOrDefault(LiveWallpaper.State(false, false, false, false))
 
     /** True when the user has chosen this app in Settings > Display > Screen saver. */
     fun dreamConfigured(): Boolean {

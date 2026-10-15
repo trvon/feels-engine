@@ -48,6 +48,7 @@ import dev.fengine.wallpaper.ui.design.Section
 import dev.fengine.wallpaper.ui.design.Sheet
 import dev.fengine.wallpaper.ui.design.Space
 import dev.fengine.wallpaper.ui.design.TextAction
+import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 
 /**
  * The one main screen. Reads top to bottom like a magazine page: a headline sentence that says
@@ -67,7 +68,7 @@ fun HomeScreen(
     onSetActive: (String) -> Unit = {},
     dreamConfigured: Boolean = false,
     onOpenDreamSettings: () -> Unit = {},
-    motion: Pair<Boolean, Boolean> = false to false,
+    motion: LiveWallpaper.State = LiveWallpaper.State(false, false, false, false),
     onTurnOnMotion: () -> Unit = {},
     onSetStill: () -> Unit = {},
 ) {
@@ -113,7 +114,12 @@ fun HomeScreen(
         }
 
         Section("Look") {
-            val (home, lock) = motion
+            // A foldable can have the engine on one panel only: One UI's chooser puts it on whichever
+            // panel is active when the user taps Set. Say which, so a folded choice is not a mystery.
+            val home = motion.innerHome || motion.coverHome
+            val lock = motion.innerLock || motion.coverLock
+            val coverOnly = motion.coverHome && !motion.innerHome
+            val innerOnly = motion.innerHome && !motion.coverHome
             ChipRow(
                 options = listOf(Look.STILL to "Still", Look.MOTION to "Motion"),
                 selected = if (home) Look.MOTION else Look.STILL,
@@ -122,8 +128,12 @@ fun HomeScreen(
             Spacer(Modifier.height(Space.sm))
             Caption(
                 when {
-                    home && lock -> "Photos cross-fade and drift with the home screen, and settle on the lock screen. Costs nothing while nothing moves."
-                    home -> "Photos cross-fade and drift with the home screen. The lock screen stays still on this phone."
+                    coverOnly -> "Motion is on the cover screen only. Open the phone and choose Motion again to put it on the inner screen too."
+                    home && lock -> "Photos cross-fade and drift with the home screen, and settle on the lock screen." +
+                        (if (innerOnly) " The cover screen stays still; choose Motion while closed to change that." else "") +
+                        " Costs nothing while nothing moves."
+                    home -> "Photos cross-fade and drift with the home screen. The lock screen keeps the still photo." +
+                        (if (innerOnly) " The cover screen stays still; choose Motion while closed to change that." else "")
                     else -> "Each photo is set once and stays put. Motion cross-fades between photos and moves them with the home screen."
                 },
             )

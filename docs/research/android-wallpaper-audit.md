@@ -283,6 +283,22 @@ changed with the phone still folded.
   The cover panel stays static whatever the chooser option, so a rotation with
   the engine on both inner screens writes exactly one still photo, to
   `which=19`.
+- Where the chooser puts the engine is routing, not policy (decompiled
+  One UI 9 picker and WallpaperManagerService, 2026-10-14). The picker sends
+  `which` 1, 2 or 3 with no display bits; the service fills the mode from the
+  hinge, so the engine lands on the panel that was active when the user tapped
+  Set: open gives record 7 (inner), folded gives 19 (cover). The cover records
+  accept any live component. A third-party app cannot choose the panel:
+  `setWallpaperComponent` needs `SET_WALLPAPER_COMPONENT`. Samsung's
+  `CoverWallpaperService` path exists only on Flip devices with the watchface
+  feature. Inside the engine `getWallpaperFlags()` carries the full Samsung
+  value (5, 7, 17, 19). On AOSP, `getWallpaperInfo` with any bits beyond
+  FLAG_SYSTEM or FLAG_LOCK throws; the bits are passed only where
+  `SamsungDisplays.hasDisplayBits()`. Not run: setting the engine while folded
+  (code says it binds to the cover records and draws there). Reports only, not
+  verified: a live wallpaper landing on a Flip 3 cover instead of home; KLWP
+  lock screen not showing on a Fold 7. Samsung's `SemWallpaperManager` has no
+  public developer page; treat it as undocumented.
 - `ContentResolver.loadThumbnail` fails for Google Photos cloud picker URIs
   (`content://media/picker/0/com.google.android.apps.photos.cloudpicker/media/...`)
   while `ImageDecoder` on the same URI works; the UI falls back to a small decode.
