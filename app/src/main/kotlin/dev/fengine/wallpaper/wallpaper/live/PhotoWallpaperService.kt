@@ -97,11 +97,24 @@ class PhotoWallpaperService : WallpaperService() {
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
-            // Finish any draw in flight before the surface goes away.
-            val done = java.util.concurrent.CountDownLatch(1)
-            render.post { act(state.onVisibility(false)); done.countDown() }
-            done.await(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+            // Finish any draw in flight before the surface goes away; its content goes with it.
+            Log.i(TAG, "surface lost")
+            onRenderThread { act(state.onSurfaceLost()) }
             super.onSurfaceDestroyed(holder)
+        }
+
+        /** The system shows the surface right after this returns, so the frame is drawn before that. */
+        override fun onSurfaceRedrawNeeded(holder: SurfaceHolder) {
+            super.onSurfaceRedrawNeeded(holder)
+            Log.i(TAG, "surface redraw needed")
+            onRenderThread { act(state.onRedrawNeeded()) }
+        }
+
+        /** Run [block] on the render thread and wait for it, bounded so a stalled GPU never blocks the caller for long. */
+        private fun onRenderThread(block: () -> Unit) {
+            val done = java.util.concurrent.CountDownLatch(1)
+            render.post { try { block() } finally { done.countDown() } }
+            done.await(500, java.util.concurrent.TimeUnit.MILLISECONDS)
         }
 
         override fun onOffsetsChanged(xOff: Float, yOff: Float, xStep: Float, yStep: Float, xPx: Int, yPx: Int) {

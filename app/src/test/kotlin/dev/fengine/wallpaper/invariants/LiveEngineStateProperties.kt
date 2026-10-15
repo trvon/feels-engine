@@ -28,6 +28,10 @@ class LiveEngineStateProperties {
         data class Photo(val uri: String?) : Ev
         data class Decoded(val uri: String) : Ev
         data class Fade(val t: Float) : Ev
+        /** The surface was destroyed (screen off, panel off). */
+        object Lost : Ev { override fun toString() = "Lost" }
+        /** The system asks for the surface's content before showing it. */
+        object Redraw : Ev { override fun toString() = "Redraw" }
     }
 
     @Provide
@@ -41,6 +45,7 @@ class LiveEngineStateProperties {
             uris.map { Ev.Photo(it) },
             Arbitraries.of("a", "b", "c").map { Ev.Decoded(it) },
             Arbitraries.of(0f, 0.3f, 0.7f, 1f).map { Ev.Fade(it) },
+            Arbitraries.of<Ev>(Ev.Lost, Ev.Redraw),
         )
         return ev.list().ofMaxSize(60)
     }
@@ -53,6 +58,8 @@ class LiveEngineStateProperties {
         is Ev.Photo -> s.onPhoto(e.uri).also { d -> d.decode?.let { pendingKeepOld[it] = d.keepOld } }
         is Ev.Decoded -> s.onDecoded(e.uri, pendingKeepOld[e.uri] ?: false)
         is Ev.Fade -> s.onFadeFrame(e.t)
+        is Ev.Lost -> s.onSurfaceLost()
+        is Ev.Redraw -> s.onRedrawNeeded()
     }
 
     @Property(tries = 3000)
@@ -63,7 +70,8 @@ class LiveEngineStateProperties {
             val visibleBefore = s.visible
             val offsetBefore = s.xOffset; val zoomBefore = s.zoom
             val d = apply(s, e, keep)
-            if (d.draw) assertTrue("draw while invisible after $e", s.visible)
+            // The one draw allowed for a screen nobody sees yet is the system asking for the surface's content.
+            if (d.draw) assertTrue("draw while invisible after $e", s.visible || e is Ev.Redraw)
             if (e is Ev.Offset && e.x == offsetBefore) assertEquals("no-op offset drew", LiveEngineState.Decision.NONE, d)
             if (e is Ev.Zoom && e.z == zoomBefore) assertEquals("no-op zoom drew", LiveEngineState.Decision.NONE, d)
             if (e is Ev.Visible && e.v == visibleBefore) assertEquals(LiveEngineState.Decision.NONE, d)
@@ -111,6 +119,23 @@ class LiveEngineStateProperties {
         // a dirty state redraws once.
         if (owedDecode) assertTrue(d.decode != null || d.draw == wasDirty) else assertEquals(wasDirty, d.draw)
         assertEquals(LiveEngineState.Decision.NONE, s.onVisibility(true))
+    }
+
+    /** A surface that went away comes back with a frame: through the redraw request, or on visibility. */
+    @Property(tries = 3000)
+    fun lostSurfaceGetsItsFrameBack(@ForAll("events") events: List<Ev>, @ForAll systemAsksFirst: Boolean) {
+        val s = LiveEngineState(); val keep = HashMap<String, Boolean>()
+        events.forEach { apply(s, it, keep) }
+        if (s.shown == null) return  // nothing decoded: the decode (and its draw) follows visibility, covered elsewhere
+        s.onSurfaceLost()
+        assertFalse(s.visible); assertTrue(s.dirty)
+        if (systemAsksFirst) {
+            assertTrue("redraw request drew nothing", s.onRedrawNeeded().draw)
+            // Visibility may still owe a decode for a photo that changed while invisible, but no second draw.
+            assertFalse("drew again on visibility", s.onVisibility(true).draw)
+        } else {
+            assertTrue("visibility drew nothing", s.onVisibility(true).draw)
+        }
     }
 
     @Property(tries = 500)

@@ -82,9 +82,35 @@ class LiveEngineState {
             fading = false; hasPrevious = false
             return Decision(cancelFade = cancel)
         }
-        // Visible again: a deferred decode comes first (its result draws), else a dirty redraw.
-        if (pendingDecode) { val d = decodeWanted(keepOld = shown == null); if (d != Decision.NONE) return d }
+        // Visible again: a deferred decode comes first (its result draws). A dirty surface with an
+        // old photo decoded gets that photo back in the same step, so a lost surface is never
+        // blank for the length of a decode; the new photo then fades in over it.
+        if (pendingDecode) {
+            val d = decodeWanted(keepOld = shown == null)
+            if (d != Decision.NONE) return if (dirty && shown != null) { dirty = false; d.copy(draw = true) } else d
+        }
         return if (dirty) draw() else Decision.NONE
+    }
+
+    /**
+     * The surface is gone and whatever it showed went with it. The next surface starts blank, so
+     * the state is dirty from here: a screen that turned off (a closed foldable's inner panel, a
+     * long sleep) must get its frame back when it is shown again, photo change or not.
+     */
+    fun onSurfaceLost(): Decision {
+        dirty = true
+        return onVisibility(false)
+    }
+
+    /**
+     * The system is about to show the surface and wants its content now (a new surface after a
+     * sleep, or a visibility change the system would rather not flash black on). Draw whatever
+     * is decoded, visible flag or not: this is the one draw for a screen nobody sees yet, and it
+     * is the system asking. Nothing decoded yet means nothing to draw; the decode follows visibility.
+     */
+    fun onRedrawNeeded(): Decision {
+        dirty = true
+        return if (shown != null) draw() else Decision.NONE
     }
 
     /** The settings say this screen should show [uri] (or nothing). */
