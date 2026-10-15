@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.1 (2026-10-15)
+
+- Fold fix: the inner screen no longer comes back black after the phone was
+  closed. One UI does not always tell a live wallpaper it is visible again;
+  the engine now treats the system's redraw request as visibility and always
+  answers it with a frame (`LiveEngineState.onRedrawNeeded`). A surface that
+  was destroyed is redrawn when it returns; a draw the surface refuses stays
+  owed. Three new properties cover these rules.
+- Keyboard goes away on Done and on a tap outside the field.
+- Described groups: the library permission is explained in the app's own
+  words before the system dialog, with the photo picker offered as the other
+  way (Play photo permissions policy).
+- Look row reads both panels of a foldable and says where motion is on.
+
 ## 0.2.0 (2026-10-14)
 
 - Live wallpaper engine: motion over your photos. Cross-fade on change,
