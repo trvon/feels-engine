@@ -6,6 +6,8 @@ import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dev.fengine.wallpaper.FengineApp
+import dev.fengine.wallpaper.data.Ledger
+import dev.fengine.wallpaper.data.LedgerStore
 import dev.fengine.wallpaper.wallpaper.WallpaperApplier
 import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 import java.text.DateFormat
@@ -28,6 +30,8 @@ class RotateWallpaperWorker(appContext: Context, params: WorkerParameters) :
             .filterKeys { it.startsWith(KEY_PIN_PREFIX) }
             .map { (k, v) -> k.removePrefix(KEY_PIN_PREFIX) to (v as Int) }.toMap()
         val forceStatic = inputData.getBoolean(KEY_FORCE_STATIC, false)
+        val source = inputData.getString(KEY_SOURCE) ?: Ledger.Source.SCHEDULE
+        val ledger = LedgerStore(applicationContext)
         val live = if (forceStatic) LiveWallpaper.State(false, false, false, false) else LiveWallpaper.state(applicationContext)
         Log.i(TAG, "live: $live")
         // Screens the live engine draws itself only need the cursor to move; it watches the settings.
@@ -51,13 +55,17 @@ class RotateWallpaperWorker(appContext: Context, params: WorkerParameters) :
         val advanced = plan.cursors
         for ((id, index) in plan.cursors) if (plan.writes.none { it.groupId == id }) {
             Log.i(TAG, "${settings.group(id)?.name}: photo ${index + 1} -> live engine")
+            ledger.record(Ledger.Event.Rotation(source, 0, 0, "live"))
         }
         for (write in plan.writes) {
             val group = settings.group(write.groupId) ?: continue
             when (val outcome = applier.apply(write.uri.toUri(), write.which, write.panels)) {
-                is WallpaperApplier.Result.Applied ->
+                is WallpaperApplier.Result.Applied -> {
                     Log.i(TAG, "${group.name}: photo ${write.index + 1} -> which=${write.which} panels=${write.panels}, ids ${outcome.wallpaperIds}")
+                    ledger.record(Ledger.Event.Rotation(source, write.which, write.panels, "applied"))
+                }
                 is WallpaperApplier.Result.Failed -> {
+                    ledger.record(Ledger.Event.Rotation(source, write.which, write.panels, "failed"))
                     Log.w(TAG, "${group.name}: ${outcome.reason}")
                     failures += "${group.name}: ${outcome.reason}"
                 }
@@ -83,5 +91,7 @@ class RotateWallpaperWorker(appContext: Context, params: WorkerParameters) :
         const val KEY_PIN_PREFIX = "pin:"
         /** Input key: write static photos even where the live engine is active. */
         const val KEY_FORCE_STATIC = "force_static"
+        /** Input key: what asked for this rotation (`Ledger.Source`). */
+        const val KEY_SOURCE = "source"
     }
 }

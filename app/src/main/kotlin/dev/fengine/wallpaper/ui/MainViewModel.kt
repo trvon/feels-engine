@@ -12,6 +12,8 @@ import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
 import dev.fengine.wallpaper.FengineApp
 import dev.fengine.wallpaper.data.Group
+import dev.fengine.wallpaper.data.Ledger
+import dev.fengine.wallpaper.data.LedgerStore
 import dev.fengine.wallpaper.data.Mode
 import dev.fengine.wallpaper.data.Platform
 import dev.fengine.wallpaper.data.Screen
@@ -260,7 +262,29 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setTimesOfDay(minutes: List<Int>) = update { it.copy(timesOfDay = minutes.distinct().sorted()) }
     fun setEnabled(enabled: Boolean) = update { it.copy(enabled = enabled) }
 
-    fun rotateNow() = scheduler.rotateNow()
+    fun rotateNow() = scheduler.rotateNow(source = Ledger.Source.NEXT)
+
+    /** The last 7 days of the local ledger in one sentence; null before anything was recorded. */
+    val diagnostics = MutableStateFlow<String?>(null)
+
+    fun refreshDiagnostics() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val entries = LedgerStore(getApplication()).entries()
+            val now = System.currentTimeMillis()
+            diagnostics.value = if (entries.isEmpty()) null
+            else Ledger.sentence(Ledger.summarize(entries, now - 7L * 24 * 3600 * 1000, now))
+        }
+    }
+
+    /** Write the whole ledger to a file the owner picked (system "save as"). */
+    fun exportLedger(target: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val app = getApplication<Application>()
+            runCatching {
+                app.contentResolver.openOutputStream(target)?.use { it.write(LedgerStore(app).text().toByteArray()) }
+            }
+        }
+    }
 
     /**
      * Make [groupId] the active scheme: it feeds both screens and its cover (or current photo) shows
@@ -275,7 +299,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             store.update { it.copy(homeGroupId = groupId, lockGroupId = groupId) }
             scheduler.sync(store.read())
-            if (pool.isNotEmpty()) scheduler.rotateNow(pinned = mapOf(groupId to index))
+            if (pool.isNotEmpty()) scheduler.rotateNow(pinned = mapOf(groupId to index), source = Ledger.Source.SET_ACTIVE)
         }
     }
 
@@ -283,7 +307,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun showNow(groupId: String, uri: String) {
         val group = settings.value.group(groupId) ?: return
         val index = group.allPhotos.indexOf(uri).takeIf { it >= 0 } ?: return
-        scheduler.rotateNow(pinned = mapOf(groupId to index))
+        scheduler.rotateNow(pinned = mapOf(groupId to index), source = Ledger.Source.SHOW_NOW)
     }
 
     /**
@@ -295,7 +319,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val pins = listOfNotNull(s.homeGroup, s.lockGroup).distinct()
             .filter { it.allPhotos.isNotEmpty() }
             .associate { it.id to it.cursor.coerceIn(0, it.allPhotos.size - 1) }
-        scheduler.rotateNow(pinned = pins, forceStatic = true)
+        scheduler.rotateNow(pinned = pins, forceStatic = true, source = Ledger.Source.STILL)
     }
 
     /** On a foldable, the group the cover screen shows; off means the same photo as the inner screen. */

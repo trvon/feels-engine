@@ -75,6 +75,8 @@ fun HomeScreen(
     hasCoverScreen: Boolean = false,
     onAssignScreen: (Screen, String?) -> Unit = { _, _ -> },
     onSetDreamWirelessOnly: (Boolean) -> Unit = {},
+    diagnostics: String? = null,
+    onExportLog: () -> Unit = {},
 ) {
     var choosingFor by remember { mutableStateOf<Screen?>(null) }
     choosingFor?.let { screen ->
@@ -204,6 +206,12 @@ fun HomeScreen(
         Spacer(Modifier.height(Space.sm))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             TextAction("Next photo", onChangeNow)
+        }
+        Spacer(Modifier.height(Space.section))
+        Section("This week") {
+            // The local ledger: stays on the phone; export writes a file the owner chooses.
+            Caption(diagnostics ?: "Nothing recorded yet. Changes, motion and the screen saver are noted here, on this phone only.")
+            if (diagnostics != null) TextAction("Export log", onExportLog)
         }
     }
 }

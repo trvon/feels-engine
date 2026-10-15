@@ -11,6 +11,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import dev.fengine.wallpaper.data.Ledger
 import dev.fengine.wallpaper.data.Mode
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.smart.IndexLibraryWorker
@@ -93,8 +94,9 @@ class RotationScheduler(private val context: Context) {
      * Runs one rotation immediately through WorkManager so the worker path is exercised. [pinned]
      * shows those indexes instead of advancing; [forceStatic] writes still photos over a live engine.
      */
-    fun rotateNow(pinned: Map<String, Int> = emptyMap(), forceStatic: Boolean = false) {
+    fun rotateNow(pinned: Map<String, Int> = emptyMap(), forceStatic: Boolean = false, source: String = Ledger.Source.NEXT) {
         val data = Data.Builder().putBoolean(RotateWallpaperWorker.KEY_FORCE_STATIC, forceStatic)
+            .putString(RotateWallpaperWorker.KEY_SOURCE, source)
         for ((id, index) in pinned) data.putInt(RotateWallpaperWorker.KEY_PIN_PREFIX + id, index)
         WorkManager.getInstance(context).enqueueUniqueWork(
             RotateWallpaperWorker.ONE_SHOT_NAME,

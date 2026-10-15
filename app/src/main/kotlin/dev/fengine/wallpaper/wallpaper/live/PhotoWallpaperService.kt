@@ -17,6 +17,8 @@ import android.util.Log
 import android.view.SurfaceHolder
 import android.view.animation.LinearInterpolator
 import dev.fengine.wallpaper.FengineApp
+import dev.fengine.wallpaper.data.Ledger
+import dev.fengine.wallpaper.data.LedgerStore
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.wallpaper.WallpaperCrop
 import kotlinx.coroutines.CoroutineScope
@@ -55,12 +57,15 @@ class PhotoWallpaperService : WallpaperService() {
         private val state = LiveEngineState()
         private var watch: Job? = null
         private var load: Job? = null
-        private var current: Bitmap? = null
-        private var previous: Bitmap? = null
+        private val slots = BitmapSlots<Bitmap>()
+        private val current: Bitmap? get() = slots.current
+        private val previous: Bitmap? get() = slots.previous
         private var fade: ValueAnimator? = null
         private var fadeAlpha = 1f
-        private var softwareOnly = false
-        private var slowPosts = 0
+        private val canvas = CanvasPolicy(SLOW_POST_MS)
+        private val fadeClock = FadeClock(MIN_FRAME_MS)
+        private val health = FrameHealth()
+        private val ledger by lazy { LedgerStore(applicationContext) }
         private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
         private val matrix = Matrix()
         private var frames = 0L
@@ -100,7 +105,7 @@ class PhotoWallpaperService : WallpaperService() {
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             // Finish any draw in flight before the surface goes away; its content goes with it.
             Log.i(TAG, "surface lost")
-            onRenderThread { act(state.onSurfaceLost()) }
+            onRenderThread { hidden(); act(state.onSurfaceLost()) }
             super.onSurfaceDestroyed(holder)
         }
 
@@ -108,7 +113,7 @@ class PhotoWallpaperService : WallpaperService() {
         override fun onSurfaceRedrawNeeded(holder: SurfaceHolder) {
             super.onSurfaceRedrawNeeded(holder)
             Log.i(TAG, "surface redraw needed")
-            onRenderThread { act(state.onRedrawNeeded()) }
+            onRenderThread { actShown(state.onRedrawNeeded()) }
         }
 
         /** Run [block] on the render thread and wait for it, bounded so a stalled GPU never blocks the caller for long. */
@@ -128,7 +133,9 @@ class PhotoWallpaperService : WallpaperService() {
 
         override fun onVisibilityChanged(v: Boolean) {
             Log.i(TAG, "visible=$v")
-            render.post { act(state.onVisibility(v)) }
+            render.post {
+                if (v) actShown(state.onVisibility(true)) else { hidden(); act(state.onVisibility(false)) }
+            }
         }
 
         override fun onWallpaperFlagsChanged(which: Int) {
@@ -145,7 +152,8 @@ class PhotoWallpaperService : WallpaperService() {
             watch?.cancel(); scope.cancel()
             render.post {
                 fade?.cancel(); load?.cancel()
-                current?.recycle(); previous?.recycle(); current = null; previous = null
+                hidden()
+                slots.onDestroy().forEach(Bitmap::recycle)
             }
             renderThread.quitSafely()
             super.onDestroy()
@@ -167,11 +175,8 @@ class PhotoWallpaperService : WallpaperService() {
                 render.post {
                     val decision = state.onDecoded(uri, keepOld)
                     if (decision == LiveEngineState.Decision.NONE && state.shown != uri) { bitmap.recycle(); return@post } // stale
-                    fade?.cancel()
-                    previous?.recycle()
-                    previous = if (decision.startFade) current else null
-                    if (!decision.startFade) current?.recycle()
-                    current = bitmap
+                    fade?.cancel()   // ends through finishFade, which releases the old previous
+                    slots.onDecoded(bitmap, fade = decision.startFade).forEach(Bitmap::recycle)
                     if (!decision.startFade) fadeAlpha = 1f
                     act(decision)
                 }
@@ -189,23 +194,20 @@ class PhotoWallpaperService : WallpaperService() {
             ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                 val (dw, dh) = LiveFrame.decodeSize(info.size.width, info.size.height, tw, th)
                 decoder.setTargetSize(dw, dh)
-                decoder.allocator = if (softwareOnly) ImageDecoder.ALLOCATOR_SOFTWARE else ImageDecoder.ALLOCATOR_DEFAULT
+                decoder.allocator = if (canvas.softwareOnly) ImageDecoder.ALLOCATOR_SOFTWARE else ImageDecoder.ALLOCATOR_DEFAULT
             }
         }.onFailure { Log.w(TAG, "decode failed for $uri", it) }.getOrNull()
 
         private fun startFade() {
             fadeAlpha = 0f
-            fadeFrames = 0; fadeStart = android.os.SystemClock.elapsedRealtime()
+            fadeFrames = 0; fadeStart = android.os.SystemClock.elapsedRealtime(); fadeClock.reset()
             fade = ValueAnimator.ofFloat(0f, 1f).apply {
                 duration = FADE_MS
                 interpolator = LinearInterpolator()
-                var lastFrame = 0L
                 addUpdateListener { a ->
                     val t = a.animatedValue as Float
-                    val now = android.os.SystemClock.elapsedRealtime()
                     // 120 Hz panels tick twice as often; a 900 ms fade needs no more than 60 fps.
-                    if (t < 1f && now - lastFrame < MIN_FRAME_MS) return@addUpdateListener
-                    lastFrame = now
+                    if (!fadeClock.shouldDraw(t, android.os.SystemClock.elapsedRealtime())) return@addUpdateListener
                     fadeAlpha = LiveFrame.fadeAlpha(t)
                     act(state.onFadeFrame(t))
                 }
@@ -220,32 +222,53 @@ class PhotoWallpaperService : WallpaperService() {
             if (fade != null) Log.i(TAG, "fade: $fadeFrames frames in ${android.os.SystemClock.elapsedRealtime() - fadeStart} ms")
             fade = null
             fadeAlpha = 1f
-            previous?.recycle(); previous = null
+            slots.onFadeFinished().forEach(Bitmap::recycle)
         }
 
         /** One frame. The state already decided it is wanted and the surface is visible. */
         private fun draw() {
             val holder = surfaceHolder
-            val canvas = (if (softwareOnly) null else runCatching { holder.lockHardwareCanvas() }.getOrNull())
-                ?: run { softwareOnly = true; holder.lockCanvas() }
-            if (canvas == null) { Log.w(TAG, "no canvas; frame still owed"); act(state.onDrawFailed()); return }
+            val c = (if (canvas.softwareOnly) null else runCatching { holder.lockHardwareCanvas() }.getOrNull())
+                ?: run { canvas.onHardwareUnavailable(); holder.lockCanvas() }
+            if (c == null) { Log.w(TAG, "no canvas; frame still owed"); act(state.onDrawFailed()); return }
             val started = android.os.SystemClock.elapsedRealtime()
+            val blended = previous != null && fadeAlpha < 1f
             try {
-                canvas.drawColor(Color.BLACK)
-                previous?.let { if (fadeAlpha < 1f) drawPhoto(canvas, it, 255) }
-                current?.let { drawPhoto(canvas, it, (fadeAlpha * 255).toInt()) }
+                c.drawColor(Color.BLACK)
+                previous?.let { if (fadeAlpha < 1f) drawPhoto(c, it, 255) }
+                current?.let { drawPhoto(c, it, (fadeAlpha * 255).toInt()) }
                 frames++
                 if (fade != null) fadeFrames++ else Log.d(TAG, "frame ${frames}: offset=${state.xOffset} zoom=${state.zoom}")
             } finally {
-                holder.unlockCanvasAndPost(canvas)
+                holder.unlockCanvasAndPost(c)
             }
-            // A GPU path that stalls (emulators, some drivers) is worse than software drawing: after
-            // two slow posts the engine switches to the software canvas for the rest of its life.
-            if (!softwareOnly) {
-                val ms = android.os.SystemClock.elapsedRealtime() - started
-                if (ms > SLOW_POST_MS) { if (++slowPosts >= 2) { softwareOnly = true; Log.w(TAG, "hardware canvas stalled ${ms} ms twice; using software from now on") } }
-                else slowPosts = 0
+            // A GPU path that stalls (emulators, some drivers) is worse than software drawing.
+            val ms = android.os.SystemClock.elapsedRealtime() - started
+            if (canvas.onPost(ms)) Log.w(TAG, "hardware canvas stalled twice; using software from now on")
+            if (!isPreview) health.drew(now(), blended)?.let { record(it) }
+        }
+
+        private fun now() = android.os.SystemClock.elapsedRealtime()
+
+        /**
+         * The screen is being shown. It owes a frame when the state asks for a draw or a decode, or
+         * has nothing decoded at all; otherwise the surface already holds the right picture.
+         */
+        private fun actShown(d: LiveEngineState.Decision) {
+            if (!isPreview && (d.draw || d.decode != null || state.shown == null)) health.shown(now())
+            act(d)
+        }
+
+        /** The screen went away: close the shown-screen record and note an interrupted fade. */
+        private fun hidden() { if (!isPreview) health.hidden(now()).forEach(::record) }
+
+        private fun record(r: FrameHealth.Record) {
+            val ev = when (r) {
+                is FrameHealth.Record.FirstFrame -> Ledger.Event.FirstFrame(r.latencyMs)
+                is FrameHealth.Record.NoFrame -> Ledger.Event.NoFrame(r.shownMs)
+                FrameHealth.Record.AbandonedBlend -> Ledger.Event.AbandonedBlend
             }
+            ledger.record(ev)
         }
 
         private fun drawPhoto(canvas: Canvas, bitmap: Bitmap, alpha: Int) {

@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
 import android.os.BatteryManager
+import dev.fengine.wallpaper.data.Ledger
+import dev.fengine.wallpaper.data.LedgerStore
 import dev.fengine.wallpaper.data.Screen
 import dev.fengine.wallpaper.data.Screens
 import android.animation.ValueAnimator
@@ -81,6 +83,7 @@ class GroupDreamService : DreamService() {
         val carMode = (getSystemService(UI_MODE_SERVICE) as UiModeManager).currentModeType == Configuration.UI_MODE_TYPE_CAR
         val plugged = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
         val verdict = DreamGate.decide(carMode, plugged, settings.dreamWirelessOnly, photos.isNotEmpty())
+        withContext(Dispatchers.IO) { LedgerStore(this@GroupDreamService).record(Ledger.Event.ScreenSaver(verdict.name, plugged)) }
         if (verdict != DreamGate.Verdict.PLAY) {
             // finish() lets the phone sleep as if no screen saver were set.
             Log.i(TAG, "not playing: $verdict (plugged=$plugged)")

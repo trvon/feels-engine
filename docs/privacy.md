@@ -37,3 +37,13 @@ AICore refuses some photos on policy grounds. The app treats a refusal as
 
 The screen saver reads the same groups. It runs only after you choose Feels
 Engine photos under Settings > Display > Screen saver.
+
+## Local log
+
+The app keeps a log of what it did, in its private storage on the phone:
+when the wallpaper changed and why, how long the live wallpaper took to draw
+after the screen was shown, and whether the screen saver played. It holds no
+photos, file names or group names. It is capped at 512 KB, never sent
+anywhere, and leaves the phone only when you tap Export log on Home and pick
+where to save it. Uninstalling the app deletes it.
+

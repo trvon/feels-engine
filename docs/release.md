@@ -20,6 +20,15 @@ attaches `feels-engine-vX.Y.Z.apk` (sideload), `feels-engine-vX.Y.Z.aab` (the
 file Play Console takes) and their SHA-256. `ci.yml` runs tests, lint and a
 debug build on every push and pull request.
 
+Before merging a release PR:
+
+1. `scripts/smoke-matrix.sh fe_api28 fe_api30 fe_api33 fe_api34` passes
+   every step (docs/build.md, "Version matrix").
+2. The release PR's CI and CodeQL are green.
+3. On the Fold and the Pixel: install the build, fold and unfold, sleep and
+   wake, and check "This week" on Home shows no blank screens and no
+   interrupted fades.
+
 A hand-pushed tag still builds and attaches the same files:
 
 ```bash

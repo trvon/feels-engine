@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
@@ -47,6 +48,11 @@ private fun FengineApp(vm: MainViewModel) {
         openGroupId?.let { vm.addPhotos(it, uris) }
     }
     val context = LocalContext.current
+    val diagnostics by vm.diagnostics.collectAsStateWithLifecycle()
+    LaunchedEffect(openGroupId, settings.lastResult) { if (openGroupId == null) vm.refreshDiagnostics() }
+    val exportLog = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let(vm::exportLedger)
+    }
     val scanning by vm.scanning.collectAsStateWithLifecycle()
     val indexing by vm.indexing.collectAsStateWithLifecycle()
     val persistedGrants by vm.persistedGrants.collectAsStateWithLifecycle()
@@ -116,6 +122,8 @@ private fun FengineApp(vm: MainViewModel) {
             hasCoverScreen = vm.hasCoverScreen(),
             onAssignScreen = vm::assignScreen,
             onSetDreamWirelessOnly = vm::setDreamWirelessOnly,
+            diagnostics = diagnostics,
+            onExportLog = { exportLog.launch("feels-engine-log.jsonl") },
             dreamConfigured = vm.dreamConfigured(),
             motion = vm.motion(),
             onTurnOnMotion = {
