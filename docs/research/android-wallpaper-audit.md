@@ -262,6 +262,18 @@ changed with the phone still folded.
   panel it has seen, so a closed phone still gets a 1848x2448 inner crop and a
   1248x1972 cover crop in one rotation (ids 37/38, crop hints echoed verbatim by
   `dumpsys wallpaper`).
+- Reads take the display bits too (probe on the Fold 8, One UI 9,
+  2026-10-14, issue #1). `getWallpaperInfo(which)` and `getWallpaperId(which)`
+  answer for the panel named by the bits; with no bits they answer for the
+  panel the hinge makes active. With the engine chosen in the chooser and the
+  phone closed: `which=5` (system, inner) is the engine, `which=17` (system,
+  cover) is static, and plain `which=1` is static too. The chooser puts the
+  engine on the inner panel only (records `which=7` ours, `19` cover and `11`
+  DeX stay ImageWallpaper), and creates one engine with
+  `getWallpaperFlags() == FLAG_SYSTEM` on display 0. A read without the bits
+  made the worker write a still photo over the engine once the phone was
+  closed; `LiveWallpaper.state` now asks per panel. `getWallpaperInfo(3)`
+  throws IllegalArgumentException: one flag per call.
 - `ContentResolver.loadThumbnail` fails for Google Photos cloud picker URIs
   (`content://media/picker/0/com.google.android.apps.photos.cloudpicker/media/...`)
   while `ImageDecoder` on the same URI works; the UI falls back to a small decode.

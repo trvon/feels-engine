@@ -60,8 +60,8 @@ object RotationPlan {
         pinned: Map<String, Int> = emptyMap(),
         /** The cover screen's own group on a foldable with Samsung display bits, or null for the same photo. */
         coverGroupId: String? = null,
-        /** True where the live engine draws the inner panel only (One UI): the cover panel is always static. */
-        coverStatic: Boolean = false,
+        /** The cover panel's live state on a foldable with Samsung display bits; the inner panel's elsewhere. */
+        coverLiveHome: Boolean = liveHome, coverLiveLock: Boolean = liveLock,
     ): Advance {
         val steps = steps(homeGroupId, lockGroupId) { photos(it).isEmpty() }
         val cursors = LinkedHashMap<String, Int>()
@@ -76,7 +76,7 @@ object RotationPlan {
         for (step in steps) {
             val index = indexFor(step.groupId)
             val innerWhich = staticFlags(step.which, liveHome, liveLock)
-            val coverWhich = if (coverStatic) step.which else innerWhich
+            val coverWhich = staticFlags(step.which, coverLiveHome, coverLiveLock)
             val coverSrc = cover ?: step.groupId
             if (coverSrc == step.groupId && innerWhich == coverWhich) {
                 if (innerWhich != 0) writes += Write(step.groupId, index, photos(step.groupId)[index], innerWhich)

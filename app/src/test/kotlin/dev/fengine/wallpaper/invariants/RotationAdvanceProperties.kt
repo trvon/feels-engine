@@ -88,20 +88,29 @@ class RotationAdvanceProperties {
         assertEquals(staticWhich, inner.which); assertEquals(staticWhich, cover.which)
     }
 
-    /** On One UI the engine draws the inner home only: the cover panel still gets every flag, the inner panel only the static ones. */
+    /** Per-panel live state: each panel gets exactly the flags its engine does not draw, from the same photo. */
     @Property(tries = 1000)
-    fun coverStaticWritesEveryFlagToTheCover(
-        @ForAll @Size(min = 1, max = 5) photos: List<String>, @ForAll liveHome: Boolean, @ForAll shuffle: Boolean, @ForAll seed: Long,
+    fun panelsGetTheFlagsTheirEnginesDoNotDraw(
+        @ForAll @Size(min = 1, max = 5) photos: List<String>,
+        @ForAll innerHome: Boolean, @ForAll innerLock: Boolean, @ForAll coverHome: Boolean, @ForAll coverLock: Boolean,
+        @ForAll shuffle: Boolean, @ForAll seed: Long,
     ) {
-        val out = RotationPlan.advance("g", "g", { photos }, { -1 }, shuffle, liveHome, liveLock = false, Random(seed), coverStatic = true)
+        val out = RotationPlan.advance(
+            "g", "g", { photos }, { -1 }, shuffle, innerHome, innerLock, Random(seed),
+            coverLiveHome = coverHome, coverLiveLock = coverLock,
+        )
         val idx = out.cursors["g"]!!
-        val cover = out.writes.single { it.panels == RotationPlan.PANEL_COVER || (!liveHome && it.panels == 0) }
-        assertEquals(FLAG_SYSTEM or FLAG_LOCK, cover.which)
-        assertEquals(photos[idx], cover.uri)
-        if (liveHome) {
-            val inner = out.writes.single { it.panels == RotationPlan.PANEL_INNER }
-            assertEquals(FLAG_LOCK, inner.which)
-            assertEquals(2, out.writes.size)
-        } else assertEquals(1, out.writes.size)
+        val innerWant = (if (innerHome) 0 else FLAG_SYSTEM) or (if (innerLock) 0 else FLAG_LOCK)
+        val coverWant = (if (coverHome) 0 else FLAG_SYSTEM) or (if (coverLock) 0 else FLAG_LOCK)
+        for (w in out.writes) assertEquals(photos[idx], w.uri)
+        if (innerWant == coverWant) {
+            // Same flags on both panels: one write, no panel bits, or none at all.
+            assertEquals(if (innerWant == 0) 0 else 1, out.writes.size)
+            out.writes.firstOrNull()?.let { assertEquals(innerWant, it.which); assertEquals(0, it.panels) }
+        } else {
+            assertEquals(innerWant, out.writes.singleOrNull { it.panels == RotationPlan.PANEL_INNER }?.which ?: 0)
+            assertEquals(coverWant, out.writes.singleOrNull { it.panels == RotationPlan.PANEL_COVER }?.which ?: 0)
+            assertEquals((if (innerWant != 0) 1 else 0) + (if (coverWant != 0) 1 else 0), out.writes.size)
+        }
     }
 }

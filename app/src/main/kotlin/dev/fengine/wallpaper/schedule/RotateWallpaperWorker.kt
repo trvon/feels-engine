@@ -6,7 +6,6 @@ import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dev.fengine.wallpaper.FengineApp
-import dev.fengine.wallpaper.wallpaper.SamsungDisplays
 import dev.fengine.wallpaper.wallpaper.WallpaperApplier
 import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 import java.text.DateFormat
@@ -29,17 +28,18 @@ class RotateWallpaperWorker(appContext: Context, params: WorkerParameters) :
             .filterKeys { it.startsWith(KEY_PIN_PREFIX) }
             .map { (k, v) -> k.removePrefix(KEY_PIN_PREFIX) to (v as Int) }.toMap()
         val forceStatic = inputData.getBoolean(KEY_FORCE_STATIC, false)
+        val live = if (forceStatic) LiveWallpaper.State(false, false, false, false) else LiveWallpaper.state(applicationContext)
+        Log.i(TAG, "live: $live")
         // Screens the live engine draws itself only need the cursor to move; it watches the settings.
         val plan = RotationPlan.advance(
             settings.homeGroupId, settings.lockGroupId,
             photos = { id -> settings.group(id)?.allPhotos.orEmpty() },
             cursor = { id -> settings.group(id)?.cursor ?: -1 },
             shuffle = settings.shuffle,
-            liveHome = !forceStatic && LiveWallpaper.activeOnHome(applicationContext),
-            liveLock = !forceStatic && LiveWallpaper.activeOnLock(applicationContext),
+            liveHome = live.innerHome, liveLock = live.innerLock,
             pinned = pinned,
             coverGroupId = settings.coverGroupId,
-            coverStatic = SamsungDisplays.hasDisplayBits(),
+            coverLiveHome = live.coverHome, coverLiveLock = live.coverLock,
         )
         if (plan.cursors.isEmpty()) {
             store.update { it.copy(lastResult = "Nothing to show yet") }

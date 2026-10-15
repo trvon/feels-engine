@@ -69,7 +69,8 @@ class PhotoWallpaperService : WallpaperService() {
 
         override fun onCreate(holder: SurfaceHolder) {
             super.onCreate(holder)
-            Log.i(TAG, "engine ${System.identityHashCode(this)} created, preview=$isPreview")
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) wallpaperFlags else -1
+            Log.i(TAG, "engine ${System.identityHashCode(this)} created, preview=$isPreview flags=$flags display=${displayContext?.display?.displayId}")
             setOffsetNotificationsEnabled(true)
             watch = scope.launch {
                 (application as FengineApp).settings.settings.collectLatest { settings ->
