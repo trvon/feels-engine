@@ -141,6 +141,27 @@ class LiveEngineStateProperties {
         }
     }
 
+    /**
+     * The screen never rests on a blended frame. A frame drawn mid-fade shows two photos at once;
+     * once the fade is no longer running, either a clean frame has been drawn since, or one is
+     * owed (dirty) and the next visibility or redraw request draws it.
+     */
+    @Property(tries = 3000)
+    fun neverRestsOnABlendedFrame(@ForAll("events") events: List<Ev>) {
+        val s = LiveEngineState(); val keep = HashMap<String, Boolean>()
+        var blendedOnScreen = false
+        for (e in events) {
+            val d = apply(s, e, keep)
+            if (d.draw) blendedOnScreen = s.fading
+            if (e is Ev.Lost) blendedOnScreen = false  // the surface and its frame are gone
+        }
+        if (blendedOnScreen && !s.fading) {
+            assertTrue("blended frame left on screen and no frame owed", s.dirty)
+            val back = if (s.visible) s.onRedrawNeeded() else s.onVisibility(true)
+            assertTrue("owed clean frame was not drawn", back.draw || back.decode != null)
+        }
+    }
+
     /** A draw the surface refused is owed again: the next visibility or redraw request draws. */
     @Property(tries = 1000)
     fun refusedDrawIsOwedAgain(@ForAll("events") events: List<Ev>) {

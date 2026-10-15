@@ -264,10 +264,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * Make [groupId] the active scheme: it feeds both screens and its cover (or current photo) shows
      * right away. The rotation then carries on from that photo.
      */
-    fun setActive(groupId: String) {
+    fun setActive(groupId: String, photo: String? = null) {
         val group = settings.value.group(groupId) ?: return
         val pool = group.allPhotos
-        val index = pool.indexOf(group.cover).takeIf { it >= 0 } ?: group.cursor.coerceIn(0, (pool.size - 1).coerceAtLeast(0))
+        val index = photo?.let { pool.indexOf(it) }?.takeIf { it >= 0 }
+            ?: pool.indexOf(group.cover).takeIf { it >= 0 }
+            ?: group.cursor.coerceIn(0, (pool.size - 1).coerceAtLeast(0))
         viewModelScope.launch {
             store.update { it.copy(homeGroupId = groupId, lockGroupId = groupId) }
             scheduler.sync(store.read())

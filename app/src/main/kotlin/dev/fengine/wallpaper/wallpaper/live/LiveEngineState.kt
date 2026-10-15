@@ -77,8 +77,10 @@ class LiveEngineState {
         if (v == visible) return Decision.NONE
         visible = v
         if (!v) {
-            // Never animate for a screen nobody sees; the fade ends where it is.
+            // Never animate for a screen nobody sees; the fade ends where it is. The surface still
+            // holds that half-blended frame (two photos at once), so the clean frame is owed.
             val cancel = fading
+            if (cancel) dirty = true
             fading = false; hasPrevious = false
             return Decision(cancelFade = cancel)
         }
