@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -75,6 +76,8 @@ fun GroupScreen(
     onDelete: () -> Unit,
     onSetRule: (String) -> Unit = {},
     onFindPhotos: () -> Unit = {},
+    /** True once the app may read the library; false means [onFindPhotos] will ask the system first. */
+    hasLibraryAccess: Boolean = true,
     onAddToPool: () -> Unit = {},
     onRemoveFromPool: (String) -> Unit = {},
     onExcludePhoto: (String) -> Unit = {},
@@ -106,6 +109,25 @@ fun GroupScreen(
     LaunchedEffect(group) { if (group != settings.group(group.id)) savedTick++ }
     val saved = { savedTick++ }
     var chosen by remember(group.id) { mutableStateOf<String?>(null) }
+    // The one place the app asks for library access: a described group about to look through the
+    // whole library. Said in plain words first, with the picker offered as the other way, so the
+    // system dialog never arrives unexplained (Play photo-permissions policy, declaration on file).
+    var askLibrary by remember { mutableStateOf(false) }
+    if (askLibrary) {
+        AlertDialog(
+            onDismissRequest = { askLibrary = false },
+            title = { Text("Look through all photos on this phone?") },
+            text = {
+                Text(
+                    "Feels Engine labels the photos on this phone, on the phone, to find the ones that match " +
+                        "your description, and keeps looking as new photos arrive. Nothing leaves the device. " +
+                        "If you would rather choose the photos yourself, add them with the picker instead.",
+                )
+            },
+            confirmButton = { TextAction("Allow") { askLibrary = false; onFindPhotos() } },
+            dismissButton = { TextAction("Add photos instead") { askLibrary = false; onAddToPool() } },
+        )
+    }
     chosen?.let { uri ->
         PhotoSheet(
             uri = uri,
@@ -210,7 +232,7 @@ fun GroupScreen(
                 )
                 Spacer(Modifier.height(Space.md))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-                    FilledTonalButton(onClick = { commitRule(); onFindPhotos() }, enabled = rule.isNotBlank() && !scanning) {
+                    FilledTonalButton(onClick = { commitRule(); if (hasLibraryAccess) onFindPhotos() else askLibrary = true }, enabled = rule.isNotBlank() && !scanning) {
                         Text(if (scanning) "Looking..." else "Find photos")
                     }
                     if (scanning) CircularProgressIndicator(modifier = Modifier.size(Size.progress), strokeWidth = Size.progressStroke)

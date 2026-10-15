@@ -78,6 +78,7 @@ private fun FengineApp(vm: MainViewModel) {
                 if (vm.hasLibraryAccess()) vm.findPhotos()
                 else mediaPermission.launch(MediaLibrary.requiredPermissions().toTypedArray())
             },
+            hasLibraryAccess = vm.hasLibraryAccess(),
             onExcludePhoto = { vm.excludePhoto(openGroup.id, it) },
             onAddToPool = { poolPicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
             onRemoveFromPool = { vm.removeFromPool(openGroup.id, it) },
