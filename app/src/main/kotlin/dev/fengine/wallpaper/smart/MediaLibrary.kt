@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import dev.fengine.wallpaper.data.Platform
 import androidx.core.content.ContextCompat
 
 /** Read-only view of the device's image library through MediaStore. */
@@ -24,7 +25,7 @@ class MediaLibrary(private val context: Context) {
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DATE_ADDED,
-            MediaStore.Images.Media.RELATIVE_PATH,
+            Platform.folderColumn(Build.VERSION.SDK_INT),
         )
         val out = ArrayList<Item>(limit)
         context.contentResolver.query(
@@ -36,10 +37,9 @@ class MediaLibrary(private val context: Context) {
         )?.use { c ->
             val idCol = c.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val dateCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
-            val pathCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
+            val pathCol = c.getColumnIndexOrThrow(Platform.folderColumn(Build.VERSION.SDK_INT))
             while (c.moveToNext() && out.size < limit) {
-                val path = c.getString(pathCol).orEmpty()
-                if (path.contains("Screenshots", ignoreCase = true)) continue
+                if (Platform.isScreenshot(c.getString(pathCol))) continue
                 out += Item(c.getLong(idCol), c.getLong(dateCol))
             }
         }

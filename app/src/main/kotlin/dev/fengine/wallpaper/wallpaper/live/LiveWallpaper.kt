@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import dev.fengine.wallpaper.data.Platform
 import dev.fengine.wallpaper.wallpaper.SamsungDisplays
 
 /** Whether this app's live engine is the active wallpaper, per screen; and the intent that offers it. */
@@ -24,16 +25,20 @@ object LiveWallpaper {
     fun state(context: Context, samsung: Boolean = SamsungDisplays.hasDisplayBits()): State {
         val wm = WallpaperManager.getInstance(context)
         val mine = component(context)
-        fun home(panel: Int): Boolean = runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) wm.getWallpaperInfo(WallpaperManager.FLAG_SYSTEM or panel)?.component == mine
-            else wm.wallpaperInfo?.component == mine   // one answer for every panel before Android 14
-        }.getOrDefault(false)
-        fun lock(panel: Int): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // The lock screen shows the home wallpaper when it has none of its own.
-            val info = runCatching { wm.getWallpaperInfo(WallpaperManager.FLAG_LOCK or panel) }.getOrNull()
-            if (info != null) info.component == mine
-            else runCatching { wm.getWallpaperId(WallpaperManager.FLAG_LOCK or panel) }.getOrDefault(0) <= 0 && home(panel)
-        } else home(panel)   // before Android 14 the API cannot answer per screen; the engine covers both
+        fun home(panel: Int): Boolean {
+            val info = runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) wm.getWallpaperInfo(WallpaperManager.FLAG_SYSTEM or panel)?.component == mine
+                else wm.wallpaperInfo?.component == mine   // one answer for every panel before Android 14
+            }.getOrDefault(false)
+            return Platform.homeIsLive(Build.VERSION.SDK_INT, info, LiveEngines.anyRunning)
+        }
+        fun lock(panel: Int): Boolean {
+            val ours = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+                runCatching { wm.getWallpaperInfo(WallpaperManager.FLAG_LOCK or panel) }.getOrNull()?.let { it.component == mine }
+            else null
+            val lockId = runCatching { wm.getWallpaperId(WallpaperManager.FLAG_LOCK or panel) }.getOrDefault(0)
+            return Platform.lockIsLive(Build.VERSION.SDK_INT, home(panel), ours, lockId)
+        }
         if (!samsung) {
             val h = home(0); val l = lock(0)
             return State(h, l, h, l)

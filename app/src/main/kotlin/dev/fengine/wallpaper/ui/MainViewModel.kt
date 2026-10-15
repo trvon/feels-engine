@@ -13,6 +13,7 @@ import com.google.mlkit.genai.common.FeatureStatus
 import dev.fengine.wallpaper.FengineApp
 import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Mode
+import dev.fengine.wallpaper.data.Platform
 import dev.fengine.wallpaper.data.Screen
 import dev.fengine.wallpaper.data.Screens
 import dev.fengine.wallpaper.data.Settings
@@ -176,9 +177,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setCover(groupId: String, uri: String) = updateGroup(groupId) { it.copy(coverUri = uri) }
 
     companion object {
-        /** UriGrantsManagerService.MAX_PERSISTED_URI_GRANTS on Android 11+. */
-        const val GRANT_CEILING = 512
-        const val GRANT_WARN_AT = 400
+        /** Persisted picker grants this Android version keeps (128 before Android 11, 512 after). */
+        val GRANT_CEILING = Platform.grantCeiling(android.os.Build.VERSION.SDK_INT)
+        val GRANT_WARN_AT = Platform.grantWarnAt(android.os.Build.VERSION.SDK_INT)
     }
 
     /** How many photos the system picker hands over per pick; the cloud has no bulk road. */

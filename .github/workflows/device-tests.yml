@@ -1,6 +1,8 @@
 name: Device tests
 
-# Instrumented tests (SQLite index, DataStore) on an API 36 emulator. Slow, so on demand and weekly.
+# Instrumented tests (SQLite index, DataStore) on the oldest supported Android (9) through
+# current. Slow, so on demand and weekly. The full smoke walk (live engine, screen saver,
+# rotation) drives system UI and runs locally: scripts/smoke-matrix.sh (docs/build.md).
 
 on:
   workflow_dispatch:
@@ -10,6 +12,10 @@ on:
 jobs:
   connected:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [28, 30, 33, 36]
     steps:
       - uses: actions/checkout@v4
       - name: Enable KVM
@@ -23,13 +29,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 36
+          api-level: ${{ matrix.api-level }}
           arch: x86_64
           target: google_apis
-          profile: pixel_8
+          profile: pixel_5
           script: ./gradlew :app:connectedDebugAndroidTest --no-daemon
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: device-test-reports
+          name: device-test-reports-api${{ matrix.api-level }}
           path: app/build/reports/androidTests/

@@ -16,7 +16,9 @@ import java.io.File
  * Rows are keyed by [PhotoId.identity], so the picker's URI and the library's URI for the same
  * file share one row. Written only by the workers, which WorkManager serialises by unique name.
  */
-class PhotoIndex(context: Context) : SQLiteOpenHelper(context, NAME, null, VERSION) {
+// Closeable explicitly: SQLiteOpenHelper only implements AutoCloseable from Android 10 (API 29),
+// so `PhotoIndex(...).use { }` threw ClassCastException on Android 9 (found by scripts/smoke-matrix.sh).
+class PhotoIndex(context: Context) : SQLiteOpenHelper(context, NAME, null, VERSION), java.io.Closeable {
     private val legacy = File(context.filesDir, "label_index.json")
 
     override fun onCreate(db: SQLiteDatabase) {

@@ -72,6 +72,7 @@ class PhotoWallpaperService : WallpaperService() {
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) wallpaperFlags else -1
             val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) displayContext?.display?.displayId else null
             Log.i(TAG, "engine ${System.identityHashCode(this)} created, preview=$isPreview flags=$flags display=$display")
+            LiveEngines.created(System.identityHashCode(this), isPreview)
             setOffsetNotificationsEnabled(true)
             watch = scope.launch {
                 (application as FengineApp).settings.settings.collectLatest { settings ->
@@ -140,6 +141,7 @@ class PhotoWallpaperService : WallpaperService() {
 
         override fun onDestroy() {
             Log.i(TAG, "engine ${System.identityHashCode(this)} destroyed")
+            LiveEngines.destroyed(System.identityHashCode(this))
             watch?.cancel(); scope.cancel()
             render.post {
                 fade?.cancel(); load?.cancel()

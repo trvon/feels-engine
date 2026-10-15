@@ -10,6 +10,8 @@
             <intent-filter>
                 <action android:name="dev.fengine.wallpaper.ROTATE_NOW" />
                 <action android:name="dev.fengine.wallpaper.PROBE" />
+                <action android:name="dev.fengine.wallpaper.SEED" />
+                <action android:name="dev.fengine.wallpaper.SCAN" />
             </intent-filter>
         </receiver>
     </application>

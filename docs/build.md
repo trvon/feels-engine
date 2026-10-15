@@ -69,6 +69,26 @@ include (no visibility on open, a recreated surface). Rules that follow:
 - Line coverage is a map of where to look, not a score: it says nothing about
   events the model leaves out.
 
+### Version matrix
+
+Old phones take paths new ones never do. Four emulators cover minSdk to
+current: Android 9 (28), 11 (30), 13 (33), 14 (34), plus the API 36 `fe_phone`.
+
+```bash
+sdkmanager "system-images;android-28;google_apis;arm64-v8a"   # and 30, 33, 34
+avdmanager create avd -n fe_api28 -k "system-images;android-28;google_apis;arm64-v8a" -d pixel_5
+./gradlew :app:assembleDebug
+scripts/smoke-matrix.sh fe_api28 fe_api30 fe_api33 fe_api34   # results in build/smoke/summary.txt
+```
+
+Each run boots the emulator headless, opens the app, seeds a group from the
+library (debug `SEED` broadcast), opens the app again with data, rotates,
+labels and scans, applies the live engine, rotates over it, starts the screen
+saver, checks the crash buffer and runs the on-device tests. About ten minutes
+per version. `.github/workflows/device-tests.yml` runs the on-device tests on
+API 28, 30, 33 and 36 weekly. `docs/research/api-inventory.md` lists every
+framework API, its first version and the fallback.
+
 ## Device loop
 
 Drive the UI from `uiautomator dump` bounds, never guessed coordinates:
