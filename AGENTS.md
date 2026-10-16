@@ -26,10 +26,11 @@ Never:
 
 - Add a network permission or send photos off the device. Labeling and Gemini
   Nano run on the phone only.
-- Widen media access. Picked groups use the photo picker plus
-  `takePersistableUriPermission` and need no permission; `READ_MEDIA_IMAGES`
-  (and the Android 14 partial grant) is requested only when a described group
-  looks for photos.
+- Request any photo or media permission. Every photo, including what a
+  description looks through, comes through the photo picker plus
+  `takePersistableUriPermission` (Play rejected READ_MEDIA_IMAGES twice;
+  owner decision 2026-10-15). `ManifestContractTest` enforces it, and keeps
+  `INTERNET` removed from the merged manifest (ML Kit adds it).
 - Add exact-alarm permissions. Timing is inexact by design.
 - Call Gemini Nano per photo without the label ordering, or outside the
   budgets (`IndexLibraryWorker.SLICE`, `TIME_BUDGET_MS`,
@@ -84,8 +85,9 @@ in the audit.
   `DisplayManager.getDisplay(id)`; `Displays` probes ids and remembers panels.
 - Photo picker: 100 photos per pick (`MediaStore.getPickImagesMaxLimit`),
   512 persisted grants per app, oldest dropped. Cloud items the picker shows
-  are not enumerable by apps. A large library must be on the phone and read
-  with `READ_MEDIA_IMAGES`, which has no cap.
+  are not enumerable by apps. Descriptions search what the user hands over,
+  one pick at a time; whole-library search would need a permission Play
+  refused.
 - `ContentResolver.loadThumbnail` fails for Google Photos cloud picker URIs;
   decode a small copy instead (`PhotoImage` does).
 - WorkManager periodic floor: 15 minutes. Inexact alarms fire in Doze within

@@ -30,7 +30,7 @@ Minimum Android 9 (API 28). Gemini Nano judging needs a phone on Google's Prompt
 3. Set the rhythm: every so often (15 minutes to a day) or at set times. Pick Still or Motion under Look.
 4. Turn rotation on. Next photo advances right away; tap a photo in a group for Show now.
 
-A description looks through the photos on the phone; what it finds joins the same grid as the photos you added, with a Found badge. tap X to keep one out for good. The screen saver plays under Settings > Display > Screen saver once Feels Engine is chosen there.
+A description looks through photos you choose in the picker (tap Find photos, up to 100 at a time, Google Photos included) and keeps the ones that match; they join the same grid with a Found badge. Tap X to keep one out for good. The app asks for no photo permission and has no network access. The screen saver plays under Settings > Display > Screen saver once Feels Engine is chosen there.
 
 ## Layout
 

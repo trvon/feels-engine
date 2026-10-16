@@ -23,10 +23,11 @@ or AGP refuse 25.
 
 ## Rules that come up most
 
-- `SET_WALLPAPER` writes wallpapers. Picked groups need no media permission
-  (picker + persisted grants). `READ_MEDIA_IMAGES` is requested only when a
-  described group looks for photos (owner decision 2026-10-13). Never add a
-  network permission; labeling and Gemini Nano run on the phone.
+- `SET_WALLPAPER` writes wallpapers. No photo permission at all: every photo,
+  including what a description looks through, comes through the photo picker
+  with persisted grants (Play rejected READ_MEDIA_IMAGES twice; 2026-10-15).
+  No network: `INTERNET` is removed from the merged manifest because ML Kit
+  adds it. `ManifestContractTest` and CI check both.
 - Scheduling is inexact by design (WorkManager periodic, `setAndAllowWhileIdle`).
   Do not add `SCHEDULE_EXACT_ALARM` or `USE_EXACT_ALARM`.
 - Pure scheduling logic lives in `schedule/RotationPlan.kt` and stays free of

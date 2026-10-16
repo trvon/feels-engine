@@ -21,6 +21,15 @@ jobs:
         run: ./gradlew :app:lintDebug --no-daemon
       - name: Debug APK
         run: ./gradlew :app:assembleDebug --no-daemon
+      # Libraries add permissions when manifests merge; check what the APK actually declares.
+      - name: Merged manifest promises (no network, no broad photo access)
+        run: |
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/aapt2
+          perms=$("$AAPT2" dump permissions app/build/outputs/apk/debug/app-debug.apk)
+          echo "$perms"
+          if echo "$perms" | grep -E "android.permission.(INTERNET|READ_MEDIA_IMAGES|READ_MEDIA_VIDEO|READ_MEDIA_VISUAL_USER_SELECTED|READ_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE)'"; then
+            echo "::error::The APK declares a permission the privacy policy rules out"; exit 1
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

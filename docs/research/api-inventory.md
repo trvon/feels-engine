@@ -40,8 +40,7 @@ Regenerate the "newer than minSdk" list with
 | `ImageDecoder` (`createSource`, `setTargetSize`) | 28 | every decode | always present at minSdk | smoke `rotate`, `live` |
 | `ContentResolver.loadThumbnail` | 29 | thumbnails | small decode instead | lint, Android 9 smoke |
 | `MediaStore` `RELATIVE_PATH` column | 29 | `MediaLibrary.newest` | `_data` instead (`Platform.folderColumn`); naming `relative_path` on Android 9 fails the query | `PlatformProperties.queriesOnlyColumnsThatExist`, smoke `scan` on API 28 |
-| `READ_MEDIA_IMAGES` | 33 | descriptions | `READ_EXTERNAL_STORAGE` (maxSdkVersion 32) | smoke `scan` |
-| `READ_MEDIA_VISUAL_USER_SELECTED` | 34 | descriptions | not requested | smoke on 34 |
+| `READ_MEDIA_IMAGES`, `READ_MEDIA_VISUAL_USER_SELECTED`, `READ_EXTERNAL_STORAGE` | 33, 34, 1 | not requested since 2026-10-15 (Play photo policy); descriptions search picker photos | n/a | `ManifestContractTest`, CI merged-manifest step |
 
 ## Scheduling, screen saver, system
 

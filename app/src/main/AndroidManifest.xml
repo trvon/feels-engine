@@ -7,14 +7,15 @@
 
     <!-- Normal permission: granted at install, no runtime prompt. -->
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <!-- No network. ML Kit's vision-internal-vkp and Google's datatransport (usage logging) add
+         INTERNET to the merged manifest; it is removed here so nothing can leave the phone. The
+         labeling model is bundled and Gemini Nano runs in AICore, so neither needs it.
+         ACCESS_NETWORK_STATE (WorkManager) stays: it reads connectivity, it cannot send. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
     <!-- Re-arm time-of-day alarms after reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Picked photos need no permission (photo picker + persisted grants). Described groups
-         ("find all my beach photos") scan the library on device and need read access to images.
-         Requested only when the user creates a described group. Never any network permission. -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Photos come only through the system photo picker with persisted grants: no photo permission.
+         A description looks through the photos handed over the same way (Play photo policy, 2026-10-15). -->
 
     <application
         android:name=".FengineApp"

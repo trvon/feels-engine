@@ -76,9 +76,9 @@ fun GroupScreen(
     onRemovePhoto: (String) -> Unit,
     onDelete: () -> Unit,
     onSetRule: (String) -> Unit = {},
+    /** Opens the photo picker; what the user hands over is searched for the description. */
     onFindPhotos: () -> Unit = {},
-    /** True once the app may read the library; false means [onFindPhotos] will ask the system first. */
-    hasLibraryAccess: Boolean = true,
+    pickerMax: Int = 100,
     onExcludePhoto: (String) -> Unit = {},
     scanning: Boolean = false,
     indexing: Boolean = false,
@@ -109,25 +109,6 @@ fun GroupScreen(
     LaunchedEffect(group) { if (group != settings.group(group.id)) savedTick++ }
     val saved = { savedTick++ }
     var chosen by remember(group.id) { mutableStateOf<String?>(null) }
-    // The one place the app asks for library access: a described group about to look through the
-    // whole library. Said in plain words first, with the picker offered as the other way, so the
-    // system dialog never arrives unexplained (Play photo-permissions policy, declaration on file).
-    var askLibrary by remember { mutableStateOf(false) }
-    if (askLibrary) {
-        AlertDialog(
-            onDismissRequest = { askLibrary = false },
-            title = { Text("Look through all photos on this phone?") },
-            text = {
-                Text(
-                    "Feels Engine labels the photos on this phone, on the phone, to find the ones that match " +
-                        "your description, and keeps looking as new photos arrive. Nothing leaves the device. " +
-                        "If you would rather choose the photos yourself, add them with the picker instead.",
-                )
-            },
-            confirmButton = { TextAction("Allow") { askLibrary = false; onFindPhotos() } },
-            dismissButton = { TextAction("Add photos instead") { askLibrary = false; onAddPhotos() } },
-        )
-    }
     chosen?.let { uri ->
         var verdict by remember(uri) { mutableStateOf<ClockLegibility.Verdict?>(null) }
         var checked by remember(uri) { mutableStateOf(false) }
@@ -241,13 +222,13 @@ fun GroupScreen(
                 )
                 Spacer(Modifier.height(Space.md))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-                    FilledTonalButton(onClick = { commitRule(); if (hasLibraryAccess) onFindPhotos() else askLibrary = true }, enabled = rule.isNotBlank() && !scanning) {
+                    FilledTonalButton(onClick = { commitRule(); onFindPhotos() }, enabled = rule.isNotBlank() && !scanning) {
                         Text(if (scanning) "Looking..." else "Find photos")
                     }
                     if (scanning) CircularProgressIndicator(modifier = Modifier.size(Size.progress), strokeWidth = Size.progressStroke)
                 }
                 Spacer(Modifier.height(Space.sm))
-                Caption(aiStatus ?: group.scanNote.ifBlank { null } ?: "Describe what to look for and the phone adds matching photos to this group, now and as new ones arrive. Runs on this phone only.")
+                Caption(aiStatus ?: group.scanNote.ifBlank { null } ?: "Describe what to look for, then tap Find photos and choose photos to look through, up to ${"$"}pickerMax at a time, from this phone or Google Photos. The phone keeps the ones that match. Runs on this phone only.")
                 if (group.hasDescription) indexProgress?.let { (done, total) ->
                     if (total > 0) Caption(
                         when {

@@ -60,9 +60,9 @@ private fun FengineApp(vm: MainViewModel) {
     val aiStatus by vm.aiStatus.collectAsStateWithLifecycle()
     val aiReadiness by vm.aiReadiness.collectAsStateWithLifecycle()
     LaunchedEffect(openGroupId, openGroup?.hasDescription) { if (openGroup?.hasDescription == true) vm.refreshAi() }
-    // Library access is asked for only when a described group looks for photos.
-    val mediaPermission = rememberLauncherForActivityResult(RequestMultiplePermissions()) { result ->
-        if (result.values.any { it }) vm.findPhotos()
+    // Find photos hands the description a batch from the system picker; no broad photo permission.
+    val findPicker = rememberLauncherForActivityResult(PickMultipleVisualMedia(vm.pickerMax())) { uris ->
+        openGroupId?.let { vm.addToPool(it, uris) }
     }
 
     if (openGroup != null) {
@@ -77,11 +77,8 @@ private fun FengineApp(vm: MainViewModel) {
             onRemovePhoto = { vm.removePhoto(openGroup.id, it) },
             onDelete = { vm.deleteGroup(openGroup.id); openGroupId = null },
             onSetRule = { vm.setRule(openGroup.id, it) },
-            onFindPhotos = {
-                if (vm.hasLibraryAccess()) vm.findPhotos()
-                else mediaPermission.launch(MediaLibrary.requiredPermissions().toTypedArray())
-            },
-            hasLibraryAccess = vm.hasLibraryAccess(),
+            onFindPhotos = { findPicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
+            pickerMax = vm.pickerMax(),
             onExcludePhoto = { vm.excludePhoto(openGroup.id, it) },
             onSetCover = { vm.setCover(openGroup.id, it) },
             onSetDream = { vm.setDreamGroup(openGroup.id, it) },

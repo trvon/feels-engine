@@ -1,6 +1,7 @@
 # Privacy
 
-The app has no network permission. Nothing it reads leaves the phone. This is
+The app has no network permission and no photo library permission. Nothing it
+reads leaves the phone. This is
 the developer's view; the policy users and the store see is `site/privacy.html`,
 published at https://trvon.github.io/feels-engine/privacy.html.
 
@@ -10,8 +11,17 @@ published at https://trvon.github.io/feels-engine/privacy.html.
 |---|---|---|
 | `SET_WALLPAPER` | install | write the wallpaper |
 | `RECEIVE_BOOT_COMPLETED` | install | re-arm time-of-day alarms after a reboot |
-| `READ_MEDIA_IMAGES`, `READ_MEDIA_VISUAL_USER_SELECTED` (Android 13+) | the first time a group's description looks for photos (Find photos) | read the library so the description can be matched |
-| `READ_EXTERNAL_STORAGE` (Android 9 to 12) | same | same |
+Every photo arrives through the system photo picker, including the ones a
+description looks through (Find photos). There is no library permission
+(removed 2026-10-15 after Play's photo policy rejected two submissions).
+
+`INTERNET` is removed from the merged manifest. ML Kit's
+`vision-internal-vkp` and Google's `datatransport` usage-logging library add
+it; releases up to and including 0.2.1 shipped with it, so ML Kit could send
+its usage logs to Google. From 0.3.0 it cannot. `ManifestContractTest` and the
+CI step "Merged manifest promises" fail the build if it returns.
+`ACCESS_NETWORK_STATE` (from WorkManager) stays; it reads connectivity and
+cannot send anything.
 
 Picked photos need no permission. The system photo picker grants read access
 per photo and the app keeps the grant with `takePersistableUriPermission`.

@@ -27,12 +27,9 @@ class SmartGroupWorker(appContext: Context, params: WorkerParameters) : Coroutin
         val library = MediaLibrary(applicationContext)
         val groups = store.read().groups.filter { it.hasDescription }
         if (groups.isEmpty()) return Result.success()
-        if (!library.hasAccess()) {
-            note(groups.map { it.id }) { "Needs photo access to look through the library." }
-            return Result.success()
-        }
-
-        val libraryKeys = library.newest(MAX_SCAN).map { it.uri.toString() }
+        // No broad photo permission (Play photo policy, 2026-10-15): descriptions look through the
+        // photos the user handed over with the picker. Library code stays for builds that have access.
+        val libraryKeys = if (library.hasAccess()) library.newest(MAX_SCAN).map { it.uri.toString() } else emptyList()
         val index = PhotoIndex(applicationContext)
         // The pool is small and the user just handed it over: label it here. The library is the
         // indexer's job; it labels in slices and re-runs this scan after each one.
@@ -53,7 +50,8 @@ class SmartGroupWorker(appContext: Context, params: WorkerParameters) : Coroutin
         } finally {
             labeler.close()
         }
-        val unlabeled = index.unlabeled(libraryKeys).size
+        Log.i(TAG, "picked photos labeled on the phone: $labeled of ${pool.size}")
+        val unlabeled = if (libraryKeys.isEmpty()) 0 else index.unlabeled(libraryKeys).size
         if (unlabeled > 0) IndexLibraryWorker.enqueue(applicationContext)
         val labels = index.allLabels()
         val labelsFor = { uri: String -> labels[PhotoId.identity(uri)] }

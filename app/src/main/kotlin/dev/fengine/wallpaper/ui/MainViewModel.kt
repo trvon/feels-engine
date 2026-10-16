@@ -203,6 +203,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }.getOrNull()
     }
 
+    /**
+     * Photos the description should look through, from the system picker (cloud included). The
+     * matches join the group with a Found badge; grants are persisted so a rescan can read them.
+     */
+    fun addToPool(groupId: String, uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        val resolver = getApplication<Application>().contentResolver
+        val kept = uris.filter { uri ->
+            runCatching { resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }.isSuccess
+        }.map(Uri::toString)
+        updateGroup(groupId) { it.copy(pool = (it.pool + kept).distinct()) }
+        findPhotos()
+    }
+
     /** The photo that represents the group on the home rail. */
     fun setCover(groupId: String, uri: String) = updateGroup(groupId) { it.copy(coverUri = uri) }
 
@@ -274,7 +288,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 nano.close()
             }
-            scheduler.indexNow()
+            if (library.hasAccess()) scheduler.indexNow()
             scheduler.scanNow()
             // From here the scan note speaks; the readiness card already explains the labels-only case.
             aiStatus.value = null
