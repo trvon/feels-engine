@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.0](https://github.com/trvon/feels-engine/compare/v0.2.1...v0.3.0) (2026-10-16)
+
+
+### Features
+
+* **groups:** clock-safe photos: verdict on the photo sheet, skip from rotation ([e44bf00](https://github.com/trvon/feels-engine/commit/e44bf005269b933886e018482b5c69f02cfcefc8))
+* **groups:** one kind of group: add photos, describe, or both ([1a95c3e](https://github.com/trvon/feels-engine/commit/1a95c3ed85bc9eb5e35aea7a1e33b185571287ee))
+* **log:** local ledger with engine health; engine decisions move into tested rules ([7d2d795](https://github.com/trvon/feels-engine/commit/7d2d7954f8e38b38dad311ae5234c86f9e743d6d))
+* **screensaver:** wireless charging or a dock only by default on new installs ([ab442e6](https://github.com/trvon/feels-engine/commit/ab442e61dee6c7faaf0afb9736c050be6be1ed81))
+* **screens:** each screen picks its group; screen saver stays out of the car ([6d37e2b](https://github.com/trvon/feels-engine/commit/6d37e2b14c345ce52727247c8330b1aa7af055c5))
+* **shortcuts:** Next photo as a Quick Settings tile and a 1x1 widget ([bc90919](https://github.com/trvon/feels-engine/commit/bc90919c8a357f81216079f8b8d387945e250fb7))
+
+
+### Fixes
+
+* Android 9-13 found by a version matrix; API inventory ([f6d0724](https://github.com/trvon/feels-engine/commit/f6d07244dc25bc36afd2c48227a3d0be7ee5d3c5))
+* **groups:** drop photos the app can no longer read instead of failing on them ([fd5d197](https://github.com/trvon/feels-engine/commit/fd5d1972d16f627ba2d4bfdce4d4ea8478da2a20))
+* **live:** never rest on a half-faded frame; Show now applies once ([69fc0e2](https://github.com/trvon/feels-engine/commit/69fc0e28b5b44cab494ff3cb2b5421fe6cfd18df))
+* **privacy:** no photo permission and no network permission ([63c187b](https://github.com/trvon/feels-engine/commit/63c187ba82c8f52503c0261e593c0bdb9b0583c9))
+
 ## 0.2.1 (2026-10-15)
 
 - Fold fix: the inner screen no longer comes back black after the phone was
