@@ -25,6 +25,8 @@ class WallpaperApplier(private val context: Context) {
         /** One id per setBitmap call; Samsung foldables get two (inner, cover). */
         data class Applied(val wallpaperIds: List<Int>) : Result
         data class Failed(val reason: String) : Result
+        /** The photo cannot be read any more (grant lost, photo deleted): drop it, do not retry. */
+        data class Unreadable(val reason: String) : Result
     }
 
     /**
@@ -42,7 +44,8 @@ class WallpaperApplier(private val context: Context) {
             // SecurityException here means the persisted URI grant was lost (e.g. photo deleted or
             // the 5000-grant cap evicted it). The caller should drop the photo and re-prompt.
             Log.w(TAG, "decode failed for $uri", e)
-            return Result.Failed("cannot read photo: ${e.javaClass.simpleName}")
+            return if (e is SecurityException || e is java.io.FileNotFoundException) Result.Unreadable(e.javaClass.simpleName)
+            else Result.Failed("cannot read photo: ${e.javaClass.simpleName}")
         }
 
         try {

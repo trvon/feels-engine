@@ -94,9 +94,10 @@ class RotationScheduler(private val context: Context) {
      * Runs one rotation immediately through WorkManager so the worker path is exercised. [pinned]
      * shows those indexes instead of advancing; [forceStatic] writes still photos over a live engine.
      */
-    fun rotateNow(pinned: Map<String, Int> = emptyMap(), forceStatic: Boolean = false, source: String = Ledger.Source.NEXT) {
+    fun rotateNow(pinned: Map<String, Int> = emptyMap(), forceStatic: Boolean = false, source: String = Ledger.Source.NEXT, hops: Int = 0) {
         val data = Data.Builder().putBoolean(RotateWallpaperWorker.KEY_FORCE_STATIC, forceStatic)
             .putString(RotateWallpaperWorker.KEY_SOURCE, source)
+            .putInt(RotateWallpaperWorker.KEY_HOPS, hops)
         for ((id, index) in pinned) data.putInt(RotateWallpaperWorker.KEY_PIN_PREFIX + id, index)
         WorkManager.getInstance(context).enqueueUniqueWork(
             RotateWallpaperWorker.ONE_SHOT_NAME,

@@ -57,6 +57,31 @@ data class Group(
             return all.filterNot { PhotoId.identity(it) in out }.ifEmpty { all }
         }
 
+    /** The group without one photo, wherever it came from (picked, found, looked through, skipped). */
+    fun withoutPhoto(uri: String): Group {
+        val id = PhotoId.identity(uri)
+        fun List<String>.drop() = filterNot { PhotoId.identity(it) == id }
+        return copy(
+            photos = photos.drop(), matched = matched.drop(), pool = pool.drop(), skipped = skipped.drop(),
+            coverUri = coverUri?.takeUnless { PhotoId.identity(it) == id }, cursor = -1,
+        )
+    }
+
+    /**
+     * The group without photos it found by reading the phone's library directly. Those URIs need
+     * the library permission, which the app no longer has (2026-10-15); picked photos carry their
+     * own grants and stay.
+     */
+    fun withoutLibraryFinds(): Group {
+        if ((matched + pool + skipped).none(::isLibraryUri) && coverUri?.let(::isLibraryUri) != true) return this
+        // Only the library copies go: a picked copy of the same photo has its own grant and stays.
+        return copy(
+            matched = matched.filterNot(::isLibraryUri), pool = pool.filterNot(::isLibraryUri),
+            skipped = skipped.filterNot(::isLibraryUri),
+            coverUri = coverUri?.takeUnless(::isLibraryUri), cursor = -1,
+        )
+    }
+
     fun isSkipped(uri: String): Boolean = skipped.any { PhotoId.identity(it) == PhotoId.identity(uri) }
 
     val cover: String?
@@ -82,6 +107,9 @@ data class Group(
         .put("skipped", JSONArray(skipped))
 
     companion object {
+        /** A MediaStore library URI, readable only with a library permission (picker URIs are not). */
+        fun isLibraryUri(uri: String): Boolean = uri.startsWith("content://media/external/")
+
         private fun JSONObject.strings(key: String): List<String> =
             optJSONArray(key)?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList()
 
