@@ -116,3 +116,41 @@ kernel with Doze transitions. It is still under a second per 20 minutes.
 
 1,503 synthetic 640x480 photos labeled in three slices, about 90 ms per photo,
 index 287 KB. Real camera photos decode slower.
+
+## Settings navigation, phone emulator, API 36, debug (2026-10-17)
+
+`emulator-5580`, arm64, 1080×2400 px at 420 dpi, font scale 1.0, light mode,
+Skia/OpenGL. Warm running activity; one Smoke group with eight synthetic photos,
+rotation paused. Ten Home → Settings → Back cycles, 20 transitions. Taps used
+bounds from a fresh UI XML dump at each step. UIAutomator waited between taps;
+this is not a continuous scrolling or live-wallpaper workload.
+
+Reset `dumpsys gfxinfo dev.fengine.wallpaper` before the cycles, then collected
+`framestats` and `dumpsys meminfo`. Local script and raw files are under
+`build/settings-device-check/`: `profile-ui.py`, `profile-gfxinfo.txt`,
+`profile-memory-before.txt`, `profile-memory-after.txt`, `profile-summary.json`.
+
+| Measure | Result |
+|---|---|
+| Completed frames in sample | 40 |
+| HWUI-reported janky frames | 21 / 40 (52.5%) |
+| HWUI histogram p50 / p95 | 32 / 65 ms |
+| `FrameCompleted − IntendedVsync` p50 / p95 | 17.56 / 66.91 ms, nearest-rank |
+| GPU histogram p95 | 17 ms |
+| Whole-process PSS, before / after | 101,109 / 104,633 kB |
+| Native-heap PSS, before / after | 19,941 / 13,331 kB |
+| Reported graphics memory | 0 kB; not representative of phone hardware bitmaps |
+
+The HWUI histogram and raw end-to-end frame timestamps are different metrics;
+do not treat their medians as interchangeable. The launch command delivered
+an intent to an already running activity; its 0 ms result is not startup time.
+
+This is a debug/emulator baseline, not a before/after optimization result.
+Reinstall/instrumentation had already detached the live engine from Home;
+this run does not reproduce the live-engine profiles above. Process memory includes prior preview state and caches.
+Two endpoint samples do not establish a leak or steady-state memory cost.
+
+Next: record release-equivalent traces on a disposable emulator and the Fold,
+with matching data and warm-up. Separate Compose/layout, group thumbnail decode
+and GPU submission before changing code. The small jank sample warrants that
+trace, not an inferred decode bottleneck or a performance rewrite.

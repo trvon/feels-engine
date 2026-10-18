@@ -16,12 +16,17 @@ API client are bundled.
 ## Install on a device
 
 ```bash
-adb install -r -t app/build/outputs/apk/debug/app-debug.apk
+SERIAL=emulator-5580  # explicitly select the approved target
+adb -s "$SERIAL" install -r -t app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Installing does not change the wallpaper. Running a rotation does, and the
-app cannot put the previous wallpaper back (Android 14+ does not let apps read
-it). Use a test device or expect to reset the wallpaper by hand.
+Installing an update force-stops the package and can detach an active live
+wallpaper. Instrumentation also force-stops it at start and finish. On the
+API 36 emulator, reinstall/instrumentation left Home on system ImageWallpaper
+and the app's engine on Lock only.
+A rotation changes the photo too. Android 14+ prevents the app from reading
+and restoring the previous wallpaper. Use a disposable emulator; ask before
+installing or instrumenting on a user's active-wallpaper device.
 
 ## Tests
 
@@ -37,12 +42,21 @@ it). Use a test device or expect to reset the wallpaper by hand.
 
 Android classes (`SettingsStore`, workers, `WallpaperApplier`,
 `GroupDreamService`, `PhotoWallpaperService`) are thin over the pure cores.
-The two stores have on-device tests in `app/src/androidTest/`:
+`app/src/androidTest/` covers the stores and Settings navigation/system bars.
+Store tests replace groups; run the full suite only on disposable test data:
 
 ```bash
 ANDROID_SERIAL=emulator-5580 ./gradlew :app:connectedDebugAndroidTest
 ```
 
+To exclude store writes, select only the Settings cases:
+
+```bash
+ANDROID_SERIAL=emulator-5580 ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=dev.fengine.wallpaper.SettingsUiTest
+```
+
+Class selection does not prevent the runner's wallpaper-affecting force-stop.
 The rest is verified on devices by hand or with the scripts below.
 
 ### Coverage

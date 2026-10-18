@@ -33,7 +33,7 @@ foldable) and `Displays` supplies the sizes, so the system never guesses.
 
 - Screens compose `Page`, `Section`, `Headline`, `Eyebrow`, `Caption`,
   `BodyMuted`, `ChipRow`, `StatusCard`, `PhotoGrid`, `PhotoTile`, `CoverCard`,
-  `NewCoverCard`, `ActionBar`, `TextAction`, `SwitchRow`. Material 3 controls appear inside
+  `NewCoverCard`, `ActionBar`, `TextAction`, `SwitchRow`, `ChoiceRow`. Material 3 controls appear inside
   those components, or as the page's single `Button`, switches and text fields.
 - No raw dp in screens. Every dimension is a token from `Space`, `Radius`,
   `Grid` or `Size`. The test fails the build otherwise.
@@ -51,6 +51,12 @@ foldable) and `Displays` supplies the sizes, so the system never guesses.
   AI card last, only once a description has text.
 - One photo, one tile: the picker and the library name the same file with
   different URIs; `PhotoId.identity` unifies them (`data/PhotoId.kt`).
+- Home keeps groups, screen assignments, rotation pause/resume and photo actions.
+  Settings is secondary navigation from the header or Schedule action. Its
+  Rotation, Wallpaper, Screen saver and Appearance sections use tonal containers.
+  Radio rows explain exclusive choices; switches represent booleans. Complete
+  time edits save explicitly. Appearance follows the phone, with system colors
+  on Android 12+ and a light/dark fallback on older versions.
 - One filled button per page ("Set active"). Secondary actions are tonal
   buttons inside a section header or text actions. Destructive actions are text.
 - Two UX lanes (`LayoutSpec.lane`). COMPACT (under 600 dp: phones, cover
@@ -58,12 +64,14 @@ foldable) and `Displays` supplies the sizes, so the system never guesses.
   (unfolded foldables, tablets) puts the same choice in a centred card at most
   440 dp wide, because a full-width sheet stretches across the hinge and sits
   far from either hand. `Sheet` in `ui/design/Components.kt` picks the lane;
-  screens never call `ModalBottomSheet` or `Dialog` directly.
+  screens never call `ModalBottomSheet` or `Dialog` directly. Both lanes scroll
+  when choices or large text exceed the available height.
 - Choices that change the wallpaper are explicit and immediate. "Set active"
   lists the groups and puts the chosen group's cover up on both screens. A
   photo's sheet offers "Show now" (that photo, now, rotation continues from it)
-  and "Make the cover". The Look row (Still, Motion) reflects what the system
-  reports, not a stored preference: Motion opens the system chooser, Still
+  and "Make the cover". Settings > Wallpaper (Still, Motion) reflects what the
+  system reports, refreshed on return from Android's chooser, not a stored
+  preference: Motion opens the system chooser, Still
   writes the current photos as still wallpapers, which replaces the engine.
 - Status and guidance are `StatusCard`s: title, body, at most one text action.
   Tone: primary container when ready, secondary container when something is in

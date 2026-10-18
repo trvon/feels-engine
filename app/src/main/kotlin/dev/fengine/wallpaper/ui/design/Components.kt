@@ -4,11 +4,10 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.os.Build
 import android.util.Log
-import android.util.Size as AndroidSize
-import dev.fengine.wallpaper.smart.Images
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,11 +21,14 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -34,9 +36,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -49,20 +52,20 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
+import dev.fengine.wallpaper.smart.Images
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import android.util.Size as AndroidSize
 
 /*
  * The component vocabulary. Every screen is composed from these and nothing else at the layout
@@ -78,18 +81,20 @@ fun Page(content: @Composable ColumnScope.() -> Unit) {
         Scaffold { padding ->
             // A tap on empty page space ends editing, which also puts the keyboard away.
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .pointerInput(Unit) { detectTapGestures(onTap = { focus.clearFocus() }) },
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .pointerInput(Unit) { detectTapGestures(onTap = { focus.clearFocus() }) },
                 contentAlignment = Alignment.TopCenter,
             ) {
                 Column(
-                    modifier = Modifier
-                        .widthIn(max = spec.maxContentWidth)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = Space.page),
+                    modifier =
+                        Modifier
+                            .widthIn(max = spec.maxContentWidth)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = Space.page),
                 ) {
                     Spacer(Modifier.height(Space.xl))
                     content()
@@ -102,7 +107,10 @@ fun Page(content: @Composable ColumnScope.() -> Unit) {
 
 /** Small caps label above a section. */
 @Composable
-fun Eyebrow(text: String, modifier: Modifier = Modifier) {
+fun Eyebrow(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Text(
         text.uppercase(),
         style = MaterialTheme.typography.labelLarge,
@@ -113,7 +121,11 @@ fun Eyebrow(text: String, modifier: Modifier = Modifier) {
 
 /** Section = eyebrow, fixed gap, content, section gap after. */
 @Composable
-fun Section(eyebrow: String, trailing: (@Composable () -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+fun Section(
+    eyebrow: String,
+    trailing: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
         if (trailing == null) {
             Eyebrow(eyebrow)
@@ -122,7 +134,10 @@ fun Section(eyebrow: String, trailing: (@Composable () -> Unit)? = null, content
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
-            ) { Eyebrow(eyebrow); trailing() }
+            ) {
+                Eyebrow(eyebrow)
+                trailing()
+            }
         }
         Spacer(Modifier.height(Space.eyebrow))
         content()
@@ -132,7 +147,10 @@ fun Section(eyebrow: String, trailing: (@Composable () -> Unit)? = null, content
 
 /** The page's one serif headline, with an optional one-line caption under it. */
 @Composable
-fun Headline(text: String, caption: String? = null) {
+fun Headline(
+    text: String,
+    caption: String? = null,
+) {
     Text(text, style = MaterialTheme.typography.displaySmall)
     caption?.let {
         Spacer(Modifier.height(Space.sm))
@@ -141,7 +159,10 @@ fun Headline(text: String, caption: String? = null) {
 }
 
 @Composable
-fun Caption(text: String, modifier: Modifier = Modifier) {
+fun Caption(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier)
 }
 
@@ -152,30 +173,76 @@ fun BodyMuted(text: String) {
 
 /** Text-only action; the page has at most one filled button, everything else is this. */
 @Composable
-fun TextAction(label: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick) { Text(label) }
+fun TextAction(
+    label: String,
+    onClick: () -> Unit,
+) = TextAction(label, enabled = true, onClick = onClick)
+
+@Composable
+fun TextAction(
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    TextButton(onClick = onClick, enabled = enabled) { Text(label) }
 }
 
 /** A labelled switch on one line: title on the left, the control on the right. */
 @Composable
-fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
+fun SwitchRow(
+    label: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
+) {
     // The whole row is the tap target (label included), announced as one switch.
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
-            .padding(vertical = Space.xs),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Size.touchTarget)
+                .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+                .padding(vertical = Space.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, style = MaterialTheme.typography.titleMedium)
+        Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).padding(end = Space.md))
         Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+    }
+}
+
+/** One accessibility node per option; the label and supporting text are part of the target. */
+@Composable
+fun ChoiceRow(
+    label: String,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Size.touchTarget)
+                .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+                .padding(vertical = Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.md),
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.titleMedium)
+            Caption(description)
+        }
     }
 }
 
 /** Back on the left, a destructive or secondary action on the right. */
 @Composable
-fun ActionBar(leading: Pair<String, () -> Unit>, trailing: Pair<String, () -> Unit>? = null) {
+fun ActionBar(
+    leading: Pair<String, () -> Unit>,
+    trailing: Pair<String, () -> Unit>? = null,
+) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         TextAction(leading.first, leading.second)
         trailing?.let { TextAction(it.first, it.second) }
@@ -185,7 +252,11 @@ fun ActionBar(leading: Pair<String, () -> Unit>, trailing: Pair<String, () -> Un
 /** A row of single-choice chips; wraps on narrow screens instead of clipping. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun <T> ChipRow(options: List<Pair<T, String>>, selected: T?, onSelect: (T) -> Unit) {
+fun <T> ChipRow(
+    options: List<Pair<T, String>>,
+    selected: T?,
+    onSelect: (T) -> Unit,
+) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
         options.forEach { (value, label) ->
             FilterChip(selected = selected == value, onClick = { onSelect(value) }, label = { Text(label) })
@@ -195,7 +266,12 @@ fun <T> ChipRow(options: List<Pair<T, String>>, selected: T?, onSelect: (T) -> U
 
 /** Rounded surface with a title, a body and at most one text action. Used for status and guidance. */
 @Composable
-fun StatusCard(title: String, body: String, tone: Color = MaterialTheme.colorScheme.surfaceVariant, action: Pair<String, () -> Unit>? = null) {
+fun StatusCard(
+    title: String,
+    body: String,
+    tone: Color = MaterialTheme.colorScheme.surfaceVariant,
+    action: Pair<String, () -> Unit>? = null,
+) {
     Surface(color = tone, shape = RoundedCornerShape(Radius.card), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(Space.lg)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
@@ -255,30 +331,38 @@ fun PhotoTile(
     onClick: (() -> Unit)? = null,
 ) {
     Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(Radius.tile))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        modifier =
+            modifier
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(Radius.tile))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
         PhotoImage(uri, Modifier.fillMaxSize(), contentDescription = "Photo")
         badge?.let { Badge(it, Modifier.align(Alignment.BottomStart).padding(Space.sm)) }
         onRemove?.let {
             // A small disc the eye reads as "x", inside a tap target that still meets the 44 dp minimum.
             Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(Size.tileAction)
-                    .clickable(onClick = it),
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .size(Size.tileAction)
+                        .clickable(onClick = it),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(Size.tileActionDisc)
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f), CircleShape),
+                    modifier =
+                        Modifier
+                            .size(Size.tileActionDisc)
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "Remove photo", tint = Color.White, modifier = Modifier.size(Size.tileIcon))
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Remove photo",
+                        tint = Color.White,
+                        modifier = Modifier.size(Size.tileIcon),
+                    )
                 }
             }
         }
@@ -292,21 +376,31 @@ fun PhotoTile(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun Sheet(
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     when (currentLayoutSpec().lane) {
-        Lane.COMPACT -> ModalBottomSheet(onDismissRequest = onDismiss) {
-            Column(modifier = Modifier.padding(horizontal = Space.page)) {
-                content()
-                Spacer(Modifier.height(Space.xl))
+        Lane.COMPACT -> {
+            ModalBottomSheet(onDismissRequest = onDismiss) {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = Space.page)) {
+                    content()
+                    Spacer(Modifier.height(Space.xl))
+                }
             }
         }
-        Lane.WIDE -> Dialog(onDismissRequest = onDismiss) {
-            Surface(
-                shape = RoundedCornerShape(Radius.card),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.widthIn(max = Size.sheetCardWidth).fillMaxWidth(),
-            ) {
-                Column(modifier = Modifier.padding(horizontal = Space.page, vertical = Space.xl)) { content() }
+
+        Lane.WIDE -> {
+            Dialog(onDismissRequest = onDismiss) {
+                Surface(
+                    shape = RoundedCornerShape(Radius.card),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.widthIn(max = Size.sheetCardWidth).fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = Space.page, vertical = Space.xl),
+                    ) { content() }
+                }
             }
         }
     }
@@ -314,27 +408,38 @@ fun Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
 
 /** Pill label over imagery. Always white on a scrim so it reads on any photo. */
 @Composable
-fun Badge(text: String, modifier: Modifier = Modifier) {
+fun Badge(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Text(
         text,
         style = MaterialTheme.typography.labelMedium,
         color = Color.White,
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f), CircleShape)
-            .padding(horizontal = Space.md, vertical = Space.xs),
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f), CircleShape)
+                .padding(horizontal = Space.md, vertical = Space.xs),
     )
 }
 
 /** Portrait cover with title and caption, for the group rail. */
 @Composable
-fun CoverCard(title: String, caption: String, coverUri: String?, badge: String?, onClick: () -> Unit) {
+fun CoverCard(
+    title: String,
+    caption: String,
+    coverUri: String?,
+    badge: String?,
+    onClick: () -> Unit,
+) {
     Column(modifier = Modifier.width(LocalLayout.current.coverWidth).clickable(onClick = onClick)) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(Size.coverAspect)
-                .clip(RoundedCornerShape(Radius.card))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(Size.coverAspect)
+                    .clip(RoundedCornerShape(Radius.card))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             coverUri?.let { PhotoImage(it, Modifier.fillMaxSize(), contentDescription = null) }
             badge?.let { Badge(it, Modifier.align(Alignment.BottomStart).padding(Space.md)) }
@@ -347,14 +452,18 @@ fun CoverCard(title: String, caption: String, coverUri: String?, badge: String?,
 
 /** The "+" cover that ends the rail. */
 @Composable
-fun NewCoverCard(title: String, onClick: () -> Unit) {
+fun NewCoverCard(
+    title: String,
+    onClick: () -> Unit,
+) {
     Column(modifier = Modifier.width(LocalLayout.current.coverWidth).clickable(onClick = onClick)) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(Size.coverAspect)
-                .clip(RoundedCornerShape(Radius.card))
-                .background(MaterialTheme.colorScheme.secondaryContainer),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(Size.coverAspect)
+                    .clip(RoundedCornerShape(Radius.card))
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center,
         ) {
             Text("+", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
@@ -373,15 +482,21 @@ val RailPadding = PaddingValues(end = Space.page)
  * surface instead of crashing.
  */
 @Composable
-fun PhotoImage(uri: String, modifier: Modifier = Modifier, contentDescription: String?) {
+fun PhotoImage(
+    uri: String,
+    modifier: Modifier = Modifier,
+    contentDescription: String?,
+) {
     val context = LocalContext.current
     val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = uri) {
-        value = withContext(Dispatchers.IO) {
-            // The system thumbnail road fails for Google Photos cloud items; decode a small copy instead.
-            loadThumbnail(context.contentResolver, Uri.parse(uri))
-                ?: runCatching { Images.decode(context, Uri.parse(uri), THUMB_EDGE).asImageBitmap() }
-                    .onFailure { Log.w("PhotoImage", "no thumbnail for $uri", it) }.getOrNull()
-        }
+        value =
+            withContext(Dispatchers.IO) {
+                // The system thumbnail road fails for Google Photos cloud items; decode a small copy instead.
+                loadThumbnail(context.contentResolver, Uri.parse(uri))
+                    ?: runCatching { Images.decode(context, Uri.parse(uri), THUMB_EDGE).asImageBitmap() }
+                        .onFailure { Log.w("PhotoImage", "no thumbnail for $uri", it) }
+                        .getOrNull()
+            }
     }
     bitmap?.let {
         Image(bitmap = it, contentDescription = contentDescription, contentScale = ContentScale.Crop, modifier = modifier)
@@ -390,7 +505,10 @@ fun PhotoImage(uri: String, modifier: Modifier = Modifier, contentDescription: S
 
 private const val THUMB_EDGE = 320
 
-private fun loadThumbnail(resolver: ContentResolver, uri: Uri): ImageBitmap? {
+private fun loadThumbnail(
+    resolver: ContentResolver,
+    uri: Uri,
+): ImageBitmap? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null // Android 9: the decode fallback below handles it
     return runCatching { resolver.loadThumbnail(uri, AndroidSize(THUMB_EDGE, THUMB_EDGE), null).asImageBitmap() }.getOrNull()
 }
