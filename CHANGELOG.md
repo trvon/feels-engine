@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/trvon/feels-engine/compare/v0.3.0...v0.4.0) (2026-10-21)
+
+
+### Features
+
+* **settings:** separate preferences from photo actions ([70269a3](https://github.com/trvon/feels-engine/commit/70269a33f255c845d9dd317e9bf6a5802642310b))
+
 ## [0.3.0](https://github.com/trvon/feels-engine/compare/v0.2.1...v0.3.0) (2026-10-16)
 
 
