@@ -57,7 +57,39 @@ ANDROID_SERIAL=emulator-5580 ./gradlew :app:connectedDebugAndroidTest \
 ```
 
 Class selection does not prevent the runner's wallpaper-affecting force-stop.
-The rest is verified on devices by hand or with the scripts below.
+
+### Lifecycle states
+
+`LifecycleFlowTest` and `LifecycleFlowProperties` exercise settings, rotation
+and rendering together. They cover cursor reconstruction, hidden updates,
+selected versus running engines, lost surfaces and interrupted fades.
+Preference round trips are in memory; Android process death is not simulated.
+
+The emulator checks remain separate:
+
+| State | Record |
+| --- | --- |
+| UI foreground/background | Resumed activity, selected wallpaper component, engine visibility |
+| Process death/restart | PID change, persisted cursor, service recreation and first frame |
+| Force-stop/relaunch | Package stopped flag, wallpaper selection and trigger registrations before relaunch |
+| Screen off/on, lock/unlock | Display power and lock state, visibility/surface callbacks and restored frame |
+| Doze, low battery, background restriction | System state and periodic job constraints, then delivery after restrictions lift |
+| Reboot | Saved settings, periodic work and time-of-day alarm registration |
+| Static/live selection | Per-screen component and static writes; a PID alone does not establish ownership |
+
+Use an approved disposable emulator and synthetic photos. Pass its verified
+serial to every device command. Installing, seeding and selecting wallpaper
+change its state. Record initial power/restriction settings and restore them.
+
+`am kill` can leave a bound wallpaper process alive: require an observed PID
+change before calling a case process death. Do not launch the app, send a debug
+broadcast or run instrumentation before recording an unstimulated restart or
+force-stop state. Those actions can start or stop the process being measured.
+
+Manual Next uses unconstrained one-shot work; automatic interval rotation
+requires battery-not-low. A successful manual rotation or forced job does not
+prove automatic work runs under battery constraints or in Doze. Scheduling is
+inexact; registration and actual delivery are separate observations.
 
 ### Coverage
 
