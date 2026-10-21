@@ -1,0 +1,15 @@
+rules:
+  - id: aes-ecb
+    languages: [kotlin]
+    severity: ERROR
+    message: >-
+      AES defaults to ECB or explicitly uses ECB. Use authenticated encryption
+      such as AES/GCM with a unique nonce.
+    metadata:
+      category: security
+      cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+    patterns:
+      - pattern: javax.crypto.Cipher.getInstance($MODE, ...)
+      - metavariable-regex:
+          metavariable: $MODE
+          regex: '(?i)^"(?:AES|[^"]*/ECB/[^"]*)"$'

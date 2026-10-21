@@ -7,19 +7,29 @@ plugins {
 
 // Release signing: environment variables on CI, docs/local/signing.properties (ignored by git) on a
 // developer machine. With neither, assembleRelease is unsigned and says so. See docs/release.md.
-val signing = Properties().apply {
-    val f = rootProject.file("docs/local/signing.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
-}
-fun signingValue(env: String, key: String): String? = System.getenv(env) ?: signing.getProperty(key)
-val releaseStore = signingValue("FENGINE_KEYSTORE", "storeFile")?.let { path ->
-    if (File(path).isAbsolute) File(path) else rootProject.file(path)
-}
+val signing =
+    Properties().apply {
+        val f = rootProject.file("docs/local/signing.properties")
+        if (f.exists()) f.inputStream().use { load(it) }
+    }
+
+fun signingValue(
+    env: String,
+    key: String,
+): String? = System.getenv(env) ?: signing.getProperty(key)
+
+val releaseStore =
+    signingValue("FENGINE_KEYSTORE", "storeFile")?.let { path ->
+        if (File(path).isAbsolute) File(path) else rootProject.file(path)
+    }
 
 // release-please rewrites this line from the release PR; versionCode follows it
 // (major*10000 + minor*100 + patch), so 0.2.2 is 202 and every release is higher.
 val appVersion = "0.3.0" // x-release-please-version
-val appVersionCode = appVersion.split('.').map(String::toInt).let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
+val appVersionCode =
+    appVersion.split('.').map(String::toInt).let { (major, minor, patch) ->
+        major * 10000 + minor * 100 + patch
+    }
 
 android {
     namespace = "dev.fengine.wallpaper"
@@ -53,9 +63,17 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            if (releaseStore != null) signingConfig = signingConfigs.getByName("release")
-            else logger.warn("No release signing configured; assembleRelease will be unsigned (docs/release.md).")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            if (releaseStore != null) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                logger.warn(
+                    "No release signing configured; assembleRelease will be unsigned (docs/release.md)."
+                )
+            }
         }
     }
 
@@ -67,13 +85,15 @@ android {
     buildFeatures {
         compose = true
     }
-
 }
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     // Property seeds are printed on failure so a counterexample can be replayed.
-    testLogging { events("failed"); showStandardStreams = false }
+    testLogging {
+        events("failed")
+        showStandardStreams = false
+    }
 }
 
 dependencies {
@@ -93,7 +113,8 @@ dependencies {
     implementation(libs.mlkit.image.labeling)
     implementation(libs.mlkit.genai.prompt)
     testImplementation(libs.junit)
-    // Invariant / fuzz suite: jqwik properties on the JUnit platform; JUnit 4 tests keep running via vintage.
+    // Invariant / fuzz suite: jqwik properties on the JUnit platform; JUnit 4 tests keep running
+    // via vintage.
     testImplementation(libs.jqwik)
     testImplementation(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)

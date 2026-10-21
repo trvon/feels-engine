@@ -1,0 +1,11 @@
+rules:
+  - id: tls-hostname-verifier
+    languages: [kotlin]
+    severity: ERROR
+    message: >-
+      Hostname verification always succeeds. Keep the platform verifier;
+      do not accept arbitrary server certificates.
+    metadata:
+      category: security
+      cwe: "CWE-295: Improper Certificate Validation"
+    pattern: "javax.net.ssl.HostnameVerifier { $HOST, $SESSION -> true }"

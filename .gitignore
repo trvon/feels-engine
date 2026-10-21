@@ -2,11 +2,14 @@
 build/
 local.properties
 .idea/
+/.pi/
 *.iml
 .DS_Store
 .kotlin/
 captures/
 .jqwik-database
+__pycache__/
+*.py[cod]
 docs/local/*
 !docs/local/README.md
 !docs/local/*.example.*
