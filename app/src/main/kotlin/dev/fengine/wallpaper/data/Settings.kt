@@ -22,9 +22,14 @@ data class Settings(
     val shuffle: Boolean = false,
     val enabled: Boolean = false,
     val lastResult: String = "",
+    /** Epoch millis of the last photo change on any screen; 0 before the first. */
+    val lastRotationAt: Long = 0,
     /** Group the screen saver plays, or null for the home group. */
     val dreamGroupId: String? = null,
-    /** On a foldable, the group the cover screen shows instead of the inner screen's; null for the same. */
+    /**
+     * On a foldable, the group the cover screen shows instead of the inner screen's; null for the
+     * same.
+     */
     val coverGroupId: String? = null,
     /**
      * Screen saver plays only on wireless charging or a dock, so a car's USB charger never starts
@@ -35,16 +40,25 @@ data class Settings(
     val dreamWirelessOnly: Boolean = true,
 ) {
     fun group(id: String?): Group? = id?.let { g -> groups.firstOrNull { it.id == g } }
-    val homeGroup: Group? get() = group(homeGroupId)
-    val lockGroup: Group? get() = group(lockGroupId)
-    val dreamGroup: Group? get() = group(dreamGroupId)
-    val coverGroup: Group? get() = group(coverGroupId)
+
+    val homeGroup: Group?
+        get() = group(homeGroupId)
+
+    val lockGroup: Group?
+        get() = group(lockGroupId)
+
+    val dreamGroup: Group?
+        get() = group(dreamGroupId)
+
+    val coverGroup: Group?
+        get() = group(coverGroupId)
 
     /** True when at least one screen has a group with photos: the precondition for rotating. */
     val canRotate: Boolean
         get() = listOfNotNull(homeGroup, lockGroup).any { it.allPhotos.isNotEmpty() }
 
-    val hasDescribedGroups: Boolean get() = groups.any { it.hasDescription }
+    val hasDescribedGroups: Boolean
+        get() = groups.any { it.hasDescription }
 
     companion object {
         const val MIN_INTERVAL_MINUTES = 15

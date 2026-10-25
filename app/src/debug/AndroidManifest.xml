@@ -12,6 +12,7 @@
                 <action android:name="dev.fengine.wallpaper.PROBE" />
                 <action android:name="dev.fengine.wallpaper.SEED" />
                 <action android:name="dev.fengine.wallpaper.SCAN" />
+                <action android:name="dev.fengine.wallpaper.OVERDUE" />
             </intent-filter>
         </receiver>
     </application>

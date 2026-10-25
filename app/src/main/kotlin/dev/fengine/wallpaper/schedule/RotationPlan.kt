@@ -15,12 +15,20 @@ object RotationPlan {
      * one call with both flags so the system treats the image as shared; different groups get one
      * call each. Screens without a group, or whose group is empty, are left alone.
      */
-    fun steps(homeGroupId: String?, lockGroupId: String?, isEmpty: (String) -> Boolean): List<Step> {
+    fun steps(
+        homeGroupId: String?,
+        lockGroupId: String?,
+        isEmpty: (String) -> Boolean,
+    ): List<Step> {
         val home = homeGroupId?.takeUnless(isEmpty)
         val lock = lockGroupId?.takeUnless(isEmpty)
         return when {
             home != null && home == lock -> listOf(Step(home, FLAG_SYSTEM or FLAG_LOCK))
-            else -> listOfNotNull(home?.let { Step(it, FLAG_SYSTEM) }, lock?.let { Step(it, FLAG_LOCK) })
+            else ->
+                listOfNotNull(
+                    home?.let { Step(it, FLAG_SYSTEM) },
+                    lock?.let { Step(it, FLAG_LOCK) },
+                )
         }
     }
 
@@ -42,7 +50,13 @@ object RotationPlan {
      * every panel, or Samsung display bits (4 inner, 16 cover) when a foldable's panels show
      * different groups.
      */
-    data class Write(val groupId: String, val index: Int, val uri: String, val which: Int, val panels: Int = 0)
+    data class Write(
+        val groupId: String,
+        val index: Int,
+        val uri: String,
+        val which: Int,
+        val panels: Int = 0,
+    )
 
     /** Everything one rotation decides: the writes to make and the new cursor per group. */
     data class Advance(val writes: List<Write>, val cursors: Map<String, Int>)
@@ -53,15 +67,27 @@ object RotationPlan {
      * remaining screens get the group's new photo.
      */
     fun advance(
-        homeGroupId: String?, lockGroupId: String?,
-        photos: (String) -> List<String>, cursor: (String) -> Int,
-        shuffle: Boolean, liveHome: Boolean, liveLock: Boolean, random: Random = Random.Default,
+        homeGroupId: String?,
+        lockGroupId: String?,
+        photos: (String) -> List<String>,
+        cursor: (String) -> Int,
+        shuffle: Boolean,
+        liveHome: Boolean,
+        liveLock: Boolean,
+        random: Random = Random.Default,
         /** Indexes to show instead of advancing ("show this one now"). */
         pinned: Map<String, Int> = emptyMap(),
-        /** The cover screen's own group on a foldable with Samsung display bits, or null for the same photo. */
+        /**
+         * The cover screen's own group on a foldable with Samsung display bits, or null for the
+         * same photo.
+         */
         coverGroupId: String? = null,
-        /** The cover panel's live state on a foldable with Samsung display bits; the inner panel's elsewhere. */
-        coverLiveHome: Boolean = liveHome, coverLiveLock: Boolean = liveLock,
+        /**
+         * The cover panel's live state on a foldable with Samsung display bits; the inner panel's
+         * elsewhere.
+         */
+        coverLiveHome: Boolean = liveHome,
+        coverLiveLock: Boolean = liveLock,
     ): Advance {
         val steps = steps(homeGroupId, lockGroupId) { photos(it).isEmpty() }
         val cursors = LinkedHashMap<String, Int>()
@@ -69,7 +95,8 @@ object RotationPlan {
         fun indexFor(id: String): Int {
             val pool = photos(id)
             return cursors.getOrPut(id) {
-                pinned[id]?.takeIf { it in pool.indices } ?: nextIndex(pool.size, cursor(id), shuffle, random)
+                pinned[id]?.takeIf { it in pool.indices }
+                    ?: nextIndex(pool.size, cursor(id), shuffle, random)
             }
         }
         val cover = coverGroupId?.takeIf { photos(it).isNotEmpty() }
@@ -79,14 +106,24 @@ object RotationPlan {
             val coverWhich = staticFlags(step.which, coverLiveHome, coverLiveLock)
             val coverSrc = cover ?: step.groupId
             if (coverSrc == step.groupId && innerWhich == coverWhich) {
-                if (innerWhich != 0) writes += Write(step.groupId, index, photos(step.groupId)[index], innerWhich)
+                if (innerWhich != 0)
+                    writes += Write(step.groupId, index, photos(step.groupId)[index], innerWhich)
             } else {
                 // The panels differ: inner from this step's group, cover from the cover group or
                 // this group with the flags the engine does not draw there.
-                if (innerWhich != 0) writes += Write(step.groupId, index, photos(step.groupId)[index], innerWhich, panels = PANEL_INNER)
+                if (innerWhich != 0)
+                    writes +=
+                        Write(
+                            step.groupId,
+                            index,
+                            photos(step.groupId)[index],
+                            innerWhich,
+                            panels = PANEL_INNER,
+                        )
                 if (coverWhich != 0) {
                     val ci = indexFor(coverSrc)
-                    writes += Write(coverSrc, ci, photos(coverSrc)[ci], coverWhich, panels = PANEL_COVER)
+                    writes +=
+                        Write(coverSrc, ci, photos(coverSrc)[ci], coverWhich, panels = PANEL_COVER)
                 }
             }
         }
@@ -107,16 +144,76 @@ object RotationPlan {
     }
 
     /**
-     * Next trigger as epoch millis for a list of minutes-after-midnight slots in [zoneOffsetMillis].
-     * Uses a plain civil-day model: good enough for wallpaper, and DST shifts self-correct because
-     * the receiver reschedules from the real clock after each firing.
+     * Shortest wait before an overdue interval alarm fires, so a missed slot never fires in a
+     * burst.
      */
-    fun nextTimeOfDay(nowEpochMillis: Long, slotsMinutes: List<Int>, zoneOffsetMillis: Long): Long? {
+    const val MIN_ALARM_DELAY_MS = 60_000L
+
+    /** A scheduled change may run this early (alarm batching); earlier than this it is skipped. */
+    const val EARLY_TOLERANCE = 0.9
+
+    /**
+     * When the next interval change is due: one interval after the last change, or soon if that
+     * moment already passed (a missed slot), or one interval from now before the first change.
+     */
+    fun nextIntervalAt(nowMs: Long, lastChangeMs: Long, intervalMinutes: Int): Long {
+        val interval = intervalMinutes.coerceAtLeast(1) * 60_000L
+        if (lastChangeMs <= 0) return nowMs + interval
+        return maxOf(lastChangeMs + interval, nowMs + MIN_ALARM_DELAY_MS)
+    }
+
+    /**
+     * Whether a scheduled change should happen now. Several paths can ask (the alarm, the periodic
+     * job kept as a backstop, the live engine on screen-on); only the first one that is due changes
+     * the photo, so they never double up.
+     */
+    fun isDue(nowMs: Long, lastChangeMs: Long, intervalMinutes: Int): Boolean {
+        if (lastChangeMs <= 0) return true
+        val interval = intervalMinutes.coerceAtLeast(1) * 60_000L
+        return nowMs - lastChangeMs >= (interval * EARLY_TOLERANCE).toLong()
+    }
+
+    /**
+     * Due for either rhythm: an interval elapsed (within [EARLY_TOLERANCE]), or a set time passed
+     * since the last change.
+     */
+    fun due(
+        mode: dev.fengine.wallpaper.data.Mode,
+        nowMs: Long,
+        lastChangeMs: Long,
+        intervalMinutes: Int,
+        slots: List<Int>,
+        zoneOffsetMillis: Long,
+    ): Boolean =
+        when (mode) {
+            dev.fengine.wallpaper.data.Mode.INTERVAL -> isDue(nowMs, lastChangeMs, intervalMinutes)
+            dev.fengine.wallpaper.data.Mode.TIME_OF_DAY ->
+                lastChangeMs <= 0 ||
+                    (nextTimeOfDay(lastChangeMs, slots, zoneOffsetMillis)?.let { it <= nowMs }
+                        ?: false)
+        }
+
+    /** How late a change ran against its due time (negative when early, within tolerance). */
+    fun lateness(nowMs: Long, lastChangeMs: Long, intervalMinutes: Int): Long =
+        if (lastChangeMs <= 0) 0
+        else nowMs - (lastChangeMs + intervalMinutes.coerceAtLeast(1) * 60_000L)
+
+    /**
+     * Next trigger as epoch millis for a list of minutes-after-midnight slots in
+     * [zoneOffsetMillis]. Uses a plain civil-day model: good enough for wallpaper, and DST shifts
+     * self-correct because the receiver reschedules from the real clock after each firing.
+     */
+    fun nextTimeOfDay(
+        nowEpochMillis: Long,
+        slotsMinutes: List<Int>,
+        zoneOffsetMillis: Long,
+    ): Long? {
         if (slotsMinutes.isEmpty()) return null
         val day = 24L * 60 * 60 * 1000
         val local = nowEpochMillis + zoneOffsetMillis
         val midnight = local - local.mod(day)
-        // Slots outside a day (a corrupt store, a future import) wrap instead of scheduling into the past.
+        // Slots outside a day (a corrupt store, a future import) wrap instead of scheduling into
+        // the past.
         val sorted = slotsMinutes.map { it.mod(24 * 60) }.distinct().sorted()
         val todayCandidate = sorted.map { midnight + it * 60_000L }.firstOrNull { it > local }
         val next = todayCandidate ?: (midnight + day + sorted.first() * 60_000L)

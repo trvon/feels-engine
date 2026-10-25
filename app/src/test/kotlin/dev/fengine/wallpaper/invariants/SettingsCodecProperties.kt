@@ -18,31 +18,68 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 
 /**
- * The settings file must survive write -> read unchanged, must never throw on a corrupt
- * preference, and must migrate the v0.1 flat photo list into one group for both screens.
+ * The settings file must survive write -> read unchanged, must never throw on a corrupt preference,
+ * and must migrate the v0.1 flat photo list into one group for both screens.
  */
 class SettingsCodecProperties {
 
-    private val text: Arbitrary<String> = Arbitraries.strings().withCharRange(' ', '￿').ofMaxLength(30)
+    private val text: Arbitrary<String> =
+        Arbitraries.strings().withCharRange(' ', '￿').ofMaxLength(30)
 
     @Provide
     fun groups(): Arbitrary<List<Group>> =
         Combinators.combine(text, text.list().ofMaxSize(4), text.injectNull(0.5))
-            .`as` { name: String, photos: List<String>, rule: String? -> Group(name = name, photos = photos, rule = rule) }
-            .list().ofMaxSize(4)
+            .`as` { name: String, photos: List<String>, rule: String? ->
+                Group(name = name, photos = photos, rule = rule)
+            }
+            .list()
+            .ofMaxSize(4)
 
-    /** Settings as the app itself produces them: assignments point at existing groups, slots sorted. */
+    /**
+     * Settings as the app itself produces them: assignments point at existing groups, slots sorted.
+     */
     @Provide
-    fun validSettings(): Arbitrary<Settings> = groups().flatMap { gs ->
-        val pick: Arbitrary<String?> = if (gs.isEmpty()) Arbitraries.just(null) else Arbitraries.of(gs.map { it.id }).injectNull(0.3)
-        Combinators.combine(
-            pick, pick, Arbitraries.of(Mode.entries), Arbitraries.integers().between(1, 24 * 60),
-            Arbitraries.integers().between(0, 24 * 60 - 1).list().ofMaxSize(6), Arbitraries.of(true, false),
-            Arbitraries.of(true, false), text,
-        ).`as` { home: String?, lock: String?, mode: Mode, interval: Int, times: List<Int>, shuffle: Boolean, enabled: Boolean, last: String ->
-            Settings(gs, home, lock, mode, interval, times.sorted(), shuffle, enabled, last, dreamGroupId = lock ?: home, coverGroupId = home, dreamWirelessOnly = shuffle != enabled)
+    fun validSettings(): Arbitrary<Settings> =
+        groups().flatMap { gs ->
+            val pick: Arbitrary<String?> =
+                if (gs.isEmpty()) Arbitraries.just(null)
+                else Arbitraries.of(gs.map { it.id }).injectNull(0.3)
+            Combinators.combine(
+                    pick,
+                    pick,
+                    Arbitraries.of(Mode.entries),
+                    Arbitraries.integers().between(1, 24 * 60),
+                    Arbitraries.integers().between(0, 24 * 60 - 1).list().ofMaxSize(6),
+                    Arbitraries.of(true, false),
+                    Arbitraries.of(true, false),
+                    text,
+                )
+                .`as` {
+                    home: String?,
+                    lock: String?,
+                    mode: Mode,
+                    interval: Int,
+                    times: List<Int>,
+                    shuffle: Boolean,
+                    enabled: Boolean,
+                    last: String ->
+                    Settings(
+                        gs,
+                        home,
+                        lock,
+                        mode,
+                        interval,
+                        times.sorted(),
+                        shuffle,
+                        enabled,
+                        last,
+                        dreamGroupId = lock ?: home,
+                        coverGroupId = home,
+                        dreamWirelessOnly = shuffle != enabled,
+                        lastRotationAt = interval * 60_000L,
+                    )
+                }
         }
-    }
 
     @Property(tries = 500)
     fun validSettingsRoundTrip(@ForAll("validSettings") s: Settings) {
@@ -53,22 +90,39 @@ class SettingsCodecProperties {
 
     @Property(tries = 500)
     fun danglingAssignmentsAreDroppedAndSlotsSorted(
-        @ForAll("groups") gs: List<Group>, @ForAll home: String?, @ForAll lock: String?,
+        @ForAll("groups") gs: List<Group>,
+        @ForAll home: String?,
+        @ForAll lock: String?,
         @ForAll times: List<Int>,
     ) {
         val prefs = mutablePreferencesOf()
-        SettingsCodec.write(prefs, Settings(groups = gs, homeGroupId = home, lockGroupId = lock, timesOfDay = times))
+        SettingsCodec.write(
+            prefs,
+            Settings(groups = gs, homeGroupId = home, lockGroupId = lock, timesOfDay = times),
+        )
         val out = SettingsCodec.read(prefs)
         assertEquals(gs, out.groups)
         assertEquals(home?.takeIf { id -> gs.any { it.id == id } }, out.homeGroupId)
         assertEquals(lock?.takeIf { id -> gs.any { it.id == id } }, out.lockGroupId)
-        assertEquals(home?.takeIf { id -> gs.any { it.id == id } }, SettingsCodec.read(mutablePreferencesOf().also { SettingsCodec.write(it, Settings(groups = gs, dreamGroupId = home)) }).dreamGroupId)
+        assertEquals(
+            home?.takeIf { id -> gs.any { it.id == id } },
+            SettingsCodec.read(
+                    mutablePreferencesOf().also {
+                        SettingsCodec.write(it, Settings(groups = gs, dreamGroupId = home))
+                    }
+                )
+                .dreamGroupId,
+        )
         assertEquals(times.sorted(), out.timesOfDay)
         assertTrue(out.timesOfDay.zipWithNext().all { (a, b) -> a <= b })
     }
 
     @Property(tries = 1000)
-    fun readNeverThrowsOnGarbage(@ForAll junkGroups: String, @ForAll junkMode: String, @ForAll junkTimes: String) {
+    fun readNeverThrowsOnGarbage(
+        @ForAll junkGroups: String,
+        @ForAll junkMode: String,
+        @ForAll junkTimes: String,
+    ) {
         val prefs = mutablePreferencesOf()
         prefs[SettingsCodec.Keys.groups] = junkGroups
         prefs[SettingsCodec.Keys.mode] = junkMode
@@ -99,7 +153,10 @@ class SettingsCodecProperties {
     }
 
     @Property(tries = 300)
-    fun legacyListNeverOverridesExistingGroups(@ForAll("validSettings") s: Settings, @ForAll legacy: String) {
+    fun legacyListNeverOverridesExistingGroups(
+        @ForAll("validSettings") s: Settings,
+        @ForAll legacy: String,
+    ) {
         val prefs = mutablePreferencesOf()
         SettingsCodec.write(prefs, s)
         prefs[SettingsCodec.Keys.legacyPhotos] = legacy
@@ -107,14 +164,22 @@ class SettingsCodecProperties {
         if (s.groups.isNotEmpty()) assertEquals(s.groups, out.groups)
     }
 
-    /** New installs default to wireless-or-dock only; installs from before the setting keep playing on any charger. */
+    /**
+     * New installs default to wireless-or-dock only; installs from before the setting keep playing
+     * on any charger.
+     */
     @Property(tries = 300)
     fun screenSaverDefaultRespectsExistingInstalls(@ForAll("validSettings") s: Settings) {
         val prefs = mutablePreferencesOf()
         SettingsCodec.write(prefs, s)
-        prefs.remove(booleanPreferencesKey("dream_wireless_only"))   // as written before the setting existed
+        prefs.remove(
+            booleanPreferencesKey("dream_wireless_only")
+        ) // as written before the setting existed
         val back = SettingsCodec.read(prefs)
         assertEquals(s.groups.isEmpty(), back.dreamWirelessOnly)
-        assertEquals(true, SettingsCodec.read(mutablePreferencesOf()).dreamWirelessOnly)  // a fresh install
+        assertEquals(
+            true,
+            SettingsCodec.read(mutablePreferencesOf()).dreamWirelessOnly,
+        ) // a fresh install
     }
 }

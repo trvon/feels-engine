@@ -507,3 +507,33 @@ Settings density stays low; anything diagnostic goes to a secondary screen.
 - https://developers.google.cn/photos/support/updates
 - `~/Library/Android/sdk/sources/android-37.2/android/service/wallpaper/WallpaperService.java`
 - https://developer.android.com/develop/ui/compose/layouts/adaptive/foldables
+
+## 7. Scheduled changes for a rarely opened app (2026-10-25)
+
+The owner's Fold log (10-16 to 10-25) showed an hourly rhythm stalling 3 to
+16 hours most days and once 80 hours. Cause: the app is rarely opened, so App
+Standby moves it to RARE (40) or lower, and WorkManager periodic work there
+gets about 10 minutes of job time per 24 h and 3 job sessions per 24 h (Pixel
+`dumpsys jobscheduler`, qc_max_session_count_rare). Inexact alarms get 1 per
+hour in RARE, 2 in FREQUENT, 10 in WORKING_SET, 1 per day in RESTRICTED
+(https://developer.android.com/topic/performance/power/power-details;
+`dumpsys alarm` standby_quota_rare=1). Being the live wallpaper or the screen
+saver is not a documented exemption, and Play does not allow asking a
+wallpaper app's users for a battery-optimisation exemption.
+
+Since 0.4.x the scheduled change is a chained `setAndAllowWhileIdle` alarm
+for both rhythms, and the rotation runs inside the alarm's broadcast
+(`schedule/Rotation.kt`) instead of being handed to WorkManager, which would
+put it back under the job quota. Periodic work stays as a backstop; every
+caller asks `RotationPlan.due` first, so only one changes the photo per slot.
+The live engine also catches up on screen-on when a change is overdue.
+
+Verified on the API 36 emulator with `am set-standby-bucket ... rare`: the
+alarm fired and the backstop found nothing due; the next alarm was deferred
+by `app_standby` to the next hour (quota 1). So an hourly rhythm holds in
+RARE; a 15-minute rhythm runs about hourly until the app is opened. The log
+now records `bucket` and `late_ms` on scheduled changes, and `reason` on
+unreadable photos, to check this on the Fold. Samsung "sleeping" and "deep
+sleeping" apps (after about 3 and 16 days unused) restrict alarms too
+(reported, https://developer.samsung.com/mobile/app-management.html); opening
+the app resets that.

@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 
 /**
@@ -22,6 +23,7 @@ object SettingsCodec {
         val dreamWirelessOnly = booleanPreferencesKey("dream_wireless_only")
         val enabled = booleanPreferencesKey("enabled")
         val lastResult = stringPreferencesKey("last_result")
+        val lastRotationAt = longPreferencesKey("last_rotation_at")
         val dreamGroupId = stringPreferencesKey("dream_group_id")
         val coverGroupId = stringPreferencesKey("cover_group_id")
 
@@ -40,6 +42,7 @@ object SettingsCodec {
         prefs[Keys.dreamWirelessOnly] = next.dreamWirelessOnly
         prefs[Keys.enabled] = next.enabled
         prefs[Keys.lastResult] = next.lastResult
+        prefs[Keys.lastRotationAt] = next.lastRotationAt
         next.dreamGroupId?.let { prefs[Keys.dreamGroupId] = it } ?: prefs.remove(Keys.dreamGroupId)
         next.coverGroupId?.let { prefs[Keys.coverGroupId] = it } ?: prefs.remove(Keys.coverGroupId)
         prefs.remove(Keys.legacyPhotos)
@@ -57,22 +60,29 @@ object SettingsCodec {
         val legacy = prefs[Keys.legacyPhotos]?.lines()?.filter { it.isNotBlank() }.orEmpty()
         if (groups.isEmpty() && legacy.isNotEmpty()) {
             val g = Group(name = "My photos", photos = legacy)
-            groups = listOf(g); home = g.id; lock = g.id
+            groups = listOf(g)
+            home = g.id
+            lock = g.id
         }
         return Settings(
             groups = groups,
             homeGroupId = home?.takeIf { id -> groups.any { it.id == id } },
             lockGroupId = lock?.takeIf { id -> groups.any { it.id == id } },
-            mode = prefs[Keys.mode]?.let { runCatching { Mode.valueOf(it) }.getOrNull() } ?: defaults.mode,
+            mode =
+                prefs[Keys.mode]?.let { runCatching { Mode.valueOf(it) }.getOrNull() }
+                    ?: defaults.mode,
             intervalMinutes = prefs[Keys.intervalMinutes] ?: defaults.intervalMinutes,
-            timesOfDay = prefs[Keys.timesOfDay]?.lines()?.mapNotNull { it.toIntOrNull() }?.sorted()
-                ?: defaults.timesOfDay,
+            timesOfDay =
+                prefs[Keys.timesOfDay]?.lines()?.mapNotNull { it.toIntOrNull() }?.sorted()
+                    ?: defaults.timesOfDay,
             shuffle = prefs[Keys.shuffle] ?: defaults.shuffle,
             // Never written: a new install gets the default; an install that already had groups
             // played on any charger before this setting existed and keeps doing so.
-            dreamWirelessOnly = prefs[Keys.dreamWirelessOnly] ?: (defaults.dreamWirelessOnly && groups.isEmpty()),
+            dreamWirelessOnly =
+                prefs[Keys.dreamWirelessOnly] ?: (defaults.dreamWirelessOnly && groups.isEmpty()),
             enabled = prefs[Keys.enabled] ?: defaults.enabled,
             lastResult = prefs[Keys.lastResult] ?: defaults.lastResult,
+            lastRotationAt = prefs[Keys.lastRotationAt] ?: defaults.lastRotationAt,
             dreamGroupId = prefs[Keys.dreamGroupId]?.takeIf { id -> groups.any { it.id == id } },
             coverGroupId = prefs[Keys.coverGroupId]?.takeIf { id -> groups.any { it.id == id } },
         )

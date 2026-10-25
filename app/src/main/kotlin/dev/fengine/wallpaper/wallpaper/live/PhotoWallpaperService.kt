@@ -20,7 +20,6 @@ import dev.fengine.wallpaper.FengineApp
 import dev.fengine.wallpaper.data.Ledger
 import dev.fengine.wallpaper.data.LedgerStore
 import dev.fengine.wallpaper.data.Settings
-import dev.fengine.wallpaper.wallpaper.WallpaperCrop
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,7 +27,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * The live engine: draws the current group's photo itself, with a cross-fade on change, parallax
@@ -41,16 +39,19 @@ import kotlinx.coroutines.withContext
  * can need, on the IO dispatcher, as hardware bitmaps when the surface gives a hardware canvas.
  *
  * Threading: every state change and every draw happens on one render thread, never on the main
- * thread. A GPU stall in a canvas post (seen on emulators) then costs frames, not the process:
- * the main thread stays free for WorkManager jobs and binder calls. The engine callbacks arrive
- * on the main thread and are handed over with a post.
+ * thread. A GPU stall in a canvas post (seen on emulators) then costs frames, not the process: the
+ * main thread stays free for WorkManager jobs and binder calls. The engine callbacks arrive on the
+ * main thread and are handed over with a post.
  */
 class PhotoWallpaperService : WallpaperService() {
 
     override fun onCreateEngine(): Engine = PhotoEngine()
 
     inner class PhotoEngine : Engine() {
-        private val renderThread = HandlerThread("feels-render", android.os.Process.THREAD_PRIORITY_DISPLAY).apply { start() }
+        private val renderThread =
+            HandlerThread("feels-render", android.os.Process.THREAD_PRIORITY_DISPLAY).apply {
+                start()
+            }
         private val render = Handler(renderThread.looper)
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         /** Touched only on the render thread. */
@@ -58,8 +59,12 @@ class PhotoWallpaperService : WallpaperService() {
         private var watch: Job? = null
         private var load: Job? = null
         private val slots = BitmapSlots<Bitmap>()
-        private val current: Bitmap? get() = slots.current
-        private val previous: Bitmap? get() = slots.previous
+        private val current: Bitmap?
+            get() = slots.current
+
+        private val previous: Bitmap?
+            get() = slots.previous
+
         private var fade: ValueAnimator? = null
         private var fadeAlpha = 1f
         private val canvas = CanvasPolicy(SLOW_POST_MS)
@@ -74,9 +79,17 @@ class PhotoWallpaperService : WallpaperService() {
 
         override fun onCreate(holder: SurfaceHolder) {
             super.onCreate(holder)
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) wallpaperFlags else -1
-            val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) displayContext?.display?.displayId else null
-            Log.i(TAG, "engine ${System.identityHashCode(this)} created, preview=$isPreview flags=$flags display=$display")
+            val flags =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) wallpaperFlags
+                else -1
+            val display =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                    displayContext?.display?.displayId
+                else null
+            Log.i(
+                TAG,
+                "engine ${System.identityHashCode(this)} created, preview=$isPreview flags=$flags display=$display",
+            )
             LiveEngines.created(System.identityHashCode(this), isPreview)
             setOffsetNotificationsEnabled(true)
             watch = scope.launch {
@@ -87,11 +100,19 @@ class PhotoWallpaperService : WallpaperService() {
             }
         }
 
-        /** The photo this screen should show: its group's cursor photo, or the first before any rotation. */
+        /**
+         * The photo this screen should show: its group's cursor photo, or the first before any
+         * rotation.
+         */
         private fun photoFor(settings: Settings): String? {
-            val lock = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
-                wallpaperFlags and WallpaperManager.FLAG_LOCK != 0 && wallpaperFlags and WallpaperManager.FLAG_SYSTEM == 0
-            val group = (if (lock) settings.lockGroup else settings.homeGroup) ?: settings.homeGroup ?: settings.groups.firstOrNull()
+            val lock =
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+                    wallpaperFlags and WallpaperManager.FLAG_LOCK != 0 &&
+                    wallpaperFlags and WallpaperManager.FLAG_SYSTEM == 0
+            val group =
+                (if (lock) settings.lockGroup else settings.homeGroup)
+                    ?: settings.homeGroup
+                    ?: settings.groups.firstOrNull()
             val photos = group?.rotation.orEmpty()
             if (photos.isEmpty()) return null
             return photos[group!!.cursor.coerceIn(0, photos.size - 1)]
@@ -99,31 +120,55 @@ class PhotoWallpaperService : WallpaperService() {
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
             super.onSurfaceChanged(holder, format, w, h)
-            render.post { if (w != state.width || h != state.height) Log.i(TAG, "surface ${w}x$h"); act(state.onSurface(w, h)) }
+            render.post {
+                if (w != state.width || h != state.height) Log.i(TAG, "surface ${w}x$h")
+                act(state.onSurface(w, h))
+            }
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             // Finish any draw in flight before the surface goes away; its content goes with it.
             Log.i(TAG, "surface lost")
-            onRenderThread { hidden(); act(state.onSurfaceLost()) }
+            onRenderThread {
+                hidden()
+                act(state.onSurfaceLost())
+            }
             super.onSurfaceDestroyed(holder)
         }
 
-        /** The system shows the surface right after this returns, so the frame is drawn before that. */
+        /**
+         * The system shows the surface right after this returns, so the frame is drawn before that.
+         */
         override fun onSurfaceRedrawNeeded(holder: SurfaceHolder) {
             super.onSurfaceRedrawNeeded(holder)
             Log.i(TAG, "surface redraw needed")
             onRenderThread { actShown(state.onRedrawNeeded()) }
         }
 
-        /** Run [block] on the render thread and wait for it, bounded so a stalled GPU never blocks the caller for long. */
+        /**
+         * Run [block] on the render thread and wait for it, bounded so a stalled GPU never blocks
+         * the caller for long.
+         */
         private fun onRenderThread(block: () -> Unit) {
             val done = java.util.concurrent.CountDownLatch(1)
-            render.post { try { block() } finally { done.countDown() } }
+            render.post {
+                try {
+                    block()
+                } finally {
+                    done.countDown()
+                }
+            }
             done.await(500, java.util.concurrent.TimeUnit.MILLISECONDS)
         }
 
-        override fun onOffsetsChanged(xOff: Float, yOff: Float, xStep: Float, yStep: Float, xPx: Int, yPx: Int) {
+        override fun onOffsetsChanged(
+            xOff: Float,
+            yOff: Float,
+            xStep: Float,
+            yStep: Float,
+            xPx: Int,
+            yPx: Int,
+        ) {
             render.post { act(state.onOffset(xOff)) }
         }
 
@@ -132,9 +177,25 @@ class PhotoWallpaperService : WallpaperService() {
         }
 
         override fun onVisibilityChanged(v: Boolean) {
+            // Bound while it is the wallpaper, the engine can catch up on screen-on when a change
+            // is
+            // overdue (the alarm deferred): no wake-up, no render loop, just one due check.
+            if (v && !isPreview)
+                scope.launch(Dispatchers.IO) {
+                    runCatching {
+                        dev.fengine.wallpaper.schedule.Rotation.run(
+                            applicationContext,
+                            dev.fengine.wallpaper.data.Ledger.Source.WAKE,
+                        )
+                    }
+                }
             Log.i(TAG, "visible=$v")
             render.post {
-                if (v) actShown(state.onVisibility(true)) else { hidden(); act(state.onVisibility(false)) }
+                if (v) actShown(state.onVisibility(true))
+                else {
+                    hidden()
+                    act(state.onVisibility(false))
+                }
             }
         }
 
@@ -149,9 +210,11 @@ class PhotoWallpaperService : WallpaperService() {
         override fun onDestroy() {
             Log.i(TAG, "engine ${System.identityHashCode(this)} destroyed")
             LiveEngines.destroyed(System.identityHashCode(this))
-            watch?.cancel(); scope.cancel()
+            watch?.cancel()
+            scope.cancel()
             render.post {
-                fade?.cancel(); load?.cancel()
+                fade?.cancel()
+                load?.cancel()
                 hidden()
                 slots.onDestroy().forEach(Bitmap::recycle)
             }
@@ -161,7 +224,10 @@ class PhotoWallpaperService : WallpaperService() {
 
         /** Perform what the state asked for: the only place I/O happens. */
         private fun act(d: LiveEngineState.Decision) {
-            if (d.cancelFade) { fade?.cancel(); finishFade() }
+            if (d.cancelFade) {
+                fade?.cancel()
+                finishFade()
+            }
             d.decode?.let { uri -> decodeThen(uri, d.keepOld) }
             if (d.startFade) startFade()
             if (d.draw) draw()
@@ -169,24 +235,29 @@ class PhotoWallpaperService : WallpaperService() {
 
         private fun decodeThen(uri: String, keepOld: Boolean) {
             load?.cancel()
-            val w = state.width; val h = state.height
-            load = scope.launch(Dispatchers.IO) {
-                val bitmap = decode(uri, w, h) ?: return@launch
-                render.post {
-                    val decision = state.onDecoded(uri, keepOld)
-                    if (decision == LiveEngineState.Decision.NONE && state.shown != uri) { bitmap.recycle(); return@post } // stale
-                    fade?.cancel()   // ends through finishFade, which releases the old previous
-                    slots.onDecoded(bitmap, fade = decision.startFade).forEach(Bitmap::recycle)
-                    if (!decision.startFade) fadeAlpha = 1f
-                    act(decision)
+            val w = state.width
+            val h = state.height
+            load =
+                scope.launch(Dispatchers.IO) {
+                    val bitmap = decode(uri, w, h) ?: return@launch
+                    render.post {
+                        val decision = state.onDecoded(uri, keepOld)
+                        if (decision == LiveEngineState.Decision.NONE && state.shown != uri) {
+                            bitmap.recycle()
+                            return@post
+                        } // stale
+                        fade?.cancel() // ends through finishFade, which releases the old previous
+                        slots.onDecoded(bitmap, fade = decision.startFade).forEach(Bitmap::recycle)
+                        if (!decision.startFade) fadeAlpha = 1f
+                        act(decision)
+                    }
                 }
-            }
         }
 
         /**
-         * Decode at exactly the size the frames need: a 12 MP photo on a 2448x1848 panel becomes
-         * a 2803x2116 bitmap (24 MB as a hardware bitmap), not the 49 MB a power-of-two sample
-         * size would leave. The sample size does the cheap part, the target size the rest.
+         * Decode at exactly the size the frames need: a 12 MP photo on a 2448x1848 panel becomes a
+         * 2803x2116 bitmap (24 MB as a hardware bitmap), not the 49 MB a power-of-two sample size
+         * would leave. The sample size does the cheap part, the target size the rest.
          */
         private fun decode(uri: String, w: Int, h: Int): Bitmap? = runCatching {
             val (tw, th) = LiveFrame.decodeTarget(w, h)
@@ -194,32 +265,48 @@ class PhotoWallpaperService : WallpaperService() {
             ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                 val (dw, dh) = LiveFrame.decodeSize(info.size.width, info.size.height, tw, th)
                 decoder.setTargetSize(dw, dh)
-                decoder.allocator = if (canvas.softwareOnly) ImageDecoder.ALLOCATOR_SOFTWARE else ImageDecoder.ALLOCATOR_DEFAULT
+                decoder.allocator =
+                    if (canvas.softwareOnly) ImageDecoder.ALLOCATOR_SOFTWARE
+                    else ImageDecoder.ALLOCATOR_DEFAULT
             }
-        }.onFailure { Log.w(TAG, "decode failed for $uri", it) }.getOrNull()
+        }
+            .onFailure { Log.w(TAG, "decode failed for $uri", it) }
+            .getOrNull()
 
         private fun startFade() {
             fadeAlpha = 0f
-            fadeFrames = 0; fadeStart = android.os.SystemClock.elapsedRealtime(); fadeClock.reset()
-            fade = ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = FADE_MS
-                interpolator = LinearInterpolator()
-                addUpdateListener { a ->
-                    val t = a.animatedValue as Float
-                    // 120 Hz panels tick twice as often; a 900 ms fade needs no more than 60 fps.
-                    if (!fadeClock.shouldDraw(t, android.os.SystemClock.elapsedRealtime())) return@addUpdateListener
-                    fadeAlpha = LiveFrame.fadeAlpha(t)
-                    act(state.onFadeFrame(t))
+            fadeFrames = 0
+            fadeStart = android.os.SystemClock.elapsedRealtime()
+            fadeClock.reset()
+            fade =
+                ValueAnimator.ofFloat(0f, 1f).apply {
+                    duration = FADE_MS
+                    interpolator = LinearInterpolator()
+                    addUpdateListener { a ->
+                        val t = a.animatedValue as Float
+                        // 120 Hz panels tick twice as often; a 900 ms fade needs no more than 60
+                        // fps.
+                        if (!fadeClock.shouldDraw(t, android.os.SystemClock.elapsedRealtime()))
+                            return@addUpdateListener
+                        fadeAlpha = LiveFrame.fadeAlpha(t)
+                        act(state.onFadeFrame(t))
+                    }
+                    addListener(
+                        object : android.animation.AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: android.animation.Animator) =
+                                finishFade()
+                        }
+                    )
+                    start()
                 }
-                addListener(object : android.animation.AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: android.animation.Animator) = finishFade()
-                })
-                start()
-            }
         }
 
         private fun finishFade() {
-            if (fade != null) Log.i(TAG, "fade: $fadeFrames frames in ${android.os.SystemClock.elapsedRealtime() - fadeStart} ms")
+            if (fade != null)
+                Log.i(
+                    TAG,
+                    "fade: $fadeFrames frames in ${android.os.SystemClock.elapsedRealtime() - fadeStart} ms",
+                )
             fade = null
             fadeAlpha = 1f
             slots.onFadeFinished().forEach(Bitmap::recycle)
@@ -228,9 +315,18 @@ class PhotoWallpaperService : WallpaperService() {
         /** One frame. The state already decided it is wanted and the surface is visible. */
         private fun draw() {
             val holder = surfaceHolder
-            val c = (if (canvas.softwareOnly) null else runCatching { holder.lockHardwareCanvas() }.getOrNull())
-                ?: run { canvas.onHardwareUnavailable(); holder.lockCanvas() }
-            if (c == null) { Log.w(TAG, "no canvas; frame still owed"); act(state.onDrawFailed()); return }
+            val c =
+                (if (canvas.softwareOnly) null
+                else runCatching { holder.lockHardwareCanvas() }.getOrNull())
+                    ?: run {
+                        canvas.onHardwareUnavailable()
+                        holder.lockCanvas()
+                    }
+            if (c == null) {
+                Log.w(TAG, "no canvas; frame still owed")
+                act(state.onDrawFailed())
+                return
+            }
             val started = android.os.SystemClock.elapsedRealtime()
             val blended = previous != null && fadeAlpha < 1f
             try {
@@ -238,13 +334,15 @@ class PhotoWallpaperService : WallpaperService() {
                 previous?.let { if (fadeAlpha < 1f) drawPhoto(c, it, 255) }
                 current?.let { drawPhoto(c, it, (fadeAlpha * 255).toInt()) }
                 frames++
-                if (fade != null) fadeFrames++ else Log.d(TAG, "frame ${frames}: offset=${state.xOffset} zoom=${state.zoom}")
+                if (fade != null) fadeFrames++
+                else Log.d(TAG, "frame ${frames}: offset=${state.xOffset} zoom=${state.zoom}")
             } finally {
                 holder.unlockCanvasAndPost(c)
             }
             // A GPU path that stalls (emulators, some drivers) is worse than software drawing.
             val ms = android.os.SystemClock.elapsedRealtime() - started
-            if (canvas.onPost(ms)) Log.w(TAG, "hardware canvas stalled twice; using software from now on")
+            if (canvas.onPost(ms))
+                Log.w(TAG, "hardware canvas stalled twice; using software from now on")
             if (!isPreview) health.drew(now(), blended)?.let { record(it) }
         }
 
@@ -255,26 +353,40 @@ class PhotoWallpaperService : WallpaperService() {
          * has nothing decoded at all; otherwise the surface already holds the right picture.
          */
         private fun actShown(d: LiveEngineState.Decision) {
-            if (!isPreview && (d.draw || d.decode != null || state.shown == null)) health.shown(now())
+            if (!isPreview && (d.draw || d.decode != null || state.shown == null))
+                health.shown(now())
             act(d)
         }
 
         /** The screen went away: close the shown-screen record and note an interrupted fade. */
-        private fun hidden() { if (!isPreview) health.hidden(now()).forEach(::record) }
+        private fun hidden() {
+            if (!isPreview) health.hidden(now()).forEach(::record)
+        }
 
         private fun record(r: FrameHealth.Record) {
-            val ev = when (r) {
-                is FrameHealth.Record.FirstFrame -> Ledger.Event.FirstFrame(r.latencyMs)
-                is FrameHealth.Record.NoFrame -> Ledger.Event.NoFrame(r.shownMs)
-                FrameHealth.Record.AbandonedBlend -> Ledger.Event.AbandonedBlend
-            }
+            val ev =
+                when (r) {
+                    is FrameHealth.Record.FirstFrame -> Ledger.Event.FirstFrame(r.latencyMs)
+                    is FrameHealth.Record.NoFrame -> Ledger.Event.NoFrame(r.shownMs)
+                    FrameHealth.Record.AbandonedBlend -> Ledger.Event.AbandonedBlend
+                }
             ledger.record(ev)
         }
 
         private fun drawPhoto(canvas: Canvas, bitmap: Bitmap, alpha: Int) {
             if (bitmap.isRecycled) return
-            val f = LiveFrame.frame(bitmap.width, bitmap.height, state.width, state.height, state.xOffset, state.zoom)
-            matrix.reset(); matrix.postScale(f.scale, f.scale); matrix.postTranslate(f.dx, f.dy)
+            val f =
+                LiveFrame.frame(
+                    bitmap.width,
+                    bitmap.height,
+                    state.width,
+                    state.height,
+                    state.xOffset,
+                    state.zoom,
+                )
+            matrix.reset()
+            matrix.postScale(f.scale, f.scale)
+            matrix.postTranslate(f.dx, f.dy)
             paint.alpha = alpha
             canvas.drawBitmap(bitmap, matrix, paint)
         }

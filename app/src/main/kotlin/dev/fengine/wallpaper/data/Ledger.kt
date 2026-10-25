@@ -16,6 +16,12 @@ object Ledger {
             val which: Int,
             val panels: Int,
             val result: String,
+            /** App standby bucket when it ran (10 active ... 50 never); -1 unknown. */
+            val bucket: Int = -1,
+            /** How late against the due time, for scheduled changes; null when not scheduled. */
+            val lateMs: Long? = null,
+            /** Why a photo could not be used (exception class and URI authority, never the URI). */
+            val reason: String? = null,
         ) : Event
 
         /** A shown screen got its first engine frame after [latencyMs]. */
@@ -33,6 +39,8 @@ object Ledger {
 
     object Source {
         const val SCHEDULE = "schedule"
+        const val ALARM = "alarm"
+        const val WAKE = "wake"
         const val NEXT = "next"
         const val SHOW_NOW = "show-now"
         const val SET_ACTIVE = "set-active"
@@ -53,6 +61,11 @@ object Ledger {
                     .put("which", ev.which)
                     .put("panels", ev.panels)
                     .put("result", ev.result)
+                    .apply {
+                        if (ev.bucket >= 0) put("bucket", ev.bucket)
+                        ev.lateMs?.let { put("late_ms", it) }
+                        ev.reason?.let { put("reason", it) }
+                    }
             is Event.FirstFrame -> o.put("type", "first_frame").put("ms", ev.latencyMs)
             is Event.NoFrame -> o.put("type", "no_frame").put("ms", ev.shownMs)
             Event.AbandonedBlend -> o.put("type", "abandoned_blend")
@@ -77,6 +90,9 @@ object Ledger {
                         o.getInt("which"),
                         o.getInt("panels"),
                         o.getString("result"),
+                        bucket = o.optInt("bucket", -1),
+                        lateMs = if (o.has("late_ms")) o.getLong("late_ms") else null,
+                        reason = if (o.has("reason")) o.getString("reason") else null,
                     )
                 "first_frame" -> Event.FirstFrame(o.getLong("ms"))
                 "no_frame" -> Event.NoFrame(o.getLong("ms"))

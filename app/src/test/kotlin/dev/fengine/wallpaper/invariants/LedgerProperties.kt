@@ -24,7 +24,20 @@ class LedgerProperties {
                         Arbitraries.of(0, 4, 16),
                         Arbitraries.of("applied", "live", "failed"),
                     )
-                    .`as` { s: String, w: Int, p: Int, r: String -> Event.Rotation(s, w, p, r) },
+                    .`as` { s: String, w: Int, p: Int, r: String ->
+                        Event.Rotation(
+                            s,
+                            w,
+                            p,
+                            r,
+                            bucket = (w * 10) % 60,
+                            lateMs = if (p == 4) null else w * 1000L - 2000,
+                            reason =
+                                if (r == "unreadable")
+                                    "SecurityException com.google.android.apps.photos.cloudpicker"
+                                else null,
+                        )
+                    },
                 Arbitraries.longs().between(0, 5000).map { Event.FirstFrame(it) },
                 Arbitraries.longs().between(0, 60_000).map { Event.NoFrame(it) },
                 Arbitraries.just(Event.AbandonedBlend),
