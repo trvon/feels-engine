@@ -123,6 +123,8 @@ private fun FengineApp(vm: MainViewModel) {
             onSetBackdrop = vm::setBackdrop,
             onSetPhotoFit = vm::setPhotoFit,
             screenSaverWeek = screenSaverWeek,
+            onSetTapToChange = vm::setTapToChange,
+            onSetChangeOnTheme = vm::setChangeOnTheme,
             hasCoverScreen = vm.hasCoverScreen(),
             dreamConfigured = dreamConfigured,
             motion = motion,

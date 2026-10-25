@@ -87,6 +87,8 @@ class SettingsCodecProperties {
                         photoFit = PhotoFit.entries[(interval / 3) % 2],
                         motionOn = interval % 2 == 0,
                         motionLostAt = interval * 1000L,
+                        tapToChange = shuffle,
+                        changeOnTheme = enabled,
                     )
                 }
         }

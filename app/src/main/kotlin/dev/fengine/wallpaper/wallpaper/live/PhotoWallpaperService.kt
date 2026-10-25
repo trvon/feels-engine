@@ -3,6 +3,7 @@ package dev.fengine.wallpaper.wallpaper.live
 import android.animation.ValueAnimator
 import android.app.WallpaperColors
 import android.app.WallpaperManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -11,6 +12,7 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.service.wallpaper.WallpaperService
@@ -19,10 +21,12 @@ import android.view.SurfaceHolder
 import android.view.animation.LinearInterpolator
 import dev.fengine.wallpaper.FengineApp
 import dev.fengine.wallpaper.data.Backdrop
+import dev.fengine.wallpaper.data.ChangeTriggers
 import dev.fengine.wallpaper.data.Ledger
 import dev.fengine.wallpaper.data.LedgerStore
 import dev.fengine.wallpaper.data.PhotoFit
 import dev.fengine.wallpaper.data.Settings
+import dev.fengine.wallpaper.schedule.Rotation
 import dev.fengine.wallpaper.ui.Palette
 import dev.fengine.wallpaper.wallpaper.PhotoColors
 import kotlinx.coroutines.CoroutineScope
@@ -49,8 +53,34 @@ import kotlinx.coroutines.launch
  * main thread and are handed over with a post.
  */
 class PhotoWallpaperService : WallpaperService() {
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var uiMode: Int? = null
 
     override fun onCreateEngine(): Engine = PhotoEngine()
+
+    override fun onCreate() {
+        super.onCreate()
+        uiMode = resources.configuration.uiMode
+    }
+
+    /** Settings > Rotation, "When light or dark changes": one service, so one change per switch. */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val changed = ChangeTriggers.nightChanged(uiMode, newConfig.uiMode)
+        uiMode = newConfig.uiMode
+        if (!changed || !LiveEngines.anyRunning) return
+        serviceScope.launch(Dispatchers.IO) {
+            runCatching {
+                if ((application as FengineApp).settings.read().changeOnTheme)
+                    Rotation.run(applicationContext, Ledger.Source.THEME)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        serviceScope.cancel()
+        super.onDestroy()
+    }
 
     inner class PhotoEngine : Engine() {
         private val renderThread =
@@ -83,6 +113,8 @@ class PhotoWallpaperService : WallpaperService() {
         @Volatile private var backdropTinted = false
         @Volatile private var backdropColor = Color.BLACK
         @Volatile private var photoColors: WallpaperColors? = null
+        @Volatile private var tapToChange = false
+        private var lastTap: ChangeTriggers.Tap? = null
         private val mainHandler = Handler(android.os.Looper.getMainLooper())
         private val ledger by lazy { LedgerStore(applicationContext) }
         private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -111,6 +143,7 @@ class PhotoWallpaperService : WallpaperService() {
                     val uri = photoFor(settings)
                     val whole = settings.photoFit == PhotoFit.WHOLE
                     val tinted = settings.backdrop == Backdrop.PHOTO
+                    tapToChange = settings.tapToChange
                     render.post {
                         if (whole != fitWhole || tinted != backdropTinted) {
                             fitWhole = whole
@@ -220,6 +253,32 @@ class PhotoWallpaperService : WallpaperService() {
                     act(state.onVisibility(false))
                 }
             }
+        }
+
+        /**
+         * Launchers send a tap on empty home screen space; two close together show the next photo.
+         * Single taps stay the launcher's (they also close folders and menus).
+         */
+        override fun onCommand(
+            action: String?,
+            x: Int,
+            y: Int,
+            z: Int,
+            extras: Bundle?,
+            resultRequested: Boolean,
+        ): Bundle? {
+            if (action == WallpaperManager.COMMAND_TAP && tapToChange && !isPreview) {
+                val tap = ChangeTriggers.Tap(android.os.SystemClock.uptimeMillis(), x, y)
+                val slop = (48 * resources.displayMetrics.density).toInt()
+                if (ChangeTriggers.isDoubleTap(lastTap, tap, slop)) {
+                    lastTap = null
+                    Log.i(TAG, "double tap: next photo")
+                    scope.launch(Dispatchers.IO) {
+                        runCatching { Rotation.run(applicationContext, Ledger.Source.TAP) }
+                    }
+                } else lastTap = tap
+            }
+            return super.onCommand(action, x, y, z, extras, resultRequested)
         }
 
         override fun onWallpaperFlagsChanged(which: Int) {

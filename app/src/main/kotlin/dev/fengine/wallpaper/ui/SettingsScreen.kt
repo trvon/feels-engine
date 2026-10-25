@@ -18,6 +18,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import dev.fengine.wallpaper.data.Backdrop
+import dev.fengine.wallpaper.data.ChangeTriggers
 import dev.fengine.wallpaper.data.ColorSource
 import dev.fengine.wallpaper.data.Mode
 import dev.fengine.wallpaper.data.PhotoFit
@@ -73,7 +75,10 @@ fun SettingsScreen(
     onSetBackdrop: (Backdrop) -> Unit = {},
     onSetPhotoFit: (PhotoFit) -> Unit = {},
     screenSaverWeek: Map<String, Int> = emptyMap(),
+    onSetTapToChange: (Boolean) -> Unit = {},
+    onSetChangeOnTheme: (Boolean) -> Unit = {},
 ) {
+    val moving = motion.innerHome || motion.innerLock || motion.coverHome || motion.coverLock
     Page {
         ActionBar("Back" to onBack)
         Headline("Settings", "Rotation, wallpaper and the way the app looks.")
@@ -89,15 +94,10 @@ fun SettingsScreen(
             Spacer(Modifier.height(Space.md))
             when (settings.mode) {
                 Mode.INTERVAL -> {
-                    Segmented(
-                        options =
-                            listOf(15 to "15 min", 60 to "Hour", 180 to "3 hours", 1440 to "Day"),
-                        selected = settings.intervalMinutes,
-                        onSelect = onSetInterval,
-                    )
+                    IntervalSlider(settings.intervalMinutes, onSetInterval)
                     Spacer(Modifier.height(Space.sm))
                     Caption(
-                        "${Format.schedule(settings)}. Android may delay a change while the app goes unused; opening it now and then keeps changes on time."
+                        "Android may delay a change while the app goes unused; opening it now and then keeps changes on time."
                     )
                 }
                 Mode.TIME_OF_DAY -> TimesEditor(settings.timesOfDay, onSetTimes)
@@ -108,12 +108,31 @@ fun SettingsScreen(
                 if (settings.shuffle) "Photos play in a shuffled order."
                 else "Photos play in group order."
             )
+            Spacer(Modifier.height(Space.lg))
+            Text("Also change", style = MaterialTheme.typography.titleMedium)
+            SwitchRow(
+                "When I double-tap the home screen",
+                settings.tapToChange && moving,
+                onSetTapToChange,
+                enabled = moving,
+            )
+            SwitchRow(
+                "When light or dark mode switches",
+                settings.changeOnTheme && moving,
+                onSetChangeOnTheme,
+                enabled = moving,
+            )
+            Caption(
+                if (moving)
+                    "Taps count on empty home screen space. These work even while rotation is off."
+                else
+                    "Needs Motion, under Look: the moving wallpaper is what hears taps and the switch."
+            )
         }
 
         PreferenceGroup("Look") {
             val home = motion.innerHome || motion.coverHome
             val lock = motion.innerLock || motion.coverLock
-            val moving = home || lock
             Segmented(
                 options = listOf(false to "Still", true to "Motion"),
                 selected = moving,
@@ -233,6 +252,29 @@ fun SettingsScreen(
             )
         }
     }
+}
+
+/**
+ * Any interval from 15 minutes to a week on one stepped slider: 15, 30, 45 minutes, 1, 1.5, 2, 3,
+ * 4, 6, 8, 12 hours, 1, 2, 3 days, a week. The value is saved when the thumb is let go.
+ */
+@Composable
+private fun IntervalSlider(minutes: Int, onChange: (Int) -> Unit) {
+    val stops = ChangeTriggers.INTERVAL_STOPS
+    var index by
+        androidx.compose.runtime.remember(minutes) {
+            mutableStateOf(ChangeTriggers.nearestStop(minutes).toFloat())
+        }
+    val shown = stops[index.toInt().coerceIn(stops.indices)]
+    Text(Format.every(shown), style = MaterialTheme.typography.bodyLarge)
+    Slider(
+        value = index,
+        onValueChange = { index = it },
+        onValueChangeFinished = { onChange(stops[index.toInt().coerceIn(stops.indices)]) },
+        valueRange = 0f..(stops.size - 1).toFloat(),
+        steps = stops.size - 2,
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Interval" },
+    )
 }
 
 /** Tonal containers use the page's palette. */

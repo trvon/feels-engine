@@ -391,6 +391,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setShuffle(shuffle: Boolean) = update { it.copy(shuffle = shuffle) }
 
+    fun setTapToChange(on: Boolean) = update { it.copy(tapToChange = on) }
+
+    fun setChangeOnTheme(on: Boolean) = update { it.copy(changeOnTheme = on) }
+
     fun setIntervalMinutes(minutes: Int) = update {
         it.copy(intervalMinutes = minutes.coerceAtLeast(Settings.MIN_INTERVAL_MINUTES))
     }

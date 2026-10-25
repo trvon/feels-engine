@@ -47,6 +47,10 @@ data class Settings(
     val motionOn: Boolean = false,
     /** When Motion stopped without the owner choosing Still; 0 for no notice. */
     val motionLostAt: Long = 0,
+    /** Double-tapping empty home screen space shows the next photo (needs Motion). */
+    val tapToChange: Boolean = false,
+    /** Switching between light and dark shows the next photo (needs Motion). */
+    val changeOnTheme: Boolean = false,
 ) {
     fun group(id: String?): Group? = id?.let { g -> groups.firstOrNull { it.id == g } }
 

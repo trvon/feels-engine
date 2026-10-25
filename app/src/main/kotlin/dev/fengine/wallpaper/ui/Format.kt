@@ -11,13 +11,17 @@ object Format {
 
     fun schedule(s: Settings): String =
         when (s.mode) {
-            Mode.INTERVAL ->
-                when {
-                    s.intervalMinutes % 1440 == 0 -> plural(s.intervalMinutes / 1440, "day")
-                    s.intervalMinutes % 60 == 0 -> plural(s.intervalMinutes / 60, "hour")
-                    else -> "Every ${s.intervalMinutes} minutes"
-                }
+            Mode.INTERVAL -> every(s.intervalMinutes)
             Mode.TIME_OF_DAY -> "At " + s.timesOfDay.joinToString(" and ", transform = ::clock)
+        }
+
+    /** "Every 15 minutes", "Every 2 hours", "Every 90 minutes", "Every week". */
+    fun every(minutes: Int): String =
+        when {
+            minutes == 10080 -> "Every week"
+            minutes % 1440 == 0 -> plural(minutes / 1440, "day")
+            minutes % 60 == 0 -> plural(minutes / 60, "hour")
+            else -> "Every $minutes minutes"
         }
 
     /** The Home notice after Android turned Motion off (MotionWatch). */

@@ -62,7 +62,9 @@ object Ledger {
         const val STILL = "still"
         const val TILE = "tile"
         const val WIDGET = "widget"
-        val manual = setOf(NEXT, SHOW_NOW, SET_ACTIVE, TILE, WIDGET)
+        const val TAP = "tap"
+        const val THEME = "theme"
+        val manual = setOf(NEXT, SHOW_NOW, SET_ACTIVE, TILE, WIDGET, TAP)
     }
 
     data class Entry(val atMs: Long, val event: Event)
