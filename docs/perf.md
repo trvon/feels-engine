@@ -175,3 +175,15 @@ rare`): the alarm path changed the photo and the next alarm was deferred by
 `app_standby` to the next hour, quota 1. Pending: the same round on the
 Pixel 8 (needs the release build with the shared upload key, which means an
 uninstall) and on the Fold 8.
+
+fe_fold (Pixel 9 Pro Fold, Android 16, inner display 2076x2152), debug
+build d74451a, `scripts/profile-live.sh emulator-5610 30`:
+
+| Window | Result |
+|---|---|
+| Engine idle, 30 s | 10 ms CPU (one tick), 0 frames |
+| 20 parallax swipes | 50 ms CPU |
+| 5 cross-fades | 1890 ms CPU; 23 to 29 frames per fade, 923 to 973 ms |
+| Memory | Java heap 14 MB, native heap 38 MB PSS |
+
+Pixel 8 round still pending: replacing its 0.2.1 needs an uninstall.
