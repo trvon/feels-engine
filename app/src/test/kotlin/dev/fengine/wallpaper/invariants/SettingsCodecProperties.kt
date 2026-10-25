@@ -89,6 +89,7 @@ class SettingsCodecProperties {
                         motionLostAt = interval * 1000L,
                         tapToChange = shuffle,
                         changeOnTheme = enabled,
+                        darkAtNight = shuffle != enabled,
                     )
                 }
         }

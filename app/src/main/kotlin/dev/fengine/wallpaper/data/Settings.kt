@@ -51,6 +51,8 @@ data class Settings(
     val tapToChange: Boolean = false,
     /** Switching between light and dark shows the next photo (needs Motion). */
     val changeOnTheme: Boolean = false,
+    /** While the phone is dark, changes prefer the group's darker photos (DarkPhotos). */
+    val darkAtNight: Boolean = false,
 ) {
     fun group(id: String?): Group? = id?.let { g -> groups.firstOrNull { it.id == g } }
 

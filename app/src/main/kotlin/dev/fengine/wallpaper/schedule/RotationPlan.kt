@@ -88,6 +88,11 @@ object RotationPlan {
          */
         coverLiveHome: Boolean = liveHome,
         coverLiveLock: Boolean = liveLock,
+        /**
+         * Photos to prefer for this change (dark photos while the phone is dark), asked lazily in
+         * play order; null for no preference.
+         */
+        prefer: ((String) -> Boolean)? = null,
     ): Advance {
         val steps = steps(homeGroupId, lockGroupId) { photos(it).isEmpty() }
         val cursors = LinkedHashMap<String, Int>()
@@ -96,7 +101,8 @@ object RotationPlan {
             val pool = photos(id)
             return cursors.getOrPut(id) {
                 pinned[id]?.takeIf { it in pool.indices }
-                    ?: nextIndex(pool.size, cursor(id), shuffle, random)
+                    ?: if (prefer == null) nextIndex(pool.size, cursor(id), shuffle, random)
+                    else nextPreferred(pool, cursor(id), shuffle, random, prefer)
             }
         }
         val cover = coverGroupId?.takeIf { photos(it).isNotEmpty() }
@@ -141,6 +147,29 @@ object RotationPlan {
         var pick = random.nextInt(count - 1)
         if (cursor in 0 until count && pick >= cursor) pick += 1
         return pick
+    }
+
+    /**
+     * The next photo that [prefer] accepts, in play order: forward from [cursor] in group order, or
+     * a random order with the current photo last when shuffled. With none accepted, the plain next
+     * photo ([nextIndex]). [prefer] is asked lazily, at most once per photo, stopping at the first
+     * yes, because an answer may cost a decode.
+     */
+    fun nextPreferred(
+        pool: List<String>,
+        cursor: Int,
+        shuffle: Boolean,
+        random: Random,
+        prefer: (String) -> Boolean,
+    ): Int {
+        val n = pool.size
+        if (n <= 0) return -1
+        val current = cursor.takeIf { it in 0 until n }
+        val others = (0 until n).filter { it != current }
+        val order =
+            (if (shuffle) others.shuffled(random)
+            else others.sortedBy { (it - cursor - 1).mod(n) }) + listOfNotNull(current)
+        return order.firstOrNull { prefer(pool[it]) } ?: nextIndex(n, cursor, shuffle, random)
     }
 
     /**

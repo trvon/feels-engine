@@ -395,6 +395,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setChangeOnTheme(on: Boolean) = update { it.copy(changeOnTheme = on) }
 
+    fun setDarkAtNight(on: Boolean) = update { it.copy(darkAtNight = on) }
+
     fun setIntervalMinutes(minutes: Int) = update {
         it.copy(intervalMinutes = minutes.coerceAtLeast(Settings.MIN_INTERVAL_MINUTES))
     }

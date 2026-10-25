@@ -2,6 +2,7 @@ package dev.fengine.wallpaper.schedule
 
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.res.Configuration
 import android.net.Uri
 import android.util.Log
 import androidx.core.net.toUri
@@ -10,6 +11,8 @@ import dev.fengine.wallpaper.data.Ledger
 import dev.fengine.wallpaper.data.LedgerStore
 import dev.fengine.wallpaper.data.Mode
 import dev.fengine.wallpaper.data.Settings
+import dev.fengine.wallpaper.smart.PhotoIndex
+import dev.fengine.wallpaper.wallpaper.DarkPhotos
 import dev.fengine.wallpaper.wallpaper.WallpaperApplier
 import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 import dev.fengine.wallpaper.wallpaper.live.MotionCheck
@@ -163,22 +166,33 @@ object Rotation {
             if (forceStatic) LiveWallpaper.State(false, false, false, false)
             else LiveWallpaper.state(context)
         Log.i(TAG, "$source: live $live")
+        // Darker photos in dark mode: only while the phone is dark, measured lazily and remembered.
+        val night =
+            (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+        val index = if (settings.darkAtNight && night) PhotoIndex(context) else null
+        val dark = index?.let { DarkPhotos(context, it) }
         // Screens the live engine draws itself only need the cursor to move; it watches the
         // settings.
         val plan =
-            RotationPlan.advance(
-                settings.homeGroupId,
-                settings.lockGroupId,
-                photos = { id -> settings.group(id)?.rotation.orEmpty() },
-                cursor = { id -> settings.group(id)?.cursor ?: -1 },
-                shuffle = settings.shuffle,
-                liveHome = live.innerHome,
-                liveLock = live.innerLock,
-                pinned = pinned,
-                coverGroupId = settings.coverGroupId,
-                coverLiveHome = live.coverHome,
-                coverLiveLock = live.coverLock,
-            )
+            try {
+                RotationPlan.advance(
+                    settings.homeGroupId,
+                    settings.lockGroupId,
+                    photos = { id -> settings.group(id)?.rotation.orEmpty() },
+                    cursor = { id -> settings.group(id)?.cursor ?: -1 },
+                    shuffle = settings.shuffle,
+                    liveHome = live.innerHome,
+                    liveLock = live.innerLock,
+                    pinned = pinned,
+                    coverGroupId = settings.coverGroupId,
+                    coverLiveHome = live.coverHome,
+                    coverLiveLock = live.coverLock,
+                    prefer = dark?.let { d -> d::isDark },
+                )
+            } finally {
+                index?.close()
+            }
         if (plan.cursors.isEmpty()) return null
         val applier = WallpaperApplier(context)
         val unreadable = mutableListOf<Pair<String, String>>()

@@ -32,6 +32,7 @@ object SettingsCodec {
         val motionLostAt = longPreferencesKey("motion_lost_at")
         val tapToChange = booleanPreferencesKey("tap_to_change")
         val changeOnTheme = booleanPreferencesKey("change_on_theme")
+        val darkAtNight = booleanPreferencesKey("dark_at_night")
         val dreamGroupId = stringPreferencesKey("dream_group_id")
         val coverGroupId = stringPreferencesKey("cover_group_id")
 
@@ -59,6 +60,7 @@ object SettingsCodec {
         prefs[Keys.motionLostAt] = next.motionLostAt
         prefs[Keys.tapToChange] = next.tapToChange
         prefs[Keys.changeOnTheme] = next.changeOnTheme
+        prefs[Keys.darkAtNight] = next.darkAtNight
         next.dreamGroupId?.let { prefs[Keys.dreamGroupId] = it } ?: prefs.remove(Keys.dreamGroupId)
         next.coverGroupId?.let { prefs[Keys.coverGroupId] = it } ?: prefs.remove(Keys.coverGroupId)
         prefs.remove(Keys.legacyPhotos)
@@ -107,6 +109,7 @@ object SettingsCodec {
             motionLostAt = prefs[Keys.motionLostAt] ?: defaults.motionLostAt,
             tapToChange = prefs[Keys.tapToChange] ?: defaults.tapToChange,
             changeOnTheme = prefs[Keys.changeOnTheme] ?: defaults.changeOnTheme,
+            darkAtNight = prefs[Keys.darkAtNight] ?: defaults.darkAtNight,
             dreamGroupId = prefs[Keys.dreamGroupId]?.takeIf { id -> groups.any { it.id == id } },
             coverGroupId = prefs[Keys.coverGroupId]?.takeIf { id -> groups.any { it.id == id } },
         )

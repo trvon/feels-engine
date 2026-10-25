@@ -69,9 +69,14 @@ class PhotoWallpaperService : WallpaperService() {
         val changed = ChangeTriggers.nightChanged(uiMode, newConfig.uiMode)
         uiMode = newConfig.uiMode
         if (!changed || !LiveEngines.anyRunning) return
+        val night =
+            (newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
         serviceScope.launch(Dispatchers.IO) {
             runCatching {
-                if ((application as FengineApp).settings.read().changeOnTheme)
+                val s = (application as FengineApp).settings.read()
+                // Turning dark with "Darker photos" on moves to a dark photo right away.
+                if (s.changeOnTheme || (s.darkAtNight && night))
                     Rotation.run(applicationContext, Ledger.Source.THEME)
             }
         }

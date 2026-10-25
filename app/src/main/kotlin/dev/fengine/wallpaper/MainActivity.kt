@@ -125,6 +125,7 @@ private fun FengineApp(vm: MainViewModel) {
             screenSaverWeek = screenSaverWeek,
             onSetTapToChange = vm::setTapToChange,
             onSetChangeOnTheme = vm::setChangeOnTheme,
+            onSetDarkAtNight = vm::setDarkAtNight,
             hasCoverScreen = vm.hasCoverScreen(),
             dreamConfigured = dreamConfigured,
             motion = motion,

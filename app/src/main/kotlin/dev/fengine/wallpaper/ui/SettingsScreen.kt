@@ -77,6 +77,7 @@ fun SettingsScreen(
     screenSaverWeek: Map<String, Int> = emptyMap(),
     onSetTapToChange: (Boolean) -> Unit = {},
     onSetChangeOnTheme: (Boolean) -> Unit = {},
+    onSetDarkAtNight: (Boolean) -> Unit = {},
 ) {
     val moving = motion.innerHome || motion.innerLock || motion.coverHome || motion.coverLock
     Page {
@@ -107,6 +108,12 @@ fun SettingsScreen(
             Caption(
                 if (settings.shuffle) "Photos play in a shuffled order."
                 else "Photos play in group order."
+            )
+            SwitchRow("Darker photos in dark mode", settings.darkAtNight, onSetDarkAtNight)
+            Caption(
+                if (settings.darkAtNight)
+                    "While the phone is dark, each change picks one of the group's darker photos when it has any."
+                else "Every photo can come up, day or night."
             )
             Spacer(Modifier.height(Space.lg))
             Text("Also change", style = MaterialTheme.typography.titleMedium)
