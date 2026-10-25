@@ -48,8 +48,8 @@ import dev.fengine.wallpaper.ui.design.Space
 import dev.fengine.wallpaper.ui.design.TextAction
 
 /**
- * The one main screen. Reads top to bottom like a magazine page: a headline sentence that says
- * what the app is doing, the groups as covers, screen assignments and one primary action.
+ * The one main screen. Reads top to bottom like a magazine page: a headline sentence that says what
+ * the app is doing, the groups as covers, screen assignments and one primary action.
  */
 @Composable
 fun HomeScreen(
@@ -64,6 +64,8 @@ fun HomeScreen(
     onAssignScreen: (Screen, String?) -> Unit = { _, _ -> },
     diagnostics: String? = null,
     onExportLog: () -> Unit = {},
+    onTurnOnMotion: () -> Unit = {},
+    onDismissMotionLost: () -> Unit = {},
 ) {
     var choosingFor by remember { mutableStateOf<Screen?>(null) }
     choosingFor?.let { screen ->
@@ -91,16 +93,31 @@ fun HomeScreen(
         )
     }
     Page {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
             Eyebrow("Feels Engine", Modifier.weight(1f))
             TextAction("Settings", onOpenSettings)
         }
         Spacer(Modifier.height(Space.sm))
         Headline(Format.status(settings), caption = settings.lastResult.ifBlank { null })
+        if (settings.motionLostAt > 0 && !settings.motionOn) {
+            Spacer(Modifier.height(Space.md))
+            Caption(Format.motionLost(settings.motionLostAt))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                TextAction("Turn Motion back on", onTurnOnMotion)
+                TextAction("Dismiss", onDismissMotionLost)
+            }
+        }
         Spacer(Modifier.height(Space.section))
 
         Section("Groups") {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(Space.md), contentPadding = RailPadding) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(Space.md),
+                contentPadding = RailPadding,
+            ) {
                 items(settings.groups.size) { i ->
                     val g = settings.groups[i]
                     CoverCard(
@@ -118,23 +135,32 @@ fun HomeScreen(
         Section("Screens") {
             Caption("Each screen can show its own group. Tap one to change it.")
             Spacer(Modifier.height(Space.sm))
-            val screens =
-                buildList {
-                    add(Screen.HOME)
-                    add(Screen.LOCK)
-                    if (hasCoverScreen) add(Screen.COVER)
-                    add(Screen.SCREEN_SAVER)
-                }
+            val screens = buildList {
+                add(Screen.HOME)
+                add(Screen.LOCK)
+                if (hasCoverScreen) add(Screen.COVER)
+                add(Screen.SCREEN_SAVER)
+            }
             screens.forEach { screen ->
-                ScreenRow(screenLabel(screen), screenValue(settings, screen)) { choosingFor = screen }
+                ScreenRow(screenLabel(screen), screenValue(settings, screen)) {
+                    choosingFor = screen
+                }
             }
         }
 
         Section("Rotation", trailing = { TextAction("Schedule", onOpenSettings) }) {
-            Caption("${Format.schedule(settings)} · ${if (settings.shuffle) "Shuffled" else "In group order"}")
+            Caption(
+                "${Format.schedule(settings)} · ${if (settings.shuffle) "Shuffled" else "In group order"}"
+            )
             Spacer(Modifier.height(Space.sm))
-            ToggleRow(if (settings.enabled) "Rotation on" else "Rotation off", settings.enabled, onSetEnabled, enabled = settings.canRotate)
-            if (!settings.canRotate) Caption("Assign a group with photos to Home or Lock to start rotation.")
+            ToggleRow(
+                if (settings.enabled) "Rotation on" else "Rotation off",
+                settings.enabled,
+                onSetEnabled,
+                enabled = settings.canRotate,
+            )
+            if (!settings.canRotate)
+                Caption("Assign a group with photos to Home or Lock to start rotation.")
         }
 
         HorizontalDivider()
@@ -153,7 +179,10 @@ fun HomeScreen(
         Spacer(Modifier.height(Space.section))
         Section("This week") {
             // The local ledger: stays on the phone; export writes a file the owner chooses.
-            Caption(diagnostics ?: "Nothing recorded yet. Changes, motion and the screen saver are noted here, on this phone only.")
+            Caption(
+                diagnostics
+                    ?: "Nothing recorded yet. Changes, motion and the screen saver are noted here, on this phone only."
+            )
             if (diagnostics != null) TextAction("Export log", onExportLog)
         }
     }
@@ -170,25 +199,28 @@ private fun GroupPickerSheet(
     Sheet(onDismiss = onDismiss) {
         Eyebrow("Set active")
         Spacer(Modifier.height(Space.sm))
-        Text("Both screens show this group, starting with its cover.", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "Both screens show this group, starting with its cover.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
         Spacer(Modifier.height(Space.lg))
         groups.forEach { g ->
             Row(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { onPick(g.id) }
-                        .padding(vertical = Space.sm),
+                    Modifier.fillMaxWidth().clickable { onPick(g.id) }.padding(vertical = Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Space.md),
             ) {
                 Box(
                     modifier =
-                        Modifier
-                            .size(Size.sheetThumb)
+                        Modifier.size(Size.sheetThumb)
                             .clip(RoundedCornerShape(Radius.tile))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                ) { g.cover?.let { PhotoImage(it, Modifier.fillMaxSize(), contentDescription = null) } }
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    g.cover?.let {
+                        PhotoImage(it, Modifier.fillMaxSize(), contentDescription = null)
+                    }
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(g.name, style = MaterialTheme.typography.titleMedium)
                     Caption(coverCaption(g))
@@ -224,8 +256,7 @@ fun ToggleRow(
     checked: Boolean,
     onChange: (Boolean) -> Unit,
     enabled: Boolean = true,
-) = dev.fengine.wallpaper.ui.design
-    .SwitchRow(label, checked, onChange, enabled)
+) = dev.fengine.wallpaper.ui.design.SwitchRow(label, checked, onChange, enabled)
 
 private fun screenLabel(screen: Screen) =
     when (screen) {
@@ -240,11 +271,15 @@ private fun screenValue(
     s: Settings,
     screen: Screen,
 ): String {
-    Screens.assigned(s, screen)?.let { id -> return s.group(id)?.name ?: "Not set" }
+    Screens.assigned(s, screen)?.let { id ->
+        return s.group(id)?.name ?: "Not set"
+    }
     return when (screen) {
-        Screen.HOME, Screen.LOCK -> "Left alone"
+        Screen.HOME,
+        Screen.LOCK -> "Left alone"
         Screen.COVER -> "Same as home"
-        Screen.SCREEN_SAVER -> Screens.effective(s, screen)?.let { "Same as home (${it.name})" } ?: "Nothing to play"
+        Screen.SCREEN_SAVER ->
+            Screens.effective(s, screen)?.let { "Same as home (${it.name})" } ?: "Nothing to play"
     }
 }
 
@@ -256,8 +291,7 @@ private fun ScreenRow(
 ) {
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
+            Modifier.fillMaxWidth()
                 .heightIn(min = Size.touchTarget)
                 .clickable(onClickLabel = "Choose group", onClick = onClick)
                 .padding(vertical = Space.md),
@@ -266,7 +300,11 @@ private fun ScreenRow(
     ) {
         Column(Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.titleMedium)
-            Text(value, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
         Text(
             "Change",
@@ -277,7 +315,10 @@ private fun ScreenRow(
     }
 }
 
-/** One screen's choice: any group, or none (home and lock left alone; cover and screen saver follow home). */
+/**
+ * One screen's choice: any group, or none (home and lock left alone; cover and screen saver follow
+ * home).
+ */
 @Composable
 private fun ScreenPickerSheet(
     screen: Screen,
@@ -291,11 +332,17 @@ private fun ScreenPickerSheet(
         Spacer(Modifier.height(Space.lg))
         val none =
             when (screen) {
-                Screen.HOME, Screen.LOCK -> "Leave alone"
-                Screen.COVER, Screen.SCREEN_SAVER -> "Same as home"
+                Screen.HOME,
+                Screen.LOCK -> "Leave alone"
+                Screen.COVER,
+                Screen.SCREEN_SAVER -> "Same as home"
             }
         PickerRow(none, null, selected = current == null) { onPick(null) }
-        groups.forEach { g -> PickerRow(g.name, g.cover, selected = g.id == current, caption = coverCaption(g)) { onPick(g.id) } }
+        groups.forEach { g ->
+            PickerRow(g.name, g.cover, selected = g.id == current, caption = coverCaption(g)) {
+                onPick(g.id)
+            }
+        }
     }
 }
 
@@ -309,20 +356,18 @@ private fun PickerRow(
 ) {
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(vertical = Space.sm),
+            Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.md),
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(Size.sheetThumb)
+                Modifier.size(Size.sheetThumb)
                     .clip(RoundedCornerShape(Radius.tile))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-        ) { coverUri?.let { PhotoImage(it, Modifier.fillMaxSize(), contentDescription = null) } }
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            coverUri?.let { PhotoImage(it, Modifier.fillMaxSize(), contentDescription = null) }
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             caption?.let { Caption(it) }

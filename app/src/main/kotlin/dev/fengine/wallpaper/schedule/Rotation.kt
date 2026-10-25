@@ -12,6 +12,7 @@ import dev.fengine.wallpaper.data.Mode
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.wallpaper.WallpaperApplier
 import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
+import dev.fengine.wallpaper.wallpaper.live.MotionCheck
 import java.text.DateFormat
 import java.util.Date
 import java.util.TimeZone
@@ -60,6 +61,8 @@ object Rotation {
         if (store.read().groups.any { it.withoutLibraryFinds() != it }) {
             store.update { s -> s.copy(groups = s.groups.map { it.withoutLibraryFinds() }) }
         }
+        // Every run, due or not, checks that Motion is still on: Android can revert it silently.
+        runCatching { if (forceStatic) MotionCheck.still(app) else MotionCheck.observe(app) }
         val first = store.read()
         val now = System.currentTimeMillis()
         if (isScheduled(source) && !first.enabled) return@withLock Outcome.NotDue

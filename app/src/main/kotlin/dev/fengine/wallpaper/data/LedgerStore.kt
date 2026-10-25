@@ -31,6 +31,9 @@ class LedgerStore(context: Context) {
     fun lastScreenSaver(): Ledger.Entry? =
         entries().lastOrNull { it.event is Ledger.Event.ScreenSaver }
 
+    /** Time of the newest recorded process exit, so each exit is imported once. */
+    fun lastExitAt(): Long? = entries().lastOrNull { it.event is Ledger.Event.Exit }?.atMs
+
     /** The raw file, for export. */
     fun text(): String = synchronized(LOCK) { runCatching { file.readText() }.getOrDefault("") }
 

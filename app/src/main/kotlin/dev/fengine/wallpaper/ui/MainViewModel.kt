@@ -36,6 +36,7 @@ import dev.fengine.wallpaper.wallpaper.Displays
 import dev.fengine.wallpaper.wallpaper.SamsungDisplays
 import dev.fengine.wallpaper.wallpaper.WallpaperCrop
 import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
+import dev.fengine.wallpaper.wallpaper.live.MotionCheck
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -413,6 +414,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             diagnostics.value = if (entries.isEmpty()) null else Ledger.sentence(week)
             screenSaverWeek.value = week.screenSaver
         }
+    }
+
+    /** On every resume: notices Motion that Android turned off, or that came back. */
+    fun checkMotion() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { MotionCheck.observe(getApplication()) }
+            refreshDiagnostics()
+        }
+    }
+
+    fun dismissMotionLost() {
+        viewModelScope.launch { MotionCheck.dismiss(getApplication()) }
     }
 
     /** Write the whole ledger to a file the owner picked (system "save as"). */

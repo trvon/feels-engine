@@ -46,6 +46,17 @@ class LedgerProperties {
                         Arbitraries.of(0, 1, 2, 4, 8),
                     )
                     .`as` { v: String, p: Int -> Event.ScreenSaver(v, p) },
+                Combinators.combine(
+                        Arbitraries.of("crash", "anr", "low_memory", "user_stopped"),
+                        Arbitraries.of(100, 125, 200, 300, 400),
+                    )
+                    .`as` { r: String, i: Int -> Event.Exit(r, i) },
+                Arbitraries.of(
+                        "java.lang.IllegalStateException",
+                        "java.lang.OutOfMemoryError at a.b.c(SourceFile:12)",
+                    )
+                    .map { Event.Crash(it) },
+                Arbitraries.just(Event.MotionLost),
             )
         return Combinators.combine(Arbitraries.longs().between(0, 10_000_000), ev)
             .`as` { t: Long, e: Event -> Ledger.Entry(t, e) }
@@ -83,6 +94,10 @@ class LedgerProperties {
         assertEquals(w.count { it is Event.NoFrame }, s.noFrame)
         assertEquals(w.count { it == Event.AbandonedBlend }, s.abandonedBlends)
         assertEquals(w.filterIsInstance<Event.ScreenSaver>().size, s.screenSaver.values.sum())
+        assertEquals(w.filterIsInstance<Event.Exit>().size, s.exits.values.sum())
+        assertEquals(w.count { it == Event.MotionLost }, s.motionLost)
+        if (s.motionLost > 0) assertTrue(Ledger.sentence(s).contains("Motion stopped"))
+        if (s.exits.isNotEmpty()) assertTrue(Ledger.sentence(s).contains("App stopped"))
         val ff = w.filterIsInstance<Event.FirstFrame>().map { it.latencyMs }
         assertEquals(ff.size, s.firstFrames)
         if (ff.isNotEmpty()) {
@@ -151,6 +166,64 @@ class LedgerProperties {
     }
 
     // jqwik ignores range annotations inside a list's type argument; ranges go in a generator.
+    /** Importing Android's exit history again, from the ledger's watermark, adds nothing. */
+    @Property(tries = 500)
+    fun everyExitIsImportedOnce(@ForAll("exits") exits: List<Triple<Long, Int, Int>>) {
+        val first = Ledger.newExits(exits, null)
+        assertTrue(
+            first.all {
+                (it.event as Event.Exit).reason ==
+                    Ledger.exitReason(exits.first { e -> e.first == it.atMs }.second)
+            }
+        )
+        assertEquals(exits.count { Ledger.exitReason(it.second) != null }, first.size)
+        assertEquals(first.sortedBy { it.atMs }, first)
+        val watermark = first.lastOrNull()?.atMs
+        assertTrue(Ledger.newExits(exits, watermark).isEmpty())
+    }
+
+    @Property(tries = 300)
+    fun crashSiteSkipsLibraryFrames(@ForAll("frames") frames: List<String>) {
+        val site = Ledger.crashSite("java.lang.IllegalStateException", frames)
+        val ours = frames.firstOrNull {
+            !it.startsWith("java.") &&
+                !it.startsWith("android") &&
+                !it.startsWith("kotlin") &&
+                !it.startsWith("com.google.")
+        }
+        assertEquals(
+            if (ours == null) "java.lang.IllegalStateException"
+            else "java.lang.IllegalStateException at $ours",
+            site,
+        )
+    }
+
+    @Provide
+    fun exits(): Arbitrary<List<Triple<Long, Int, Int>>> =
+        Combinators.combine(
+                Arbitraries.longs().between(0, 1_000_000),
+                Arbitraries.integers().between(0, 16),
+                Arbitraries.of(100, 200, 400),
+            )
+            .`as` { t: Long, r: Int, i: Int -> Triple(t, r, i) }
+            .list()
+            .ofMaxSize(16)
+            .uniqueElements { it.first }
+
+    @Provide
+    fun frames(): Arbitrary<List<String>> =
+        Arbitraries.of(
+                "java.lang.Thread.run(Thread.java:1012)",
+                "android.os.Handler.dispatchMessage(Handler.java:99)",
+                "androidx.work.Worker.doWork(Worker.java:4)",
+                "kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:108)",
+                "com.google.mlkit.vision.Labeler.process(Unknown Source:3)",
+                "a.b.c(SourceFile:12)",
+                "dev.fengine.wallpaper.schedule.Rotation.run(Rotation.kt:60)",
+            )
+            .list()
+            .ofMaxSize(8)
+
     @Provide
     fun samples(): Arbitrary<List<Long>> =
         Arbitraries.longs().between(0, 10_000).list().ofMinSize(1).ofMaxSize(200)

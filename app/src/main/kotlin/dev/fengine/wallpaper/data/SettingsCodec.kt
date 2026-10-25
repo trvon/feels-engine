@@ -28,6 +28,8 @@ object SettingsCodec {
         val enabled = booleanPreferencesKey("enabled")
         val lastResult = stringPreferencesKey("last_result")
         val lastRotationAt = longPreferencesKey("last_rotation_at")
+        val motionOn = booleanPreferencesKey("motion_on")
+        val motionLostAt = longPreferencesKey("motion_lost_at")
         val dreamGroupId = stringPreferencesKey("dream_group_id")
         val coverGroupId = stringPreferencesKey("cover_group_id")
 
@@ -51,6 +53,8 @@ object SettingsCodec {
         prefs[Keys.enabled] = next.enabled
         prefs[Keys.lastResult] = next.lastResult
         prefs[Keys.lastRotationAt] = next.lastRotationAt
+        prefs[Keys.motionOn] = next.motionOn
+        prefs[Keys.motionLostAt] = next.motionLostAt
         next.dreamGroupId?.let { prefs[Keys.dreamGroupId] = it } ?: prefs.remove(Keys.dreamGroupId)
         next.coverGroupId?.let { prefs[Keys.coverGroupId] = it } ?: prefs.remove(Keys.coverGroupId)
         prefs.remove(Keys.legacyPhotos)
@@ -95,6 +99,8 @@ object SettingsCodec {
             enabled = prefs[Keys.enabled] ?: defaults.enabled,
             lastResult = prefs[Keys.lastResult] ?: defaults.lastResult,
             lastRotationAt = prefs[Keys.lastRotationAt] ?: defaults.lastRotationAt,
+            motionOn = prefs[Keys.motionOn] ?: defaults.motionOn,
+            motionLostAt = prefs[Keys.motionLostAt] ?: defaults.motionLostAt,
             dreamGroupId = prefs[Keys.dreamGroupId]?.takeIf { id -> groups.any { it.id == id } },
             coverGroupId = prefs[Keys.coverGroupId]?.takeIf { id -> groups.any { it.id == id } },
         )

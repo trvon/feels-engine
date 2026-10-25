@@ -85,6 +85,8 @@ class SettingsCodecProperties {
                         colorSource = ColorSource.entries[interval % 2],
                         backdrop = Backdrop.entries[(interval / 2) % 2],
                         photoFit = PhotoFit.entries[(interval / 3) % 2],
+                        motionOn = interval % 2 == 0,
+                        motionLostAt = interval * 1000L,
                     )
                 }
         }

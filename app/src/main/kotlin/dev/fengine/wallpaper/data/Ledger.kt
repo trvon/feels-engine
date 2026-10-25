@@ -35,6 +35,21 @@ object Ledger {
 
         /** The screen saver started; [verdict] is DreamGate's answer. */
         data class ScreenSaver(val verdict: String, val plugged: Int) : Event
+
+        /**
+         * The app's process ended earlier, as Android recorded it (`ApplicationExitInfo`, Android
+         * 11+): [reason] from [exitReason], [importance] at the time (100 foreground ... 400
+         * cached). The entry's time is the exit's own time. The live engine shares the process, so
+         * two exits within 10 s, or one force stop, make Android revert Motion to its built-in
+         * wallpaper (WallpaperManagerService; reproduced on Android 16, 2026-10-25).
+         */
+        data class Exit(val reason: String, val importance: Int) : Event
+
+        /** An uncaught exception: [site] is the exception class and the app's first frame. */
+        data class Crash(val site: String) : Event
+
+        /** Motion was on and is now off without the owner choosing Still (see MotionWatch). */
+        data object MotionLost : Event
     }
 
     object Source {
@@ -71,6 +86,10 @@ object Ledger {
             Event.AbandonedBlend -> o.put("type", "abandoned_blend")
             is Event.ScreenSaver ->
                 o.put("type", "screen_saver").put("verdict", ev.verdict).put("plugged", ev.plugged)
+            is Event.Exit ->
+                o.put("type", "exit").put("reason", ev.reason).put("importance", ev.importance)
+            is Event.Crash -> o.put("type", "crash").put("site", ev.site)
+            Event.MotionLost -> o.put("type", "motion_lost")
         }
         return o.toString()
     }
@@ -98,6 +117,9 @@ object Ledger {
                 "no_frame" -> Event.NoFrame(o.getLong("ms"))
                 "abandoned_blend" -> Event.AbandonedBlend
                 "screen_saver" -> Event.ScreenSaver(o.getString("verdict"), o.getInt("plugged"))
+                "exit" -> Event.Exit(o.getString("reason"), o.getInt("importance"))
+                "crash" -> Event.Crash(o.getString("site"))
+                "motion_lost" -> Event.MotionLost
                 else -> return null
             }
         Entry(t, ev)
@@ -116,7 +138,68 @@ object Ledger {
         val noFrame: Int,
         val abandonedBlends: Int,
         val screenSaver: Map<String, Int>,
+        /** Process exits by reason ("crash", "anr", ...). */
+        val exits: Map<String, Int> = emptyMap(),
+        val motionLost: Int = 0,
     )
+
+    /**
+     * The `ApplicationExitInfo` reasons worth a line: the ones that say the app failed or was
+     * stopped. Plain exits, cached-process kills and package updates are routine and skipped.
+     */
+    fun exitReason(code: Int): String? =
+        when (code) {
+            3 -> "low_memory"
+            4 -> "crash"
+            5 -> "native_crash"
+            6 -> "anr"
+            7 -> "init_failure"
+            9 -> "excessive_resources"
+            10 -> "user_requested"
+            11 -> "user_stopped"
+            12 -> "dependency_died"
+            14 -> "freezer"
+            else -> null
+        }
+
+    /**
+     * Exits not yet in the ledger: those after [lastRecordedMs] with a reason worth a line, oldest
+     * first. [exits] are (timestamp, reason code, importance) as Android returns them.
+     */
+    fun newExits(exits: List<Triple<Long, Int, Int>>, lastRecordedMs: Long?): List<Entry> =
+        exits
+            .filter { (t, _, _) -> lastRecordedMs == null || t > lastRecordedMs }
+            .mapNotNull { (t, code, imp) ->
+                exitReason(code)?.let { Entry(t, Event.Exit(it, imp)) }
+            }
+            .sortedBy { it.atMs }
+
+    private val libraryFrames =
+        listOf(
+            "java.",
+            "javax.",
+            "jdk.",
+            "sun.",
+            "libcore.",
+            "dalvik.",
+            "android.",
+            "androidx.",
+            "com.android.",
+            "kotlin.",
+            "kotlinx.",
+            "com.google.",
+        )
+
+    /**
+     * Where a crash came from without any message text (which can hold a URI): the root cause's
+     * class and the first frame outside the platform and libraries, from [frames] as
+     * "class.method(File:line)". Release builds are minified, so that frame is the app's own under
+     * an obfuscated name; the release mapping file turns it back.
+     */
+    fun crashSite(rootClass: String, frames: List<String>): String {
+        val ours = frames.firstOrNull { f -> libraryFrames.none { f.startsWith(it) } }
+        return if (ours == null) rootClass else "$rootClass at $ours"
+    }
 
     /**
      * A screen-saver start is worth a line when it says something new: the first one, a different
@@ -162,6 +245,8 @@ object Ledger {
                     .filterIsInstance<Event.ScreenSaver>()
                     .groupingBy { it.verdict }
                     .eachCount(),
+            exits = inWindow.filterIsInstance<Event.Exit>().groupingBy { it.reason }.eachCount(),
+            motionLost = inWindow.count { it == Event.MotionLost },
         )
     }
 
@@ -188,6 +273,17 @@ object Ledger {
                     s.screenSaver.entries
                         .sortedBy { it.key }
                         .joinToString { "${it.key.lowercase().replace('_', ' ')} ${it.value}" }
+            )
+        if (s.motionLost > 0)
+            append(
+                ". Motion stopped " + (if (s.motionLost == 1) "once" else "${s.motionLost} times")
+            )
+        if (s.exits.isNotEmpty())
+            append(
+                ". App stopped: " +
+                    s.exits.entries
+                        .sortedBy { it.key }
+                        .joinToString { "${it.key.replace('_', ' ')} ${it.value}" }
             )
         append(".")
     }

@@ -43,6 +43,10 @@ data class Settings(
     val colorSource: ColorSource = ColorSource.PHOTO,
     val backdrop: Backdrop = Backdrop.BLACK,
     val photoFit: PhotoFit = PhotoFit.FILL,
+    /** The live engine was drawing a screen when last checked (MotionWatch). */
+    val motionOn: Boolean = false,
+    /** When Motion stopped without the owner choosing Still; 0 for no notice. */
+    val motionLostAt: Long = 0,
 ) {
     fun group(id: String?): Group? = id?.let { g -> groups.firstOrNull { it.id == g } }
 

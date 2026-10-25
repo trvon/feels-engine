@@ -537,3 +537,37 @@ unreadable photos, to check this on the Fold. Samsung "sleeping" and "deep
 sleeping" apps (after about 3 and 16 days unused) restrict alarms too
 (reported, https://developer.samsung.com/mobile/app-management.html); opening
 the app resets that.
+
+## 8. When Android turns Motion off (2026-10-25)
+
+`WallpaperManagerService` (AOSP main) replaces a live wallpaper with the
+built-in one through `clearWallpaperLocked`, which leaves `mBindSource=SET_LIVE_TO_CLEAR`
+in `dumpsys wallpaper`. Paths:
+
+- package removed or its service gone (`doPackagesChangedLocked`), which covers
+  the uninstall needed to move from a sideloaded build to Play;
+- the engine's process dies twice within `MIN_WALLPAPER_CRASH_TIME` (10 s);
+- rebind fails for `WALLPAPER_RECONNECT_TIMEOUT_MS` (10 s);
+- repeated low-memory kills after `LMK_RECONNECT_REBIND_RETRIES` while memory
+  is not low.
+
+Reproduced on fe_fold (Pixel 9 Pro Fold, Android 16):
+
+| Action | Motion after |
+|---|---|
+| one `am crash` | kept, process restarted (exit reason 4) |
+| two `kill -9` 4 s apart | reverted, `Reverting to built-in wallpaper!` |
+| one `am force-stop` | reverted |
+
+The engine shares the app's process, so a crash anywhere in the app counts.
+Only a person can turn Motion back on (`ACTION_CHANGE_LIVE_WALLPAPER`).
+
+Owner devices: the Fold's ledger starts empty at 10-16 05:55, after 0.3.0 (the
+first build with the shared upload key) replaced the sideloaded 0.2.x, which
+needs an uninstall. The Pixel still runs 0.2.1 (installed 10-15 over adb) and
+shows `SET_LIVE_TO_CLEAR`, so one of the other paths cleared it; its logs no
+longer reach back far enough to say which.
+
+The app now records `motion_lost` and every recorded process exit
+(`ApplicationExitInfo`, Android 11+: crash, ANR, low memory, force stop) in the
+ledger, and Home offers "Turn Motion back on".

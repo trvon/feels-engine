@@ -83,6 +83,21 @@ private fun FengineApp(vm: MainViewModel) {
             openGroupId?.let { vm.addToPool(it, uris) }
         }
 
+    // Returning from Android's chooser or from elsewhere: Motion may have come back or gone.
+    LifecycleResumeEffect(Unit) {
+        vm.checkMotion()
+        onPauseOrDispose {}
+    }
+    val turnOnMotion = {
+        runCatching { context.startActivity(LiveWallpaper.chooserIntent(context)) }
+            .onFailure {
+                context.startActivity(
+                    Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
+                )
+            }
+        Unit
+    }
+
     if (settingsOpen) {
         BackHandler { settingsOpen = false }
         var motion by remember { mutableStateOf(vm.motion()) }
@@ -111,14 +126,7 @@ private fun FengineApp(vm: MainViewModel) {
             hasCoverScreen = vm.hasCoverScreen(),
             dreamConfigured = dreamConfigured,
             motion = motion,
-            onTurnOnMotion = {
-                runCatching { context.startActivity(LiveWallpaper.chooserIntent(context)) }
-                    .onFailure {
-                        context.startActivity(
-                            Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
-                        )
-                    }
-            },
+            onTurnOnMotion = turnOnMotion,
             onOpenDreamSettings = {
                 runCatching {
                     context.startActivity(Intent(android.provider.Settings.ACTION_DREAM_SETTINGS))
@@ -190,6 +198,8 @@ private fun FengineApp(vm: MainViewModel) {
             onAssignScreen = vm::assignScreen,
             diagnostics = diagnostics,
             onExportLog = { exportLog.launch("feels-engine-log.jsonl") },
+            onTurnOnMotion = turnOnMotion,
+            onDismissMotionLost = vm::dismissMotionLost,
         )
     }
 }
