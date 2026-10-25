@@ -22,7 +22,8 @@ class FengineApp : Application() {
         val next = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             runCatching {
-                val root = generateSequence(e) { it.cause }.last()
+                // A cause chain can loop (initCause allows A -> B -> A): bounded.
+                val root = generateSequence(e) { it.cause }.take(16).last()
                 val frames =
                     (root.stackTrace + e.stackTrace).map {
                         "${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})"
@@ -30,7 +31,11 @@ class FengineApp : Application() {
                 LedgerStore(this)
                     .record(Ledger.Event.Crash(Ledger.crashSite(root.javaClass.name, frames)))
             }
-            next?.uncaughtException(t, e)
+            if (next != null) next.uncaughtException(t, e)
+            else {
+                android.os.Process.killProcess(android.os.Process.myPid())
+                kotlin.system.exitProcess(10)
+            }
         }
     }
 

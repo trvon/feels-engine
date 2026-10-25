@@ -29,11 +29,13 @@ import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.schedule.Rotation
 import dev.fengine.wallpaper.ui.Palette
 import dev.fengine.wallpaper.wallpaper.PhotoColors
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -53,7 +55,8 @@ import kotlinx.coroutines.launch
  * main thread and are handed over with a post.
  */
 class PhotoWallpaperService : WallpaperService() {
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val serviceScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + survive)
     private var uiMode: Int? = null
 
     override fun onCreateEngine(): Engine = PhotoEngine()
@@ -93,7 +96,7 @@ class PhotoWallpaperService : WallpaperService() {
                 start()
             }
         private val render = Handler(renderThread.looper)
-        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + survive)
         /** Touched only on the render thread. */
         private val state = LiveEngineState()
         private var watch: Job? = null
@@ -144,20 +147,24 @@ class PhotoWallpaperService : WallpaperService() {
             LiveEngines.created(System.identityHashCode(this), isPreview)
             setOffsetNotificationsEnabled(true)
             watch = scope.launch {
-                (application as FengineApp).settings.settings.collectLatest { settings ->
-                    val uri = photoFor(settings)
-                    val whole = settings.photoFit == PhotoFit.WHOLE
-                    val tinted = settings.backdrop == Backdrop.PHOTO
-                    tapToChange = settings.tapToChange
-                    render.post {
-                        if (whole != fitWhole || tinted != backdropTinted) {
-                            fitWhole = whole
-                            backdropTinted = tinted
-                            act(state.onStyleChanged())
+                (application as FengineApp)
+                    .settings
+                    .settings
+                    .catch { Log.w(TAG, "settings unreadable", it) }
+                    .collectLatest { settings ->
+                        val uri = photoFor(settings)
+                        val whole = settings.photoFit == PhotoFit.WHOLE
+                        val tinted = settings.backdrop == Backdrop.PHOTO
+                        tapToChange = settings.tapToChange
+                        render.post {
+                            if (whole != fitWhole || tinted != backdropTinted) {
+                                fitWhole = whole
+                                backdropTinted = tinted
+                                act(state.onStyleChanged())
+                            }
+                            act(state.onPhoto(uri))
                         }
-                        act(state.onPhoto(uri))
                     }
-                }
             }
         }
 
@@ -334,7 +341,8 @@ class PhotoWallpaperService : WallpaperService() {
                 scope.launch(Dispatchers.IO) {
                     val bitmap = decode(uri, w, h) ?: return@launch
                     val colors = PhotoColors.of(applicationContext, uri)
-                    render.post {
+                    // A destroyed engine's looper has quit: the post is refused, release here.
+                    val posted = render.post {
                         if (colors != null && state.wanted == uri) {
                             photoColors = colors
                             backdropColor = Palette.backdrop(colors.primaryColor.toArgb())
@@ -352,6 +360,7 @@ class PhotoWallpaperService : WallpaperService() {
                         if (!decision.startFade) fadeAlpha = 1f
                         act(decision)
                     }
+                    if (!posted) bitmap.recycle()
                 }
         }
 
@@ -429,6 +438,15 @@ class PhotoWallpaperService : WallpaperService() {
                 return
             }
             val started = android.os.SystemClock.elapsedRealtime()
+            // A software canvas cannot draw hardware bitmaps decoded before the fallback.
+            if (!c.isHardwareAccelerated)
+                slots
+                    .convert { b ->
+                        if (b.config == Bitmap.Config.HARDWARE && !b.isRecycled)
+                            b.copy(Bitmap.Config.ARGB_8888, false) ?: b
+                        else b
+                    }
+                    .forEach(Bitmap::recycle)
             val blended = previous != null && fadeAlpha < 1f
             try {
                 c.drawColor(if (fitWhole && backdropTinted) backdropColor else Color.BLACK)
@@ -437,6 +455,9 @@ class PhotoWallpaperService : WallpaperService() {
                 frames++
                 if (fade != null) fadeFrames++
                 else Log.d(TAG, "frame ${frames}: offset=${state.xOffset} zoom=${state.zoom}")
+            } catch (e: RuntimeException) {
+                // One bad frame must not end the process (two deaths in 10 s cost Motion).
+                Log.w(TAG, "frame failed", e)
             } finally {
                 holder.unlockCanvasAndPost(c)
             }
@@ -496,6 +517,11 @@ class PhotoWallpaperService : WallpaperService() {
 
     companion object {
         const val TAG = "PhotoWallpaper"
+
+        /** Engine and service coroutines log a failure instead of ending the shared process. */
+        private val survive = CoroutineExceptionHandler { _, e ->
+            Log.w(TAG, "engine task failed", e)
+        }
         const val FADE_MS = 900L
         const val SLOW_POST_MS = 500L
         const val MIN_FRAME_MS = 15L

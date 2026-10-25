@@ -153,4 +153,27 @@ class EngineRulesProperties {
         assertEquals("every shown screen closed exactly once", shows, closes)
         assertEquals(open, tail.any { it is FrameHealth.Record.NoFrame })
     }
+
+    /**
+     * Converting the held bitmaps (software fallback) releases exactly the replaced originals,
+     * keeps the ones the conversion leaves alone, and never releases what is still held.
+     */
+    @net.jqwik.api.Property(tries = 500)
+    fun convertReleasesOnlyReplacedBitmaps(
+        @net.jqwik.api.ForAll @net.jqwik.api.constraints.IntRange(min = 1, max = 50) a: Int,
+        @net.jqwik.api.ForAll @net.jqwik.api.constraints.IntRange(min = 51, max = 100) b: Int,
+        @net.jqwik.api.ForAll fade: Boolean,
+        @net.jqwik.api.ForAll odd: Boolean,
+    ) {
+        val slots = BitmapSlots<Int>()
+        slots.onDecoded(a, fade = false)
+        slots.onDecoded(b, fade = fade)
+        val before = listOfNotNull(slots.current, slots.previous)
+        // "Hardware" here: values with the chosen parity get a new identity (+1000).
+        val released = slots.convert { if ((it % 2 == 1) == odd) it + 1000 else it }
+        assertEquals(before.filter { (it % 2 == 1) == odd }.toSet(), released.toSet())
+        val held = listOfNotNull(slots.current, slots.previous)
+        assertTrue(released.none { it in held })
+        assertEquals(before.size, held.size)
+    }
 }

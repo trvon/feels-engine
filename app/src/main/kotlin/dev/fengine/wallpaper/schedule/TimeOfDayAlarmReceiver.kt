@@ -19,12 +19,15 @@ class TimeOfDayAlarmReceiver : BroadcastReceiver() {
         val app = context.applicationContext as FengineApp
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val scheduler = RotationScheduler(app)
-                if (app.settings.read().enabled) {
+                if (app.settings.read().enabled)
                     Rotation.run(app, source = dev.fengine.wallpaper.data.Ledger.Source.ALARM)
-                    scheduler.armNextAlarm(app.settings.read()) // from the new last-change time
-                }
+            } catch (e: Exception) {
+                // A crash here would also end the live engine (same process); log and carry on.
+                android.util.Log.w("TimeOfDayAlarm", "rotation failed", e)
             } finally {
+                // Always the next alarm, from the new last-change time: a failed run must not end
+                // the chain.
+                runCatching { RotationScheduler(app).armNextAlarm(app.settings.read()) }
                 pending.finish()
             }
         }

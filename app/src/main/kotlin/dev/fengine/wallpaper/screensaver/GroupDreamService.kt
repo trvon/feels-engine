@@ -26,6 +26,7 @@ import dev.fengine.wallpaper.smart.Images
 import dev.fengine.wallpaper.ui.Palette
 import dev.fengine.wallpaper.wallpaper.PhotoColors
 import kotlin.random.Random
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,7 +46,16 @@ import kotlinx.coroutines.withContext
  * one, then they swap. Bitmaps are decoded off the main thread at the view's size.
  */
 class GroupDreamService : DreamService() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    // The dream shares the process with the live engine: a failure here must not end it.
+    private val scope =
+        CoroutineScope(
+            SupervisorJob() +
+                Dispatchers.Main.immediate +
+                CoroutineExceptionHandler { _, e ->
+                    Log.w(TAG, "screen saver failed; staying black", e)
+                    runCatching { isScreenBright = false }
+                }
+        )
     private var player: Job? = null
     private lateinit var front: ImageView
     private lateinit var back: ImageView
@@ -122,7 +132,14 @@ class GroupDreamService : DreamService() {
         val order = DreamPlan.order(photos, settings.shuffle, group!!.cursor, System.nanoTime())
         Log.i(TAG, "playing ${group.name}: ${order.size} photos")
         var i = 0
+        var failedInARow = 0
         while (scope.isActive) {
+            // Every photo failed (grants gone, files deleted): stop decoding, stay black.
+            if (failedInARow >= order.size) {
+                Log.w(TAG, "no photo could be decoded; staying black")
+                isScreenBright = false
+                return
+            }
             val uri = order[i % order.size]
             i++
             val edge = maxOf(front.width, front.height).coerceAtLeast(1080)
@@ -131,7 +148,13 @@ class GroupDreamService : DreamService() {
                     runCatching { Images.decode(this@GroupDreamService, Uri.parse(uri), edge) }
                         .onFailure { Log.w(TAG, "decode failed for $uri", it) }
                         .getOrNull()
-                } ?: continue
+                }
+            if (bitmap == null) {
+                failedInARow++
+                delay(DreamPlan.FADE_MS)
+                continue
+            }
+            failedInARow = 0
             val whole = settings.photoFit == PhotoFit.WHOLE
             val backdrop =
                 if (whole && settings.backdrop == Backdrop.PHOTO) {

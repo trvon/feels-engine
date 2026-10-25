@@ -20,6 +20,8 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 RotationScheduler(app).sync(app.settings.read())
+            } catch (e: Exception) {
+                android.util.Log.w("BootReceiver", "schedule sync failed", e)
             } finally {
                 pending.finish()
             }
@@ -27,10 +29,11 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     private companion object {
-        val HANDLED_ACTIONS = setOf(
-            Intent.ACTION_BOOT_COMPLETED,
-            Intent.ACTION_TIME_CHANGED,
-            Intent.ACTION_TIMEZONE_CHANGED,
-        )
+        val HANDLED_ACTIONS =
+            setOf(
+                Intent.ACTION_BOOT_COMPLETED,
+                Intent.ACTION_TIME_CHANGED,
+                Intent.ACTION_TIMEZONE_CHANGED,
+            )
     }
 }
