@@ -8,10 +8,17 @@ import net.jqwik.api.constraints.IntRange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 
-/** The screen saver never plays in car mode, never on a cable when restricted, and never on nothing. */
+/**
+ * The screen saver never plays in car mode, never on a cable when restricted, and never on nothing.
+ */
 class DreamGateProperties {
     @Property(tries = 2000)
-    fun rules(@ForAll car: Boolean, @ForAll @IntRange(min = 0, max = 15) plugged: Int, @ForAll wirelessOnly: Boolean, @ForAll photos: Boolean) {
+    fun rules(
+        @ForAll car: Boolean,
+        @ForAll @IntRange(min = 0, max = 15) plugged: Int,
+        @ForAll wirelessOnly: Boolean,
+        @ForAll photos: Boolean,
+    ) {
         val v = DreamGate.decide(car, plugged, wirelessOnly, photos)
         if (car) assertEquals(Verdict.SKIP_CAR, v)
         val wirelessOrDock = plugged and (DreamGate.PLUGGED_WIRELESS or DreamGate.PLUGGED_DOCK) != 0
@@ -23,6 +30,24 @@ class DreamGateProperties {
 
     @Property(tries = 200)
     fun carUsbChargerNeverPlaysWhenRestricted(@ForAll photos: Boolean) {
-        assertNotEquals(Verdict.PLAY, DreamGate.decide(carMode = false, plugged = 2, wirelessOnly = true, hasPhotos = photos))
+        assertNotEquals(
+            Verdict.PLAY,
+            DreamGate.decide(carMode = false, plugged = 2, wirelessOnly = true, hasPhotos = photos),
+        )
+    }
+
+    /** Only PLAY shows photos; every veto shows black (and never ends the screen saver). */
+    @Property(tries = 500)
+    fun everyVetoShowsBlack(
+        @ForAll car: Boolean,
+        @ForAll @IntRange(min = 0, max = 15) plugged: Int,
+        @ForAll wirelessOnly: Boolean,
+        @ForAll photos: Boolean,
+    ) {
+        val v = DreamGate.decide(car, plugged, wirelessOnly, photos)
+        assertEquals(
+            if (v == Verdict.PLAY) DreamGate.Show.PHOTOS else DreamGate.Show.BLACK,
+            DreamGate.show(v),
+        )
     }
 }
