@@ -107,6 +107,8 @@ object Ledger {
     data class Summary(
         val rotations: Int,
         val failed: Int,
+        /** Photos that could no longer be read and were removed from their group. */
+        val removed: Int,
         val manual: Int,
         val firstFrames: Int,
         val firstFrameP50: Long?,
@@ -148,6 +150,7 @@ object Ledger {
         return Summary(
             rotations = rot.size,
             failed = rot.count { it.result == "failed" },
+            removed = rot.count { it.result == "unreadable" },
             manual = rot.count { it.source in Source.manual },
             firstFrames = ff.size,
             firstFrameP50 = percentile(ff, 50),
@@ -167,6 +170,10 @@ object Ledger {
         fun n(count: Int, one: String, many: String) = "$count ${if (count == 1) one else many}"
         append(n(s.rotations, "change", "changes"))
         if (s.failed > 0) append(", ${s.failed} failed")
+        if (s.removed > 0)
+            append(
+                ", ${if (s.removed == 1) "1 photo" else "${s.removed} photos"} could no longer be read and ${if (s.removed == 1) "was" else "were"} removed"
+            )
         if (s.manual > 0) append(", ${s.manual} by hand")
         if (s.firstFrames > 0)
             append(
