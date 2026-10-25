@@ -1,6 +1,7 @@
 package dev.fengine.wallpaper.wallpaper.live
 
 import android.animation.ValueAnimator
+import android.app.WallpaperColors
 import android.app.WallpaperManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -17,9 +18,13 @@ import android.util.Log
 import android.view.SurfaceHolder
 import android.view.animation.LinearInterpolator
 import dev.fengine.wallpaper.FengineApp
+import dev.fengine.wallpaper.data.Backdrop
 import dev.fengine.wallpaper.data.Ledger
 import dev.fengine.wallpaper.data.LedgerStore
+import dev.fengine.wallpaper.data.PhotoFit
 import dev.fengine.wallpaper.data.Settings
+import dev.fengine.wallpaper.ui.Palette
+import dev.fengine.wallpaper.wallpaper.PhotoColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -70,6 +75,15 @@ class PhotoWallpaperService : WallpaperService() {
         private val canvas = CanvasPolicy(SLOW_POST_MS)
         private val fadeClock = FadeClock(MIN_FRAME_MS)
         private val health = FrameHealth()
+        /**
+         * Settings > Look: whole photo with a backdrop, and whether the backdrop takes the photo's
+         * colour.
+         */
+        @Volatile private var fitWhole = false
+        @Volatile private var backdropTinted = false
+        @Volatile private var backdropColor = Color.BLACK
+        @Volatile private var photoColors: WallpaperColors? = null
+        private val mainHandler = Handler(android.os.Looper.getMainLooper())
         private val ledger by lazy { LedgerStore(applicationContext) }
         private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
         private val matrix = Matrix()
@@ -95,7 +109,16 @@ class PhotoWallpaperService : WallpaperService() {
             watch = scope.launch {
                 (application as FengineApp).settings.settings.collectLatest { settings ->
                     val uri = photoFor(settings)
-                    render.post { act(state.onPhoto(uri)) }
+                    val whole = settings.photoFit == PhotoFit.WHOLE
+                    val tinted = settings.backdrop == Backdrop.PHOTO
+                    render.post {
+                        if (whole != fitWhole || tinted != backdropTinted) {
+                            fitWhole = whole
+                            backdropTinted = tinted
+                            act(state.onStyleChanged())
+                        }
+                        act(state.onPhoto(uri))
+                    }
                 }
             }
         }
@@ -233,6 +256,12 @@ class PhotoWallpaperService : WallpaperService() {
             if (d.draw) draw()
         }
 
+        /**
+         * The current photo's colours, so the phone's palette follows Motion like a still
+         * wallpaper's.
+         */
+        override fun onComputeColors(): WallpaperColors? = photoColors
+
         private fun decodeThen(uri: String, keepOld: Boolean) {
             load?.cancel()
             val w = state.width
@@ -240,7 +269,15 @@ class PhotoWallpaperService : WallpaperService() {
             load =
                 scope.launch(Dispatchers.IO) {
                     val bitmap = decode(uri, w, h) ?: return@launch
+                    val colors = PhotoColors.of(applicationContext, uri)
                     render.post {
+                        if (colors != null && state.wanted == uri) {
+                            photoColors = colors
+                            backdropColor = Palette.backdrop(colors.primaryColor.toArgb())
+                            // Android asks onComputeColors for the new palette (Material You
+                            // follows Motion).
+                            mainHandler.post { runCatching { notifyColorsChanged() } }
+                        }
                         val decision = state.onDecoded(uri, keepOld)
                         if (decision == LiveEngineState.Decision.NONE && state.shown != uri) {
                             bitmap.recycle()
@@ -330,7 +367,7 @@ class PhotoWallpaperService : WallpaperService() {
             val started = android.os.SystemClock.elapsedRealtime()
             val blended = previous != null && fadeAlpha < 1f
             try {
-                c.drawColor(Color.BLACK)
+                c.drawColor(if (fitWhole && backdropTinted) backdropColor else Color.BLACK)
                 previous?.let { if (fadeAlpha < 1f) drawPhoto(c, it, 255) }
                 current?.let { drawPhoto(c, it, (fadeAlpha * 255).toInt()) }
                 frames++
@@ -383,6 +420,7 @@ class PhotoWallpaperService : WallpaperService() {
                     state.height,
                     state.xOffset,
                     state.zoom,
+                    whole = fitWhole,
                 )
             matrix.reset()
             matrix.postScale(f.scale, f.scale)

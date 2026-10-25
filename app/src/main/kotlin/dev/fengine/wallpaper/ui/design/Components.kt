@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import android.util.Size as AndroidSize
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,6 +42,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -65,7 +69,6 @@ import androidx.compose.ui.window.Dialog
 import dev.fengine.wallpaper.smart.Images
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import android.util.Size as AndroidSize
 
 /*
  * The component vocabulary. Every screen is composed from these and nothing else at the layout
@@ -82,19 +85,17 @@ fun Page(content: @Composable ColumnScope.() -> Unit) {
             // A tap on empty page space ends editing, which also puts the keyboard away.
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .pointerInput(Unit) { detectTapGestures(onTap = { focus.clearFocus() }) },
+                    Modifier.fillMaxSize().padding(padding).pointerInput(Unit) {
+                        detectTapGestures(onTap = { focus.clearFocus() })
+                    },
                 contentAlignment = Alignment.TopCenter,
             ) {
                 Column(
                     modifier =
-                        Modifier
-                            .widthIn(max = spec.maxContentWidth)
+                        Modifier.widthIn(max = spec.maxContentWidth)
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = Space.page),
+                            .padding(horizontal = Space.page)
                 ) {
                     Spacer(Modifier.height(Space.xl))
                     content()
@@ -163,12 +164,21 @@ fun Caption(
     text: String,
     modifier: Modifier = Modifier,
 ) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier)
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier,
+    )
 }
 
 @Composable
 fun BodyMuted(text: String) {
-    Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** Text-only action; the page has at most one filled button, everything else is this. */
@@ -198,15 +208,23 @@ fun SwitchRow(
     // The whole row is the tap target (label included), announced as one switch.
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
+            Modifier.fillMaxWidth()
                 .heightIn(min = Size.touchTarget)
-                .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+                .toggleable(
+                    value = checked,
+                    enabled = enabled,
+                    role = Role.Switch,
+                    onValueChange = onChange,
+                )
                 .padding(vertical = Space.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).padding(end = Space.md))
+        Text(
+            label,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f).padding(end = Space.md),
+        )
         Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
@@ -221,8 +239,7 @@ fun ChoiceRow(
 ) {
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
+            Modifier.fillMaxWidth()
                 .heightIn(min = Size.touchTarget)
                 .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
                 .padding(vertical = Space.sm),
@@ -257,14 +274,23 @@ fun <T> ChipRow(
     selected: T?,
     onSelect: (T) -> Unit,
 ) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+        verticalArrangement = Arrangement.spacedBy(Space.xs),
+    ) {
         options.forEach { (value, label) ->
-            FilterChip(selected = selected == value, onClick = { onSelect(value) }, label = { Text(label) })
+            FilterChip(
+                selected = selected == value,
+                onClick = { onSelect(value) },
+                label = { Text(label) },
+            )
         }
     }
 }
 
-/** Rounded surface with a title, a body and at most one text action. Used for status and guidance. */
+/**
+ * Rounded surface with a title, a body and at most one text action. Used for status and guidance.
+ */
 @Composable
 fun StatusCard(
     title: String,
@@ -272,7 +298,11 @@ fun StatusCard(
     tone: Color = MaterialTheme.colorScheme.surfaceVariant,
     action: Pair<String, () -> Unit>? = null,
 ) {
-    Surface(color = tone, shape = RoundedCornerShape(Radius.card), modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        color = tone,
+        shape = RoundedCornerShape(Radius.card),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         Column(modifier = Modifier.padding(Space.lg)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Space.xs))
@@ -285,7 +315,10 @@ fun StatusCard(
     }
 }
 
-/** Tiles a page shows before "and N more": a described group can hold thousands, the page scrolls as a column. */
+/**
+ * Tiles a page shows before "and N more": a described group can hold thousands, the page scrolls as
+ * a column.
+ */
 const val PhotoGridLimit = 60
 
 /**
@@ -303,9 +336,15 @@ fun PhotoGrid(
     limit: Int = PhotoGridLimit,
 ) {
     val columns = LocalLayout.current.columns
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Grid.gap)) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Grid.gap),
+    ) {
         uris.take(limit).chunked(columns).forEach { row ->
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Grid.gap)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Grid.gap),
+            ) {
                 row.forEach { uri ->
                     PhotoTile(
                         uri = uri,
@@ -336,25 +375,25 @@ fun PhotoTile(
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(Radius.tile))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
         PhotoImage(uri, Modifier.fillMaxSize(), contentDescription = "Photo")
         badge?.let { Badge(it, Modifier.align(Alignment.BottomStart).padding(Space.sm)) }
         onRemove?.let {
-            // A small disc the eye reads as "x", inside a tap target that still meets the 44 dp minimum.
+            // A small disc the eye reads as "x", inside a tap target that still meets the 44 dp
+            // minimum.
             Box(
                 modifier =
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .size(Size.tileAction)
-                        .clickable(onClick = it),
+                    Modifier.align(Alignment.TopEnd).size(Size.tileAction).clickable(onClick = it),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
                     modifier =
-                        Modifier
-                            .size(Size.tileActionDisc)
-                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f), CircleShape),
+                        Modifier.size(Size.tileActionDisc)
+                            .background(
+                                MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f),
+                                CircleShape,
+                            ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -383,7 +422,11 @@ fun Sheet(
     when (currentLayoutSpec().lane) {
         Lane.COMPACT -> {
             ModalBottomSheet(onDismissRequest = onDismiss) {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = Space.page)) {
+                Column(
+                    modifier =
+                        Modifier.verticalScroll(rememberScrollState())
+                            .padding(horizontal = Space.page)
+                ) {
                     content()
                     Spacer(Modifier.height(Space.xl))
                 }
@@ -398,8 +441,12 @@ fun Sheet(
                     modifier = Modifier.widthIn(max = Size.sheetCardWidth).fillMaxWidth(),
                 ) {
                     Column(
-                        modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = Space.page, vertical = Space.xl),
-                    ) { content() }
+                        modifier =
+                            Modifier.verticalScroll(rememberScrollState())
+                                .padding(horizontal = Space.page, vertical = Space.xl)
+                    ) {
+                        content()
+                    }
                 }
             }
         }
@@ -435,17 +482,21 @@ fun CoverCard(
     Column(modifier = Modifier.width(LocalLayout.current.coverWidth).clickable(onClick = onClick)) {
         Box(
             modifier =
-                Modifier
-                    .fillMaxWidth()
+                Modifier.fillMaxWidth()
                     .aspectRatio(Size.coverAspect)
                     .clip(RoundedCornerShape(Radius.card))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             coverUri?.let { PhotoImage(it, Modifier.fillMaxSize(), contentDescription = null) }
             badge?.let { Badge(it, Modifier.align(Alignment.BottomStart).padding(Space.md)) }
         }
         Spacer(Modifier.height(Space.sm))
-        Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         Caption(caption)
     }
 }
@@ -459,14 +510,17 @@ fun NewCoverCard(
     Column(modifier = Modifier.width(LocalLayout.current.coverWidth).clickable(onClick = onClick)) {
         Box(
             modifier =
-                Modifier
-                    .fillMaxWidth()
+                Modifier.fillMaxWidth()
                     .aspectRatio(Size.coverAspect)
                     .clip(RoundedCornerShape(Radius.card))
                     .background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Text("+", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text(
+                "+",
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
         }
         Spacer(Modifier.height(Space.sm))
         Text(title, style = MaterialTheme.typography.titleMedium)
@@ -477,9 +531,9 @@ fun NewCoverCard(
 val RailPadding = PaddingValues(end = Space.page)
 
 /**
- * Thumbnail loader shared by tiles and covers: ContentResolver.loadThumbnail (API 29+), which
- * the picker and media providers serve without a full decode. A lost grant renders as a plain
- * surface instead of crashing.
+ * Thumbnail loader shared by tiles and covers: ContentResolver.loadThumbnail (API 29+), which the
+ * picker and media providers serve without a full decode. A lost grant renders as a plain surface
+ * instead of crashing.
  */
 @Composable
 fun PhotoImage(
@@ -488,18 +542,27 @@ fun PhotoImage(
     contentDescription: String?,
 ) {
     val context = LocalContext.current
-    val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = uri) {
-        value =
-            withContext(Dispatchers.IO) {
-                // The system thumbnail road fails for Google Photos cloud items; decode a small copy instead.
-                loadThumbnail(context.contentResolver, Uri.parse(uri))
-                    ?: runCatching { Images.decode(context, Uri.parse(uri), THUMB_EDGE).asImageBitmap() }
-                        .onFailure { Log.w("PhotoImage", "no thumbnail for $uri", it) }
-                        .getOrNull()
-            }
-    }
+    val bitmap by
+        produceState<ImageBitmap?>(initialValue = null, key1 = uri) {
+            value =
+                withContext(Dispatchers.IO) {
+                    // The system thumbnail road fails for Google Photos cloud items; decode a small
+                    // copy instead.
+                    loadThumbnail(context.contentResolver, Uri.parse(uri))
+                        ?: runCatching {
+                            Images.decode(context, Uri.parse(uri), THUMB_EDGE).asImageBitmap()
+                        }
+                            .onFailure { Log.w("PhotoImage", "no thumbnail for $uri", it) }
+                            .getOrNull()
+                }
+        }
     bitmap?.let {
-        Image(bitmap = it, contentDescription = contentDescription, contentScale = ContentScale.Crop, modifier = modifier)
+        Image(
+            bitmap = it,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = modifier,
+        )
     }
 }
 
@@ -509,6 +572,38 @@ private fun loadThumbnail(
     resolver: ContentResolver,
     uri: Uri,
 ): ImageBitmap? {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null // Android 9: the decode fallback below handles it
-    return runCatching { resolver.loadThumbnail(uri, AndroidSize(THUMB_EDGE, THUMB_EDGE), null).asImageBitmap() }.getOrNull()
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+        return null // Android 9: the decode fallback below handles it
+    return runCatching {
+        resolver.loadThumbnail(uri, AndroidSize(THUMB_EDGE, THUMB_EDGE), null).asImageBitmap()
+    }
+        .getOrNull()
+}
+
+/**
+ * One choice out of 2 to 5, as a single-select segmented button row (Material 3: segmented buttons
+ * for 2-5 options, short labels that never wrap, not full width on large screens). Material's newer
+ * connected button group is not in the stable library yet (material3 1.4.0).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun <T> Segmented(
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SingleChoiceSegmentedButtonRow(
+        modifier = modifier.fillMaxWidth().widthIn(max = Size.segmentedMaxWidth)
+    ) {
+        options.forEachIndexed { i, (value, label) ->
+            SegmentedButton(
+                selected = value == selected,
+                onClick = { onSelect(value) },
+                shape = SegmentedButtonDefaults.itemShape(index = i, count = options.size),
+                modifier = Modifier.heightIn(min = Size.touchTarget),
+                label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            )
+        }
+    }
 }

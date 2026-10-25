@@ -4,6 +4,9 @@ package dev.fengine.wallpaper.ui
 object TimeSlots {
     private val clock = Regex("""(\p{Nd}{1,2}):(\p{Nd}{2})""")
 
+    /** Slots as the time picker adds them: within one day, no duplicates, in order. */
+    fun normalize(slots: List<Int>): List<Int> = slots.map { it.mod(24 * 60) }.distinct().sorted()
+
     fun parse(text: String): List<Int>? {
         val slots =
             text.split(',').map { part ->

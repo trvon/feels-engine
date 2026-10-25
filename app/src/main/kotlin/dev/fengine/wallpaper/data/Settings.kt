@@ -38,6 +38,11 @@ data class Settings(
      * keep their behaviour: see SettingsCodec.
      */
     val dreamWirelessOnly: Boolean = true,
+    /** Settings > Appearance. */
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val colorSource: ColorSource = ColorSource.PHOTO,
+    val backdrop: Backdrop = Backdrop.BLACK,
+    val photoFit: PhotoFit = PhotoFit.FILL,
 ) {
     fun group(id: String?): Group? = id?.let { g -> groups.firstOrNull { it.id == g } }
 

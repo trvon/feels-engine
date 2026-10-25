@@ -29,12 +29,29 @@ object LiveFrame {
      * system zoom in 0..1, [parallax] the overscan fraction (0 disables parallax).
      */
     fun frame(
-        bitmapW: Int, bitmapH: Int, surfaceW: Int, surfaceH: Int,
-        xOffset: Float, zoom: Float, parallax: Float = PARALLAX, zoomRange: Float = ZOOM,
+        bitmapW: Int,
+        bitmapH: Int,
+        surfaceW: Int,
+        surfaceH: Int,
+        xOffset: Float,
+        zoom: Float,
+        parallax: Float = PARALLAX,
+        zoomRange: Float = ZOOM,
+        whole: Boolean = false,
     ): Frame {
+        if (whole) {
+            // The whole photo, centred, touching two edges; the backdrop fills the rest. No
+            // parallax
+            // or zoom headroom: either would push part of the photo off the screen.
+            val s = kotlin.math.min(surfaceW.toFloat() / bitmapW, surfaceH.toFloat() / bitmapH)
+            return Frame(s, (surfaceW - bitmapW * s) / 2f, (surfaceH - bitmapH * s) / 2f)
+        }
         val p = parallax.coerceAtLeast(0f)
         val z = zoom.coerceIn(0f, 1f)
-        val scale = cover(bitmapW, bitmapH, surfaceW, surfaceH) * (1f + p) * (1f + zoomRange.coerceAtLeast(0f) * (1f - z))
+        val scale =
+            cover(bitmapW, bitmapH, surfaceW, surfaceH) *
+                (1f + p) *
+                (1f + zoomRange.coerceAtLeast(0f) * (1f - z))
         val w = max(bitmapW * scale, surfaceW.toFloat())
         val h = max(bitmapH * scale, surfaceH.toFloat())
         // Only the parallax overscan follows the page offset; whatever else is wider than the
@@ -46,10 +63,19 @@ object LiveFrame {
         return Frame(scale, dx, dy)
     }
 
-    /** Decode target: the largest size any frame can need, so one decode serves every offset and zoom. */
-    fun decodeTarget(surfaceW: Int, surfaceH: Int, parallax: Float = PARALLAX, zoomRange: Float = ZOOM): Pair<Int, Int> {
+    /**
+     * Decode target: the largest size any frame can need, so one decode serves every offset and
+     * zoom.
+     */
+    fun decodeTarget(
+        surfaceW: Int,
+        surfaceH: Int,
+        parallax: Float = PARALLAX,
+        zoomRange: Float = ZOOM,
+    ): Pair<Int, Int> {
         val f = (1f + parallax.coerceAtLeast(0f)) * (1f + zoomRange.coerceAtLeast(0f))
-        return ceil(surfaceW * f).toInt().coerceAtLeast(1) to ceil(surfaceH * f).toInt().coerceAtLeast(1)
+        return ceil(surfaceW * f).toInt().coerceAtLeast(1) to
+            ceil(surfaceH * f).toInt().coerceAtLeast(1)
     }
 
     /**
@@ -58,7 +84,8 @@ object LiveFrame {
      * itself is smaller), aspect kept.
      */
     fun decodeSize(imageW: Int, imageH: Int, targetW: Int, targetH: Int): Pair<Int, Int> {
-        val scale = maxOf(targetW.toDouble() / imageW, targetH.toDouble() / imageH).coerceAtMost(1.0)
+        val scale =
+            maxOf(targetW.toDouble() / imageW, targetH.toDouble() / imageH).coerceAtMost(1.0)
         val w = ceil(imageW * scale).toInt().coerceIn(1, imageW)
         val h = ceil(imageH * scale).toInt().coerceIn(1, imageH)
         return w to h

@@ -3,9 +3,9 @@ package dev.fengine.wallpaper.screensaver
 import kotlin.math.max
 
 /**
- * The slow drift a screen saver gives a still photo: cover the view, then zoom a little and
- * glide between two focal points. Pure maths over sizes in pixels so the invariant suite can
- * prove the view never shows an edge, whatever the sizes and wherever the focal points land.
+ * The slow drift a screen saver gives a still photo: cover the view, then zoom a little and glide
+ * between two focal points. Pure maths over sizes in pixels so the invariant suite can prove the
+ * view never shows an edge, whatever the sizes and wherever the focal points land.
  */
 object KenBurns {
     /** Where the photo sits: scaled by [scale] about its origin, then moved by ([dx], [dy]). */
@@ -24,11 +24,25 @@ object KenBurns {
      * centre as far as the photo's edges allow; it is clamped before it could reveal a border.
      */
     fun frame(
-        imageW: Int, imageH: Int, viewW: Int, viewH: Int,
-        t: Float, zoomFrom: Float, zoomTo: Float, from: Focal, to: Focal,
+        imageW: Int,
+        imageH: Int,
+        viewW: Int,
+        viewH: Int,
+        t: Float,
+        zoomFrom: Float,
+        zoomTo: Float,
+        from: Focal,
+        to: Focal,
+        whole: Boolean = false,
     ): Frame {
+        if (whole) {
+            // The whole photo, centred and still; the backdrop fills the rest. Drift would crop it.
+            val s = kotlin.math.min(viewW.toFloat() / imageW, viewH.toFloat() / imageH)
+            return Frame(s, (viewW - imageW * s) / 2f, (viewH - imageH * s) / 2f)
+        }
         val p = t.coerceIn(0f, 1f)
-        val scale = cover(imageW, imageH, viewW, viewH) * lerp(zoomFrom, zoomTo, p).coerceAtLeast(1f)
+        val scale =
+            cover(imageW, imageH, viewW, viewH) * lerp(zoomFrom, zoomTo, p).coerceAtLeast(1f)
         // Float rounding can leave the scaled photo a hair smaller than the view; never let the
         // clamp range invert, and never let the photo be smaller than the view it must cover.
         val w = maxOf(imageW * scale, viewW.toFloat())

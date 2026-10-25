@@ -3,10 +3,14 @@ package dev.fengine.wallpaper.invariants
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import dev.fengine.wallpaper.data.Backdrop
+import dev.fengine.wallpaper.data.ColorSource
 import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Mode
+import dev.fengine.wallpaper.data.PhotoFit
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.data.SettingsCodec
+import dev.fengine.wallpaper.data.ThemeMode
 import net.jqwik.api.Arbitraries
 import net.jqwik.api.Arbitrary
 import net.jqwik.api.Combinators
@@ -77,6 +81,10 @@ class SettingsCodecProperties {
                         coverGroupId = home,
                         dreamWirelessOnly = shuffle != enabled,
                         lastRotationAt = interval * 60_000L,
+                        themeMode = ThemeMode.entries[interval % 3],
+                        colorSource = ColorSource.entries[interval % 2],
+                        backdrop = Backdrop.entries[(interval / 2) % 2],
+                        photoFit = PhotoFit.entries[(interval / 3) % 2],
                     )
                 }
         }

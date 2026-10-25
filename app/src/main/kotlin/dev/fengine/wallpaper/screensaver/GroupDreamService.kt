@@ -16,11 +16,15 @@ import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import dev.fengine.wallpaper.FengineApp
+import dev.fengine.wallpaper.data.Backdrop
 import dev.fengine.wallpaper.data.Ledger
 import dev.fengine.wallpaper.data.LedgerStore
+import dev.fengine.wallpaper.data.PhotoFit
 import dev.fengine.wallpaper.data.Screen
 import dev.fengine.wallpaper.data.Screens
 import dev.fengine.wallpaper.smart.Images
+import dev.fengine.wallpaper.ui.Palette
+import dev.fengine.wallpaper.wallpaper.PhotoColors
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -128,16 +132,24 @@ class GroupDreamService : DreamService() {
                         .onFailure { Log.w(TAG, "decode failed for $uri", it) }
                         .getOrNull()
                 } ?: continue
-            show(bitmap)
+            val whole = settings.photoFit == PhotoFit.WHOLE
+            val backdrop =
+                if (whole && settings.backdrop == Backdrop.PHOTO) {
+                    withContext(Dispatchers.IO) { PhotoColors.of(this@GroupDreamService, uri) }
+                        ?.let { Palette.backdrop(it.primaryColor.toArgb()) } ?: Color.BLACK
+                } else Color.BLACK
+            show(bitmap, whole, backdrop)
             delay(DreamPlan.PHOTO_MS)
         }
     }
 
     /** Fade [bitmap] in over the current photo and start its drift; the old bitmap is released. */
-    private fun show(bitmap: Bitmap) {
+    private fun show(bitmap: Bitmap, whole: Boolean = false, backdrop: Int = Color.BLACK) {
         val old = front.drawable
         back.setImageBitmap(bitmap)
-        startDrift(back, bitmap)
+        // An opaque backdrop on the incoming view, so its fade covers the old photo's borders too.
+        back.setBackgroundColor(if (whole) backdrop else Color.TRANSPARENT)
+        startDrift(back, bitmap, whole)
         back
             .animate()
             .alpha(1f)
@@ -155,7 +167,7 @@ class GroupDreamService : DreamService() {
             .start()
     }
 
-    private fun startDrift(view: ImageView, bitmap: Bitmap) {
+    private fun startDrift(view: ImageView, bitmap: Bitmap, whole: Boolean = false) {
         drift?.cancel()
         val rnd = Random(System.nanoTime())
         val from = KenBurns.Focal(0.3f + rnd.nextFloat() * 0.4f, 0.3f + rnd.nextFloat() * 0.4f)
@@ -180,6 +192,7 @@ class GroupDreamService : DreamService() {
                             DreamPlan.ZOOM_TO,
                             from,
                             to,
+                            whole = whole,
                         )
                     matrix.reset()
                     matrix.postScale(f.scale, f.scale)

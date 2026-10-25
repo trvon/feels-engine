@@ -21,6 +21,10 @@ object SettingsCodec {
         val timesOfDay = stringPreferencesKey("times_of_day")
         val shuffle = booleanPreferencesKey("shuffle")
         val dreamWirelessOnly = booleanPreferencesKey("dream_wireless_only")
+        val themeMode = stringPreferencesKey("theme_mode")
+        val colorSource = stringPreferencesKey("color_source")
+        val backdrop = stringPreferencesKey("backdrop")
+        val photoFit = stringPreferencesKey("photo_fit")
         val enabled = booleanPreferencesKey("enabled")
         val lastResult = stringPreferencesKey("last_result")
         val lastRotationAt = longPreferencesKey("last_rotation_at")
@@ -40,6 +44,10 @@ object SettingsCodec {
         prefs[Keys.timesOfDay] = next.timesOfDay.joinToString("\n")
         prefs[Keys.shuffle] = next.shuffle
         prefs[Keys.dreamWirelessOnly] = next.dreamWirelessOnly
+        prefs[Keys.themeMode] = next.themeMode.name
+        prefs[Keys.colorSource] = next.colorSource.name
+        prefs[Keys.backdrop] = next.backdrop.name
+        prefs[Keys.photoFit] = next.photoFit.name
         prefs[Keys.enabled] = next.enabled
         prefs[Keys.lastResult] = next.lastResult
         prefs[Keys.lastRotationAt] = next.lastRotationAt
@@ -78,6 +86,10 @@ object SettingsCodec {
             shuffle = prefs[Keys.shuffle] ?: defaults.shuffle,
             // Never written: a new install gets the default; an install that already had groups
             // played on any charger before this setting existed and keeps doing so.
+            themeMode = enumOr(prefs[Keys.themeMode], defaults.themeMode),
+            colorSource = enumOr(prefs[Keys.colorSource], defaults.colorSource),
+            backdrop = enumOr(prefs[Keys.backdrop], defaults.backdrop),
+            photoFit = enumOr(prefs[Keys.photoFit], defaults.photoFit),
             dreamWirelessOnly =
                 prefs[Keys.dreamWirelessOnly] ?: (defaults.dreamWirelessOnly && groups.isEmpty()),
             enabled = prefs[Keys.enabled] ?: defaults.enabled,
@@ -87,4 +99,11 @@ object SettingsCodec {
             coverGroupId = prefs[Keys.coverGroupId]?.takeIf { id -> groups.any { it.id == id } },
         )
     }
+
+    /**
+     * An unknown or missing name (a newer version's value, a fresh install) falls back to the
+     * default.
+     */
+    private inline fun <reified E : Enum<E>> enumOr(name: String?, default: E): E =
+        name?.let { n -> enumValues<E>().firstOrNull { it.name == n } } ?: default
 }

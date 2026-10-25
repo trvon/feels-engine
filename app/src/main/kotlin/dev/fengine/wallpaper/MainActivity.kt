@@ -37,7 +37,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Keep system-bar icons legible when the Compose theme follows the phone.
         enableEdgeToEdge()
-        setContent { FengineTheme { FengineApp(viewModel) } }
+        setContent {
+            val s by viewModel.settings.collectAsStateWithLifecycle()
+            FengineTheme(s.themeMode, s.colorSource) { FengineApp(viewModel) }
+        }
     }
 }
 
@@ -54,10 +57,15 @@ private fun FengineApp(vm: MainViewModel) {
             openGroupId?.let { vm.addPhotos(it, uris) }
         }
     val context = LocalContext.current
+    val screenSaverWeek by vm.screenSaverWeek.collectAsStateWithLifecycle()
     val diagnostics by vm.diagnostics.collectAsStateWithLifecycle()
-    LaunchedEffect(openGroupId, settings.lastResult) { if (openGroupId == null) vm.refreshDiagnostics() }
+    LaunchedEffect(openGroupId, settings.lastResult) {
+        if (openGroupId == null) vm.refreshDiagnostics()
+    }
     val exportLog =
-        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("application/json")
+        ) { uri ->
             uri?.let(vm::exportLedger)
         }
     val scanning by vm.scanning.collectAsStateWithLifecycle()
@@ -66,7 +74,9 @@ private fun FengineApp(vm: MainViewModel) {
     val indexProgress by vm.indexProgress.collectAsStateWithLifecycle()
     val aiStatus by vm.aiStatus.collectAsStateWithLifecycle()
     val aiReadiness by vm.aiReadiness.collectAsStateWithLifecycle()
-    LaunchedEffect(openGroupId, openGroup?.hasDescription) { if (openGroup?.hasDescription == true) vm.refreshAi() }
+    LaunchedEffect(openGroupId, openGroup?.hasDescription) {
+        if (openGroup?.hasDescription == true) vm.refreshAi()
+    }
     // Find photos hands the description a batch from the system picker; no broad photo permission.
     val findPicker =
         rememberLauncherForActivityResult(PickMultipleVisualMedia(vm.pickerMax())) { uris ->
@@ -81,7 +91,7 @@ private fun FengineApp(vm: MainViewModel) {
         LifecycleResumeEffect(Unit) {
             motion = vm.motion()
             dreamConfigured = vm.dreamConfigured()
-            onPauseOrDispose { }
+            onPauseOrDispose {}
         }
         LaunchedEffect(settings) { motion = vm.motion() }
         SettingsScreen(
@@ -93,16 +103,31 @@ private fun FengineApp(vm: MainViewModel) {
             onSetShuffle = vm::setShuffle,
             onSetStill = vm::setStill,
             onSetDreamWirelessOnly = vm::setDreamWirelessOnly,
+            onSetThemeMode = vm::setThemeMode,
+            onSetColorSource = vm::setColorSource,
+            onSetBackdrop = vm::setBackdrop,
+            onSetPhotoFit = vm::setPhotoFit,
+            screenSaverWeek = screenSaverWeek,
             hasCoverScreen = vm.hasCoverScreen(),
             dreamConfigured = dreamConfigured,
             motion = motion,
             onTurnOnMotion = {
                 runCatching { context.startActivity(LiveWallpaper.chooserIntent(context)) }
-                    .onFailure { context.startActivity(Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) }
+                    .onFailure {
+                        context.startActivity(
+                            Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
+                        )
+                    }
             },
             onOpenDreamSettings = {
-                runCatching { context.startActivity(Intent(android.provider.Settings.ACTION_DREAM_SETTINGS)) }
-                    .onFailure { context.startActivity(Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS)) }
+                runCatching {
+                    context.startActivity(Intent(android.provider.Settings.ACTION_DREAM_SETTINGS))
+                }
+                    .onFailure {
+                        context.startActivity(
+                            Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS)
+                        )
+                    }
             },
         )
     } else if (openGroup != null) {
@@ -126,7 +151,8 @@ private fun FengineApp(vm: MainViewModel) {
             onSetCover = { vm.setCover(openGroup.id, it) },
             onSetDream = { vm.setDreamGroup(openGroup.id, it) },
             onShowNow = { uri ->
-                // One rotation either way: making the group active already puts the tapped photo up.
+                // One rotation either way: making the group active already puts the tapped photo
+                // up.
                 if (settings.homeGroupId != openGroup.id && settings.lockGroupId != openGroup.id) {
                     vm.setActive(openGroup.id, uri)
                 } else {

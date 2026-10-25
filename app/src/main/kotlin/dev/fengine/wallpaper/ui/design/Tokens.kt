@@ -5,8 +5,8 @@ import androidx.compose.ui.unit.dp
 
 /**
  * The design language in numbers. Screens never write a raw dp value; they name a token here.
- * `DesignLanguageTest` enforces that. The vocabulary is small on purpose: editorial pages are
- * built from generous vertical rhythm, one radius per element class, and a 3-column photo grid.
+ * `DesignLanguageTest` enforces that. The vocabulary is small on purpose: editorial pages are built
+ * from generous vertical rhythm, one radius per element class, and a 3-column photo grid.
  */
 object Space {
     val xs: Dp = 4.dp
@@ -43,11 +43,19 @@ object Grid {
 object Size {
     /** Minimum whole-row touch target for settings and assignments. */
     val touchTarget: Dp = 48.dp
+    /**
+     * Segmented buttons never span a wide screen (Material 3 guidance); they centre-left at this
+     * width.
+     */
+    val segmentedMaxWidth: Dp = 520.dp
 
     /** Cover aspect ratio (portrait, like a lock screen). */
     const val coverAspect = 0.8f
 
-    /** Tap target for the remove affordance on a tile; the visible disc inside it is [tileActionDisc]. */
+    /**
+     * Tap target for the remove affordance on a tile; the visible disc inside it is
+     * [tileActionDisc].
+     */
     val tileAction: Dp = 44.dp
     val tileActionDisc: Dp = 26.dp
     val tileIcon: Dp = 16.dp
