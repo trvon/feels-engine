@@ -132,6 +132,10 @@ object Rotation {
             if (pass.unreadable.isEmpty()) break
             pins = emptyMap()
         }
+        // Whoever changed the photo (backstop job, engine on screen-on, a person), the alarm now
+        // counts
+        // from this change; otherwise it would fire at its old time only to find nothing due.
+        if (changed) RotationScheduler(app).armNextAlarm(store.read())
         Outcome.Done(failures)
     }
 

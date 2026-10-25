@@ -154,3 +154,24 @@ Next: record release-equivalent traces on a disposable emulator and the Fold,
 with matching data and warm-up. Separate Compose/layout, group thumbnail decode
 and GPU submission before changing code. The small jank sample warrants that
 trace, not an inferred decode bottleneck or a performance rewrite.
+
+## Round after the scheduling and appearance changes, fe_phone emulator, API 36 (2026-10-25)
+
+Debug build, live engine on both screens, Fill screen, group of 8 painted photos.
+
+| What | Result |
+|---|---|
+| Engine idle, 30 s | 0 ms CPU, 0 frames |
+| 20 parallax swipes | 60 ms CPU |
+| Screen off 20 min, 15-minute rhythm | 2 wake-ups: one change, one alarm that found nothing due |
+| Cold start, `am start -W`, 5 runs | 656 to 689 ms, median 676 ms |
+
+The second wake-up was the alarm firing at its old time after the periodic
+backstop had already changed the photo. The alarm is now re-armed after
+every change, whoever makes it, so one slot costs one wake-up.
+
+Standby (from the scheduling fix, same emulator, `am set-standby-bucket
+rare`): the alarm path changed the photo and the next alarm was deferred by
+`app_standby` to the next hour, quota 1. Pending: the same round on the
+Pixel 8 (needs the release build with the shared upload key, which means an
+uninstall) and on the Fold 8.
