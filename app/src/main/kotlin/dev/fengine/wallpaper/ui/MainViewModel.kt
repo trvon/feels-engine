@@ -207,17 +207,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             is DownloadStatus.DownloadProgress ->
                                 "Downloading on-device AI, ${st.totalBytesDownloaded / 1_000_000} MB"
                             is DownloadStatus.DownloadCompleted -> null
-                            is DownloadStatus.DownloadFailed -> "Download failed: ${st.e.message}"
+                            is DownloadStatus.DownloadFailed -> failure(st.e)
                             else -> aiStatus.value
                         }
                 }
-            } catch (e: Exception) {
-                aiStatus.value = "Download failed: ${e.message}"
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // Throwable: the ML Kit beta has thrown Errors (NoSuchMethodError) from download().
+                android.util.Log.w("MainViewModel", "AI download failed", e)
+                aiStatus.value = failure(e)
             } finally {
-                nano.close()
+                runCatching { nano.close() }
             }
             refreshAi()
         }
+    }
+
+    private fun failure(e: Throwable): String {
+        val g = e as? com.google.mlkit.genai.common.GenAiException
+        val retry = runCatching { g?.retryDelay?.seconds }.getOrNull()
+        return AiReadiness.downloadFailed(g?.errorCode, e.message ?: e.javaClass.simpleName, retry)
     }
 
     fun openAiCoreInPlayStore() {

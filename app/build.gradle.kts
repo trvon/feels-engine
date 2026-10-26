@@ -112,6 +112,10 @@ dependencies {
     // On-device only: ML Kit base image labeling (bundled model) and the Gemini Nano Prompt API.
     implementation(libs.mlkit.image.labeling)
     implementation(libs.mlkit.genai.prompt)
+    // genai-prompt beta3/beta4 throw NoSuchMethodError when a download completes or is cancelled
+    // with coroutines 1.10.x or older (developers.google.com/ml-kit/known-issues); 1.9.0 resolved
+    // transitively before this pin.
+    implementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.junit)
     // Invariant / fuzz suite: jqwik properties on the JUnit platform; JUnit 4 tests keep running
     // via vintage.

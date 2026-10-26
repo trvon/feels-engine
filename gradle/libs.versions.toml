@@ -13,12 +13,14 @@ datastore = "1.2.1"
 junit = "4.13.2"
 mlkitImageLabeling = "17.0.9"
 mlkitGenaiPrompt = "1.0.0-beta4"
+coroutines = "1.11.0"
 orgJson = "20260814"
 androidxTestRunner = "1.6.2"
 androidxTestCore = "1.6.1"
 androidxTestExtJunit = "1.2.1"
 
 [libraries]
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }

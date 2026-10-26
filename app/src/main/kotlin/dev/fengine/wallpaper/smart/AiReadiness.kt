@@ -2,16 +2,15 @@ package dev.fengine.wallpaper.smart
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import com.google.mlkit.genai.common.FeatureStatus
 
 /**
- * What the user needs to know about on-device AI on this phone, in plain words, with the one
- * action that moves it forward. Combines three signals: Google's published device list, the state
- * of the Android AICore package (a factory "stub" build cannot serve models), and the ML Kit
- * feature status for Gemini Nano.
+ * What the user needs to know about on-device AI on this phone, in plain words, with the one action
+ * that moves it forward. Combines three signals: Google's published device list, the state of the
+ * Android AICore package (a factory "stub" build cannot serve models), and the ML Kit feature
+ * status for Gemini Nano.
  */
 data class AiReadiness(
     val level: Level,
@@ -19,69 +18,142 @@ data class AiReadiness(
     val detail: String,
     val action: Action? = null,
 ) {
-    enum class Level { READY, DOWNLOADABLE, DOWNLOADING, NEEDS_AICORE, NOT_LISTED, UNAVAILABLE }
-    enum class Action { DOWNLOAD, OPEN_PLAY_STORE, CHECK_AGAIN }
+    enum class Level {
+        READY,
+        DOWNLOADABLE,
+        DOWNLOADING,
+        NEEDS_AICORE,
+        NOT_LISTED,
+        UNAVAILABLE,
+    }
+
+    enum class Action {
+        DOWNLOAD,
+        OPEN_PLAY_STORE,
+        CHECK_AGAIN,
+    }
 
     companion object {
         const val AICORE_PACKAGE = "com.google.android.aicore"
 
-        /** Device families on Google's ML Kit GenAI Prompt API list (developers.google.com/ml-kit/genai, read 2026-10-13). */
-        private val listedModels = listOf(
-            "Pixel 9", "Pixel 10", "Pixel 11",       // Google
-            "SM-F97", "SM-F96", "SM-F77",             // Galaxy Z Fold8 (observed SM-F971U), Fold7, Flip8 family
-        )
+        /**
+         * Device families on Google's ML Kit GenAI Prompt API list
+         * (developers.google.com/ml-kit/genai, read 2026-10-13).
+         */
+        private val listedModels =
+            listOf(
+                "Pixel 9",
+                "Pixel 10",
+                "Pixel 11", // Google
+                "SM-F97",
+                "SM-F96",
+                "SM-F77", // Galaxy Z Fold8 (observed SM-F971U), Fold7, Flip8 family
+            )
 
-        fun deviceListed(): Boolean = listedModels.any { Build.MODEL.startsWith(it, ignoreCase = true) }
+        fun deviceListed(): Boolean = listedModels.any {
+            Build.MODEL.startsWith(it, ignoreCase = true)
+        }
 
         /** AICore version name, or null when the package is absent. */
         fun aicoreVersion(context: Context): String? = runCatching {
             context.packageManager.getPackageInfo(AICORE_PACKAGE, 0).versionName
-        }.getOrNull()
+        }
+            .getOrNull()
 
-        fun isStub(version: String?): Boolean = version == null || version.contains("stub", ignoreCase = true)
+        fun isStub(version: String?): Boolean =
+            version == null || version.contains("stub", ignoreCase = true)
 
         suspend fun check(context: Context): AiReadiness {
             val version = aicoreVersion(context)
             val listed = deviceListed()
-            val status = runCatching { NanoMatcher().use { it.status() } }.getOrElse { FeatureStatus.UNAVAILABLE }
+            val status = runCatching {
+                NanoMatcher().use { it.status() }
+            }
+                .getOrElse { FeatureStatus.UNAVAILABLE }
             return when {
-                status == FeatureStatus.AVAILABLE -> AiReadiness(
-                    Level.READY, "On-device AI is ready",
-                    "Gemini Nano judges each photo against your description, on this phone only.",
-                )
-                status == FeatureStatus.DOWNLOADING -> AiReadiness(
-                    Level.DOWNLOADING, "On-device AI is downloading",
-                    "The model is a few hundred megabytes. Finding photos uses labels until it lands.",
-                    Action.CHECK_AGAIN,
-                )
-                status == FeatureStatus.DOWNLOADABLE -> AiReadiness(
-                    Level.DOWNLOADABLE, "On-device AI can be set up",
-                    "A one-time download, best on Wi-Fi. Until then, finding photos uses labels only.",
-                    Action.DOWNLOAD,
-                )
-                isStub(version) && listed -> AiReadiness(
-                    Level.NEEDS_AICORE, "Android AICore needs an update",
-                    "Google lists this phone as supported, but the AICore service on it is a factory placeholder" +
-                        (version?.let { " ($it)" } ?: "") + ". Update it in the Play Store, then check again.",
-                    Action.OPEN_PLAY_STORE,
-                )
-                !listed -> AiReadiness(
-                    Level.NOT_LISTED, "Labels only on this phone",
-                    "Google has not listed ${Build.MANUFACTURER} ${Build.MODEL} for Gemini Nano. Finding photos uses " +
-                        "on-device labels, which works for places, animals, food and scenes.",
-                    Action.CHECK_AGAIN,
-                )
-                else -> AiReadiness(
-                    Level.UNAVAILABLE, "On-device AI is not available yet",
-                    "AICore ${version ?: "is missing"} and reports the model as unavailable. This can resolve after " +
-                        "AICore finishes setting up. Finding photos uses labels until then.",
-                    Action.CHECK_AGAIN,
-                )
+                status == FeatureStatus.AVAILABLE ->
+                    AiReadiness(
+                        Level.READY,
+                        "On-device AI is ready",
+                        "Gemini Nano judges each photo against your description, on this phone only.",
+                    )
+                status == FeatureStatus.DOWNLOADING ->
+                    AiReadiness(
+                        Level.DOWNLOADING,
+                        "On-device AI is downloading",
+                        "The model is a few hundred megabytes. Finding photos uses labels until it lands.",
+                        Action.CHECK_AGAIN,
+                    )
+                status == FeatureStatus.DOWNLOADABLE ->
+                    AiReadiness(
+                        Level.DOWNLOADABLE,
+                        "On-device AI can be set up",
+                        "A one-time download, best on Wi-Fi. Until then, finding photos uses labels only.",
+                        Action.DOWNLOAD,
+                    )
+                isStub(version) && listed ->
+                    AiReadiness(
+                        Level.NEEDS_AICORE,
+                        "Android AICore needs an update",
+                        "Google lists this phone as supported, but the AICore service on it is a factory placeholder" +
+                            (version?.let { " ($it)" } ?: "") +
+                            ". Update it in the Play Store, then check again.",
+                        Action.OPEN_PLAY_STORE,
+                    )
+                !listed ->
+                    AiReadiness(
+                        Level.NOT_LISTED,
+                        "Labels only on this phone",
+                        "Google has not listed ${Build.MANUFACTURER} ${Build.MODEL} for Gemini Nano. Finding photos uses " +
+                            "on-device labels, which works for places, animals, food and scenes.",
+                        Action.CHECK_AGAIN,
+                    )
+                else ->
+                    AiReadiness(
+                        Level.UNAVAILABLE,
+                        "On-device AI is not available yet",
+                        "AICore ${version ?: "is missing"} and reports the model as unavailable. This can resolve after " +
+                            "AICore finishes setting up. Finding photos uses labels until then.",
+                        Action.CHECK_AGAIN,
+                    )
             }
         }
 
+        /**
+         * One line for a failed model download. [code] is GenAiException.errorCode (null when the
+         * failure was not one), [message] carries AICore's own type and code, [retrySeconds] when
+         * AICore asks to wait.
+         */
+        fun downloadFailed(code: Int?, message: String, retrySeconds: Long?): String {
+            val hint =
+                when {
+                    code == 501 -> "The phone needs more free space."
+                    code == 604 -> "Android needs a system update first."
+                    code == 9 || code == 27 -> "AICore is busy; try again later."
+                    message.contains("601") || message.contains("BINDING_FAILURE") ->
+                        "AICore changed after this app was installed. Update AICore in the Play Store, then restart the phone."
+                    message.contains("606") || message.contains("FEATURE_NOT_FOUND") ->
+                        "AICore is still setting up. This can take a few hours; restarting the phone helps."
+                    message.contains("DOWNLOAD_ERROR") || message.contains("CONNECTION_ERROR") ->
+                        "AICore could not reach the network. Stay on Wi-Fi and try again."
+                    else -> null
+                }
+            val wait =
+                retrySeconds
+                    ?.takeIf { it > 0 }
+                    ?.let { s ->
+                        " Try again in ${if (s < 120) "$s seconds" else "${s / 60} minutes"}."
+                    }
+                    .orEmpty()
+            val tail = if (code != null) " (code $code)" else ""
+            return "Download failed$tail: ${hint ?: message}$wait"
+        }
+
         fun playStoreIntent(): Intent =
-            Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$AICORE_PACKAGE"))
+            Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("https://play.google.com/store/apps/details?id=$AICORE_PACKAGE"),
+                )
                 .setPackage("com.android.vending")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
