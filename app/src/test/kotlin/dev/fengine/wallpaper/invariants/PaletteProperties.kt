@@ -43,6 +43,11 @@ class PaletteProperties {
                 s.background to s.onBackground,
                 s.surfaceVariant to s.onSurfaceVariant,
                 s.surfaceContainer to s.onBackground,
+                // Primary and secondary are text too: buttons and eyebrows on the page and cards.
+                s.background to s.primary,
+                s.surfaceContainer to s.primary,
+                s.background to s.secondary,
+                s.surfaceContainer to s.secondary,
             )) {
             assertTrue(
                 "contrast ${Palette.contrast(bg, fg)} for seed ${Integer.toHexString(seed)} dark=$dark",

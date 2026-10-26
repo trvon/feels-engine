@@ -100,15 +100,16 @@ private fun FengineApp(vm: MainViewModel) {
 
     if (settingsOpen) {
         BackHandler { settingsOpen = false }
-        var motion by remember { mutableStateOf(vm.motion()) }
+        val motion by vm.motionState.collectAsStateWithLifecycle()
         var dreamConfigured by remember { mutableStateOf(vm.dreamConfigured()) }
         // A chooser can change system state without emitting a DataStore update.
         LifecycleResumeEffect(Unit) {
-            motion = vm.motion()
+            vm.refreshMotion()
             dreamConfigured = vm.dreamConfigured()
             onPauseOrDispose {}
         }
-        LaunchedEffect(settings) { motion = vm.motion() }
+        // Still, a rotation or a Motion check changes these; other settings edits do not need it.
+        LaunchedEffect(settings.lastResult, settings.motionOn) { vm.refreshMotion() }
         SettingsScreen(
             settings = settings,
             onBack = { settingsOpen = false },

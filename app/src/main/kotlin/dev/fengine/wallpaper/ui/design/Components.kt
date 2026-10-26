@@ -64,7 +64,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import dev.fengine.wallpaper.smart.Images
 import kotlinx.coroutines.Dispatchers
@@ -204,6 +208,8 @@ fun SwitchRow(
     checked: Boolean,
     onChange: (Boolean) -> Unit,
     enabled: Boolean = true,
+    /** Why the row is disabled, announced with it ("Needs Motion"). */
+    note: String? = null,
 ) {
     // The whole row is the tap target (label included), announced as one switch.
     Row(
@@ -215,6 +221,13 @@ fun SwitchRow(
                     enabled = enabled,
                     role = Role.Switch,
                     onValueChange = onChange,
+                )
+                .then(
+                    if (note != null)
+                        Modifier.semantics {
+                            stateDescription = (if (checked) "On" else "Off") + ", $note"
+                        }
+                    else Modifier
                 )
                 .padding(vertical = Space.xs),
         verticalAlignment = Alignment.CenterVertically,
@@ -602,7 +615,17 @@ fun <T> Segmented(
                 onClick = { onSelect(value) },
                 shape = SegmentedButtonDefaults.itemShape(index = i, count = options.size),
                 modifier = Modifier.heightIn(min = Size.touchTarget),
-                label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                // No check icon and tighter letters: three options fit 360 dp; long labels wrap.
+                icon = {},
+                label = {
+                    Text(
+                        label,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 0.1.sp),
+                    )
+                },
             )
         }
     }

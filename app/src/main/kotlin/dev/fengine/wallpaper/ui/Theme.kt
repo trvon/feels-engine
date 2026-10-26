@@ -15,6 +15,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -95,13 +96,17 @@ fun FengineTheme(
 private fun rememberWallpaperSeed(): Int? {
     val context = LocalContext.current
     val wm = remember { WallpaperManager.getInstance(context) }
-    var seed by remember {
-        mutableStateOf(
-            runCatching {
-                wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.primaryColor?.toArgb()
+    // Read off the main thread: the system may first extract colours from the wallpaper.
+    var seed by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(wm) {
+        val first =
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.primaryColor?.toArgb()
+                }
+                    .getOrNull()
             }
-                .getOrNull()
-        )
+        if (seed == null) seed = first
     }
     DisposableEffect(wm) {
         val listener = WallpaperManager.OnColorsChangedListener { colors, which ->
@@ -140,5 +145,13 @@ private fun photoScheme(p: Palette.Scheme, dark: Boolean): ColorScheme {
         surfaceContainer = c(p.surfaceContainer),
         surfaceContainerHigh = c(p.surfaceVariant),
         surfaceContainerHighest = c(p.surfaceVariant),
+        surfaceTint = c(p.primary),
+        outline = c(p.outline),
+        outlineVariant = c(p.outlineVariant),
+        tertiaryContainer = c(p.secondaryContainer),
+        onTertiaryContainer = c(p.onSecondaryContainer),
+        inverseSurface = c(p.onBackground),
+        inverseOnSurface = c(p.background),
+        inversePrimary = c(p.primaryContainer),
     )
 }

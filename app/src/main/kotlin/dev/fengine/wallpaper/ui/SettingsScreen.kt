@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
@@ -29,8 +31,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import dev.fengine.wallpaper.data.Backdrop
 import dev.fengine.wallpaper.data.ChangeTriggers
 import dev.fengine.wallpaper.data.ColorSource
@@ -49,6 +53,7 @@ import dev.fengine.wallpaper.ui.design.Space
 import dev.fengine.wallpaper.ui.design.SwitchRow
 import dev.fengine.wallpaper.ui.design.TextAction
 import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
+import kotlin.math.roundToInt
 
 /**
  * Infrequent preferences; photo actions and screen assignment stay on Home. Every single choice of
@@ -101,7 +106,12 @@ fun SettingsScreen(
                         "Android may delay a change while the app goes unused; opening it now and then keeps changes on time."
                     )
                 }
-                Mode.TIME_OF_DAY -> TimesEditor(settings.timesOfDay, onSetTimes)
+                Mode.TIME_OF_DAY ->
+                    TimesEditor(
+                        settings.timesOfDay,
+                        onSetTimes,
+                        android.text.format.DateFormat.is24HourFormat(LocalContext.current),
+                    )
             }
             Spacer(Modifier.height(Space.lg))
             SwitchRow("Shuffle photos", settings.shuffle, onSetShuffle)
@@ -119,15 +129,17 @@ fun SettingsScreen(
             Text("Also change", style = MaterialTheme.typography.titleMedium)
             SwitchRow(
                 "When I double-tap the home screen",
-                settings.tapToChange && moving,
+                settings.tapToChange,
                 onSetTapToChange,
                 enabled = moving,
+                note = if (moving) null else "Needs Motion",
             )
             SwitchRow(
                 "When light or dark mode switches",
-                settings.changeOnTheme && moving,
+                settings.changeOnTheme,
                 onSetChangeOnTheme,
                 enabled = moving,
+                note = if (moving) null else "Needs Motion",
             )
             Caption(
                 if (moving)
@@ -272,15 +284,20 @@ private fun IntervalSlider(minutes: Int, onChange: (Int) -> Unit) {
         androidx.compose.runtime.remember(minutes) {
             mutableStateOf(ChangeTriggers.nearestStop(minutes).toFloat())
         }
-    val shown = stops[index.toInt().coerceIn(stops.indices)]
+    // Rounded, not truncated: a snapped 12.999999 is stop 13.
+    val shown = stops[index.roundToInt().coerceIn(stops.indices)]
     Text(Format.every(shown), style = MaterialTheme.typography.bodyLarge)
     Slider(
         value = index,
         onValueChange = { index = it },
-        onValueChangeFinished = { onChange(stops[index.toInt().coerceIn(stops.indices)]) },
+        onValueChangeFinished = { onChange(stops[index.roundToInt().coerceIn(stops.indices)]) },
         valueRange = 0f..(stops.size - 1).toFloat(),
         steps = stops.size - 2,
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Interval" },
+        modifier =
+            Modifier.fillMaxWidth().semantics {
+                contentDescription = "Interval"
+                stateDescription = Format.every(shown)
+            },
     )
 }
 
@@ -310,6 +327,7 @@ private fun PreferenceGroup(
 private fun TimesEditor(
     current: List<Int>,
     onChange: (List<Int>) -> Unit,
+    is24: Boolean,
 ) {
     var picking by rememberSaveable { mutableStateOf(false) }
     FlowRow(
@@ -317,7 +335,7 @@ private fun TimesEditor(
         verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
         current.forEach { minutes ->
-            val label = Format.clock(minutes)
+            val label = Format.clock(minutes, is24)
             InputChip(
                 selected = false,
                 onClick = { if (current.size > 1) onChange(current - minutes) },
@@ -335,15 +353,23 @@ private fun TimesEditor(
         else "Keep at least one time. Add another to remove this one."
     )
     if (picking) {
-        val state = rememberTimePickerState(initialHour = 7, initialMinute = 0)
+        val state = rememberTimePickerState(initialHour = 7, initialMinute = 0, is24Hour = is24)
+        val chosen = state.hour * 60 + state.minute
+        val already = chosen in current
         AlertDialog(
             onDismissRequest = { picking = false },
             title = { Text("Add a time") },
-            text = { TimePicker(state = state) },
+            // Scrolls on a short screen (phone landscape), so Add is never cut off.
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    TimePicker(state = state)
+                    if (already) Caption("${Format.clock(chosen, is24)} is already set.")
+                }
+            },
             confirmButton = {
-                TextAction("Add") {
+                TextAction("Add", enabled = !already) {
                     picking = false
-                    onChange(TimeSlots.normalize(current + (state.hour * 60 + state.minute)))
+                    onChange(TimeSlots.normalize(current + chosen))
                 }
             },
             dismissButton = { TextAction("Cancel") { picking = false } },

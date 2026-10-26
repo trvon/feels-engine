@@ -328,6 +328,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    /** Which screens the live engine draws, per panel; refreshed off the main thread. */
+    val motionState = MutableStateFlow(LiveWallpaper.State(false, false, false, false))
+
+    /** Several binder calls (about ten on One UI): never on the main thread. */
+    fun refreshMotion() {
+        viewModelScope.launch(Dispatchers.IO) { motionState.value = motion() }
+    }
+
     /** Which screens the live engine draws right now, per panel. */
     fun motion(): LiveWallpaper.State = runCatching {
         LiveWallpaper.state(getApplication())

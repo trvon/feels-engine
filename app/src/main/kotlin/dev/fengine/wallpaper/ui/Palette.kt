@@ -30,6 +30,9 @@ object Palette {
          * Tonal containers (settings cards) in the photo's hue; text on them uses [onBackground].
          */
         val surfaceContainer: Int,
+        /** Borders (segmented buttons, switch tracks) in the photo's hue. */
+        val outline: Int = surfaceVariant,
+        val outlineVariant: Int = surfaceVariant,
     )
 
     fun hsl(argb: Int): Hsl {
@@ -113,14 +116,44 @@ object Palette {
             val bg = tone(c, l, s)
             return bg to onColor(bg)
         }
-        val (p, onP) = pair(if (dark) 0.78f else 0.38f)
-        val (pc, onPc) = pair(if (dark) 0.28f else 0.88f)
-        val (s2, onS) = pair(if (dark) 0.75f else 0.42f, sat * 0.45f)
-        val (sc, onSc) = pair(if (dark) 0.26f else 0.90f, sat * 0.45f)
         val (bg, onBg) = pair(if (dark) 0.07f else 0.98f, sat * 0.25f)
-        val (sv, onSv) = pair(if (dark) 0.18f else 0.91f, sat * 0.2f)
         val container = tone(c, if (dark) 0.12f else 0.95f, sat * 0.2f)
-        return Scheme(p, onP, pc, onPc, s2, onS, sc, onSc, bg, onBg, sv, onSv, container)
+        // Primary and secondary are also text (buttons, eyebrows) on the page and on cards: move
+        // their lightness away from the background until both read at 4.5:1. A yellow or green
+        // photo needs a darker primary in light mode than its hue suggests.
+        fun readable(l: Float, s: Float): Pair<Int, Int> {
+            var light = l
+            var bgc = tone(c, light, s)
+            while (
+                min(contrast(bgc, bg), contrast(bgc, container)) < 4.5 && light in 0.02f..0.98f
+            ) {
+                light += if (dark) 0.02f else -0.02f
+                bgc = tone(c, light, s)
+            }
+            return bgc to onColor(bgc)
+        }
+        val (p, onP) = readable(if (dark) 0.78f else 0.38f, sat)
+        val (pc, onPc) = pair(if (dark) 0.28f else 0.88f)
+        val (s2, onS) = readable(if (dark) 0.75f else 0.42f, sat * 0.45f)
+        val (sc, onSc) = pair(if (dark) 0.26f else 0.90f, sat * 0.45f)
+        val (sv, onSv) = pair(if (dark) 0.18f else 0.91f, sat * 0.2f)
+        return Scheme(
+            p,
+            onP,
+            pc,
+            onPc,
+            s2,
+            onS,
+            sc,
+            onSc,
+            bg,
+            onBg,
+            sv,
+            onSv,
+            container,
+            outline = tone(c, if (dark) 0.60f else 0.48f, sat * 0.25f),
+            outlineVariant = tone(c, if (dark) 0.30f else 0.82f, sat * 0.2f),
+        )
     }
 
     /** The backdrop around a whole photo: its colour, dark enough that the photo's edge reads. */

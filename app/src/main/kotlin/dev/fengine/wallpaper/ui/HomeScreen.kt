@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Screen
 import dev.fengine.wallpaper.data.Screens
@@ -51,6 +53,7 @@ import dev.fengine.wallpaper.ui.design.TextAction
  * The one main screen. Reads top to bottom like a magazine page: a headline sentence that says what
  * the app is doing, the groups as covers, screen assignments and one primary action.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     settings: Settings,
@@ -102,11 +105,13 @@ fun HomeScreen(
             TextAction("Settings", onOpenSettings)
         }
         Spacer(Modifier.height(Space.sm))
-        Headline(Format.status(settings), caption = settings.lastResult.ifBlank { null })
+        val is24 = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
+        Headline(Format.status(settings, is24), caption = settings.lastResult.ifBlank { null })
         if (settings.motionLostAt > 0 && !settings.motionOn) {
             Spacer(Modifier.height(Space.md))
             Caption(Format.motionLost(settings.motionLostAt))
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+            // Wraps at large text sizes instead of squeezing Dismiss.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
                 TextAction("Turn Motion back on", onTurnOnMotion)
                 TextAction("Dismiss", onDismissMotionLost)
             }
@@ -150,7 +155,7 @@ fun HomeScreen(
 
         Section("Rotation", trailing = { TextAction("Schedule", onOpenSettings) }) {
             Caption(
-                "${Format.schedule(settings)} · ${if (settings.shuffle) "Shuffled" else "In group order"}"
+                "${Format.schedule(settings, is24)} · ${if (settings.shuffle) "Shuffled" else "In group order"}"
             )
             Spacer(Modifier.height(Space.sm))
             ToggleRow(
