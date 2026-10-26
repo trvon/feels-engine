@@ -21,14 +21,19 @@ class RotateWallpaperWorker(appContext: Context, params: WorkerParameters) :
                 .filterKeys { it.startsWith(KEY_PIN_PREFIX) }
                 .map { (k, v) -> k.removePrefix(KEY_PIN_PREFIX) to (v as Int) }
                 .toMap()
+        val source = inputData.getString(KEY_SOURCE) ?: Ledger.Source.SCHEDULE
         val outcome =
             Rotation.run(
                 applicationContext,
-                source = inputData.getString(KEY_SOURCE) ?: Ledger.Source.SCHEDULE,
+                source = source,
                 pinned = pinned,
                 forceStatic = inputData.getBoolean(KEY_FORCE_STATIC, false),
             )
-        val failed = outcome is Rotation.Outcome.Done && outcome.failures.isNotEmpty()
+        // Only scheduled runs retry: a retried Next, tile or widget would advance again.
+        val failed =
+            outcome is Rotation.Outcome.Done &&
+                outcome.failures.isNotEmpty() &&
+                Rotation.isScheduled(source)
         return if (!failed) Result.success()
         else if (runAttemptCount < 2) Result.retry() else Result.failure()
     }

@@ -16,7 +16,7 @@ import dev.fengine.wallpaper.data.Mode
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.smart.IndexLibraryWorker
 import dev.fengine.wallpaper.smart.SmartGroupWorker
-import java.util.TimeZone
+import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 import java.util.concurrent.TimeUnit
 
 /**
@@ -131,18 +131,36 @@ class RotationScheduler(private val context: Context) {
     fun armNextAlarm(settings: Settings) {
         if (!settings.enabled || !settings.canRotate) return cancelAlarm()
         val now = System.currentTimeMillis()
-        val offset = TimeZone.getDefault().getOffset(now).toLong()
         val at =
             when (settings.mode) {
+                // From the last attempt too: a write that keeps failing retries once per interval,
+                // not every minute.
                 Mode.INTERVAL ->
                     RotationPlan.nextIntervalAt(
                         now,
-                        settings.lastRotationAt,
+                        maxOf(
+                            RotationPlan.sane(now, settings.lastRotationAt),
+                            RotationPlan.sane(now, settings.lastAttemptAt),
+                        ),
                         settings.intervalMinutes.coerceAtLeast(Settings.MIN_INTERVAL_MINUTES),
                     )
-                Mode.TIME_OF_DAY -> RotationPlan.nextTimeOfDay(now, settings.timesOfDay, offset)
+                Mode.TIME_OF_DAY ->
+                    RotationPlan.nextTimeOfDay(
+                        now,
+                        settings.timesOfDay,
+                        java.time.ZoneId.systemDefault(),
+                    )
             } ?: return cancelAlarm()
-        alarmManager().setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, alarmIntent())
+        // When Motion draws every screen, the change is only a cursor nobody can see while the
+        // phone sleeps: no wake-up; it lands when the phone wakes (and the engine catches up).
+        val live = runCatching { LiveWallpaper.state(context) }.getOrNull()
+        val type =
+            if (
+                live != null && live.innerHome && live.innerLock && live.coverHome && live.coverLock
+            )
+                AlarmManager.RTC
+            else AlarmManager.RTC_WAKEUP
+        alarmManager().setAndAllowWhileIdle(type, at, alarmIntent())
     }
 
     fun cancelAll() {

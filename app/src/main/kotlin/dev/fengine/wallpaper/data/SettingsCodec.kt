@@ -29,6 +29,7 @@ object SettingsCodec {
         val lastResult = stringPreferencesKey("last_result")
         val lastRotationAt = longPreferencesKey("last_rotation_at")
         val motionOn = booleanPreferencesKey("motion_on")
+        val lastAttemptAt = longPreferencesKey("last_attempt_at")
         val motionLostAt = longPreferencesKey("motion_lost_at")
         val tapToChange = booleanPreferencesKey("tap_to_change")
         val changeOnTheme = booleanPreferencesKey("change_on_theme")
@@ -57,6 +58,7 @@ object SettingsCodec {
         prefs[Keys.lastResult] = next.lastResult
         prefs[Keys.lastRotationAt] = next.lastRotationAt
         prefs[Keys.motionOn] = next.motionOn
+        prefs[Keys.lastAttemptAt] = next.lastAttemptAt
         prefs[Keys.motionLostAt] = next.motionLostAt
         prefs[Keys.tapToChange] = next.tapToChange
         prefs[Keys.changeOnTheme] = next.changeOnTheme
@@ -106,6 +108,7 @@ object SettingsCodec {
             lastResult = prefs[Keys.lastResult] ?: defaults.lastResult,
             lastRotationAt = prefs[Keys.lastRotationAt] ?: defaults.lastRotationAt,
             motionOn = prefs[Keys.motionOn] ?: defaults.motionOn,
+            lastAttemptAt = prefs[Keys.lastAttemptAt] ?: defaults.lastAttemptAt,
             motionLostAt = prefs[Keys.motionLostAt] ?: defaults.motionLostAt,
             tapToChange = prefs[Keys.tapToChange] ?: defaults.tapToChange,
             changeOnTheme = prefs[Keys.changeOnTheme] ?: defaults.changeOnTheme,

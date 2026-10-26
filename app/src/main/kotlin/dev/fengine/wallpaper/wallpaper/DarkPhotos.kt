@@ -17,13 +17,16 @@ class DarkPhotos(
     private var budget: Int = 24,
 ) {
     fun isDark(uri: String): Boolean {
-        index.verdict(RULE, uri)?.let {
-            return it
-        }
+        runCatching { index.verdict(RULE, uri) }
+            .getOrNull()
+            ?.let {
+                return it
+            }
         if (budget <= 0) return false
         budget--
-        val dark = measure(uri) ?: return false
-        index.putVerdict(RULE, uri, dark)
+        // A photo that cannot be measured counts as not dark, once: it no longer eats the budget.
+        val dark = measure(uri) ?: false
+        runCatching { index.putVerdict(RULE, uri, dark) }
         return dark
     }
 

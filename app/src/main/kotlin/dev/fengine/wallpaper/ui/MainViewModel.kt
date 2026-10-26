@@ -24,6 +24,7 @@ import dev.fengine.wallpaper.data.Screen
 import dev.fengine.wallpaper.data.Screens
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.data.ThemeMode
+import dev.fengine.wallpaper.schedule.Rotation
 import dev.fengine.wallpaper.schedule.RotationScheduler
 import dev.fengine.wallpaper.smart.AiReadiness
 import dev.fengine.wallpaper.smart.IndexLibraryWorker
@@ -50,6 +51,12 @@ import kotlinx.coroutines.withContext
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val store = (app as FengineApp).settings
     private val scheduler = RotationScheduler(app)
+
+    init {
+        // A force stop (or an OEM cleaner) cancels every alarm; opening the app arms them again.
+        viewModelScope.launch { runCatching { scheduler.sync(store.read()) } }
+    }
+
     private val library = MediaLibrary(app)
 
     val settings: StateFlow<Settings> =
@@ -425,7 +432,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** On every resume: notices Motion that Android turned off, or that came back. */
     fun checkMotion() {
         viewModelScope.launch(Dispatchers.IO) {
-            runCatching { MotionCheck.observe(getApplication()) }
+            runCatching { Rotation.observeMotion(getApplication()) }
             refreshDiagnostics()
         }
     }

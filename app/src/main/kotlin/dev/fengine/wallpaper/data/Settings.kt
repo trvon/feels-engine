@@ -24,6 +24,10 @@ data class Settings(
     val lastResult: String = "",
     /** Epoch millis of the last photo change on any screen; 0 before the first. */
     val lastRotationAt: Long = 0,
+    /**
+     * Epoch millis of the last rotation attempt, changed or not; spaces out retries after failures.
+     */
+    val lastAttemptAt: Long = 0,
     /** Group the screen saver plays, or null for the home group. */
     val dreamGroupId: String? = null,
     /**

@@ -18,7 +18,6 @@ import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 import dev.fengine.wallpaper.wallpaper.live.MotionCheck
 import java.text.DateFormat
 import java.util.Date
-import java.util.TimeZone
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -46,6 +45,12 @@ object Rotation {
 
         data class Done(val failures: List<String>) : Outcome
     }
+
+    /**
+     * The Motion check from outside a rotation (app resume), under the same lock so it cannot
+     * interleave with a Still run and report a loss the owner chose.
+     */
+    suspend fun observeMotion(app: FengineApp) = lock.withLock { MotionCheck.observe(app) }
 
     fun isScheduled(source: String) =
         source == Ledger.Source.SCHEDULE ||
@@ -77,7 +82,7 @@ object Rotation {
                     first.lastRotationAt,
                     first.intervalMinutes,
                     first.timesOfDay,
-                    offset(now),
+                    java.time.ZoneId.systemDefault(),
                 )
         ) {
             Log.i(TAG, "$source: not due")
@@ -132,11 +137,15 @@ object Rotation {
                         else "Problem at $stamp: ${pass.failures.joinToString("; ")}",
                     lastRotationAt =
                         if (pass.changed) System.currentTimeMillis() else cur.lastRotationAt,
+                    lastAttemptAt = System.currentTimeMillis(),
                 )
             }
             // A dropped photo leaves its screen on the old picture: try the next one right away.
             if (pass.unreadable.isEmpty()) break
-            pins = emptyMap()
+            // Only groups that hit an unreadable photo move on; the others keep what they just
+            // showed (a pinned "Show now" photo included).
+            val retrying = pass.unreadable.map { it.first }.toSet()
+            pins = pass.cursors.filterKeys { it !in retrying }
         }
         // Whoever changed the photo (backstop job, engine on screen-on, a person), the alarm now
         // counts
@@ -171,7 +180,10 @@ object Rotation {
             (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
                 Configuration.UI_MODE_NIGHT_YES
         val index = if (settings.darkAtNight && night) PhotoIndex(context) else null
-        val dark = index?.let { DarkPhotos(context, it) }
+        // The alarm path runs inside a broadcast's grace time: measure fewer new photos there.
+        val dark = index?.let {
+            DarkPhotos(context, it, budget = if (isScheduled(source)) 6 else 24)
+        }
         // Screens the live engine draws itself only need the cursor to move; it watches the
         // settings.
         val plan =
@@ -261,6 +273,4 @@ object Rotation {
         }
         return Pass(plan.cursors, unreadable, failures, changed)
     }
-
-    private fun offset(now: Long) = TimeZone.getDefault().getOffset(now).toLong()
 }

@@ -1,5 +1,10 @@
 package dev.fengine.wallpaper.schedule
 
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import kotlin.random.Random
 
 /** Pure scheduling arithmetic, kept free of Android types so it is unit-testable on the JVM. */
@@ -185,7 +190,8 @@ object RotationPlan {
      * When the next interval change is due: one interval after the last change, or soon if that
      * moment already passed (a missed slot), or one interval from now before the first change.
      */
-    fun nextIntervalAt(nowMs: Long, lastChangeMs: Long, intervalMinutes: Int): Long {
+    fun nextIntervalAt(nowMs: Long, lastChange: Long, intervalMinutes: Int): Long {
+        val lastChangeMs = sane(nowMs, lastChange)
         val interval = intervalMinutes.coerceAtLeast(1) * 60_000L
         if (lastChangeMs <= 0) return nowMs + interval
         return maxOf(lastChangeMs + interval, nowMs + MIN_ALARM_DELAY_MS)
@@ -196,7 +202,8 @@ object RotationPlan {
      * job kept as a backstop, the live engine on screen-on); only the first one that is due changes
      * the photo, so they never double up.
      */
-    fun isDue(nowMs: Long, lastChangeMs: Long, intervalMinutes: Int): Boolean {
+    fun isDue(nowMs: Long, lastChange: Long, intervalMinutes: Int): Boolean {
+        val lastChangeMs = sane(nowMs, lastChange)
         if (lastChangeMs <= 0) return true
         val interval = intervalMinutes.coerceAtLeast(1) * 60_000L
         return nowMs - lastChangeMs >= (interval * EARLY_TOLERANCE).toLong()
@@ -212,15 +219,24 @@ object RotationPlan {
         lastChangeMs: Long,
         intervalMinutes: Int,
         slots: List<Int>,
-        zoneOffsetMillis: Long,
+        zone: ZoneId,
     ): Boolean =
         when (mode) {
             dev.fengine.wallpaper.data.Mode.INTERVAL -> isDue(nowMs, lastChangeMs, intervalMinutes)
-            dev.fengine.wallpaper.data.Mode.TIME_OF_DAY ->
-                lastChangeMs <= 0 ||
-                    (nextTimeOfDay(lastChangeMs, slots, zoneOffsetMillis)?.let { it <= nowMs }
-                        ?: false)
+            dev.fengine.wallpaper.data.Mode.TIME_OF_DAY -> {
+                val last = sane(nowMs, lastChangeMs)
+                last <= 0 || (nextTimeOfDay(last, slots, zone)?.let { it <= nowMs } ?: false)
+            }
         }
+
+    fun due(
+        mode: dev.fengine.wallpaper.data.Mode,
+        nowMs: Long,
+        lastChangeMs: Long,
+        intervalMinutes: Int,
+        slots: List<Int>,
+        zoneOffsetMillis: Long,
+    ): Boolean = due(mode, nowMs, lastChangeMs, intervalMinutes, slots, fixed(zoneOffsetMillis))
 
     /** How late a change ran against its due time (negative when early, within tolerance). */
     fun lateness(nowMs: Long, lastChangeMs: Long, intervalMinutes: Int): Long =
@@ -228,24 +244,45 @@ object RotationPlan {
         else nowMs - (lastChangeMs + intervalMinutes.coerceAtLeast(1) * 60_000L)
 
     /**
-     * Next trigger as epoch millis for a list of minutes-after-midnight slots in
-     * [zoneOffsetMillis]. Uses a plain civil-day model: good enough for wallpaper, and DST shifts
-     * self-correct because the receiver reschedules from the real clock after each firing.
+     * Next trigger as epoch millis for a list of minutes-after-midnight slots in [zone]. Daylight
+     * saving is handled by java.time: a slot in a skipped hour moves forward, a repeated hour uses
+     * its first occurrence. Slots outside a day wrap instead of scheduling into the past.
      */
+    fun nextTimeOfDay(nowEpochMillis: Long, slotsMinutes: List<Int>, zone: ZoneId): Long? {
+        if (slotsMinutes.isEmpty()) return null
+        val sorted = slotsMinutes.map { it.mod(24 * 60) }.distinct().sorted()
+        val today = Instant.ofEpochMilli(nowEpochMillis).atZone(zone).toLocalDate()
+        return (0L..1L)
+            .asSequence()
+            .flatMap { d ->
+                sorted.asSequence().map { m ->
+                    LocalDateTime.of(today.plusDays(d), LocalTime.of(m / 60, m % 60))
+                        .atZone(zone)
+                        .toInstant()
+                        .toEpochMilli()
+                }
+            }
+            .firstOrNull { it > nowEpochMillis }
+            ?: LocalDateTime.of(today.plusDays(2), LocalTime.of(sorted[0] / 60, sorted[0] % 60))
+                .atZone(zone)
+                .toInstant()
+                .toEpochMilli()
+    }
+
+    /** [nextTimeOfDay] in a fixed offset from UTC (tests, and zones without daylight saving). */
     fun nextTimeOfDay(
         nowEpochMillis: Long,
         slotsMinutes: List<Int>,
         zoneOffsetMillis: Long,
-    ): Long? {
-        if (slotsMinutes.isEmpty()) return null
-        val day = 24L * 60 * 60 * 1000
-        val local = nowEpochMillis + zoneOffsetMillis
-        val midnight = local - local.mod(day)
-        // Slots outside a day (a corrupt store, a future import) wrap instead of scheduling into
-        // the past.
-        val sorted = slotsMinutes.map { it.mod(24 * 60) }.distinct().sorted()
-        val todayCandidate = sorted.map { midnight + it * 60_000L }.firstOrNull { it > local }
-        val next = todayCandidate ?: (midnight + day + sorted.first() * 60_000L)
-        return next - zoneOffsetMillis
-    }
+    ): Long? = nextTimeOfDay(nowEpochMillis, slotsMinutes, fixed(zoneOffsetMillis))
+
+    private fun fixed(offsetMillis: Long): ZoneId =
+        ZoneOffset.ofTotalSeconds((offsetMillis / 1000).toInt().coerceIn(-18 * 3600, 18 * 3600))
+
+    /**
+     * A last change stamped in the future (the clock was wrong, then corrected) counts as none, so
+     * rotation never waits for real time to catch up with it.
+     */
+    fun sane(nowMs: Long, lastChangeMs: Long): Long =
+        if (lastChangeMs > nowMs + MIN_ALARM_DELAY_MS) 0 else lastChangeMs
 }
