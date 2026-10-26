@@ -19,6 +19,7 @@ import dev.fengine.wallpaper.data.LedgerStore
 import dev.fengine.wallpaper.data.Mode
 import dev.fengine.wallpaper.data.PhotoFit
 import dev.fengine.wallpaper.data.PhotoId
+import dev.fengine.wallpaper.data.PhotoRecovery
 import dev.fengine.wallpaper.data.Platform
 import dev.fengine.wallpaper.data.Screen
 import dev.fengine.wallpaper.data.Screens
@@ -34,6 +35,7 @@ import dev.fengine.wallpaper.smart.PhotoIndex
 import dev.fengine.wallpaper.smart.SmartGroupWorker
 import dev.fengine.wallpaper.wallpaper.ClockLegibility
 import dev.fengine.wallpaper.wallpaper.Displays
+import dev.fengine.wallpaper.wallpaper.PhotoAccess
 import dev.fengine.wallpaper.wallpaper.SamsungDisplays
 import dev.fengine.wallpaper.wallpaper.WallpaperCrop
 import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
@@ -55,6 +57,78 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     init {
         // A force stop (or an OEM cleaner) cancels every alarm; opening the app arms them again.
         viewModelScope.launch { runCatching { scheduler.sync(store.read()) } }
+        checkPhotos()
+    }
+
+    /** Picked photos no group refers to any more (see [PhotoRecovery]); Home offers them back. */
+    val orphanPhotos = MutableStateFlow<List<String>>(emptyList())
+
+    /**
+     * Photos marked unreadable go back into rotation when they open again, and grants without a
+     * group are offered back. Runs when the app opens, in the foreground, so a cloud photo may
+     * load.
+     */
+    fun checkPhotos() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val app = getApplication<Application>()
+                val back =
+                    store
+                        .read()
+                        .groups
+                        .flatMap { it.unreadable }
+                        .distinct()
+                        .take(MAX_RECHECK)
+                        .filter { PhotoAccess.readable(app, it) }
+                if (back.isNotEmpty())
+                    store.update { cur ->
+                        cur.copy(groups = cur.groups.map { it.markReadable(back) })
+                    }
+                val granted =
+                    app.contentResolver.persistedUriPermissions
+                        .filter { it.isReadPermission }
+                        .map { it.uri.toString() }
+                orphanPhotos.value = PhotoRecovery.orphans(granted, store.read().groups)
+            }
+                .onFailure { android.util.Log.w("MainViewModel", "photo check failed", it) }
+        }
+    }
+
+    /** Put [orphanPhotos] back: into the one group with picked photos, or a new group. */
+    fun putBackPhotos() {
+        val uris = orphanPhotos.value
+        if (uris.isEmpty()) return
+        orphanPhotos.value = emptyList()
+        viewModelScope.launch {
+            store.update { s ->
+                val target = PhotoRecovery.target(s.groups)
+                if (target != null)
+                    s.copy(
+                        groups =
+                            s.groups.map {
+                                if (it.id == target) it.copy(photos = (it.photos + uris).distinct())
+                                else it
+                            }
+                    )
+                else {
+                    val g = Group(name = "Put back", photos = uris)
+                    s.copy(
+                        groups = s.groups + g,
+                        homeGroupId = s.homeGroupId ?: g.id,
+                        lockGroupId = s.lockGroupId ?: g.id,
+                    )
+                }
+            }
+            scheduler.sync(store.read())
+            checkPhotos()
+        }
+    }
+
+    /** Release the grants of [orphanPhotos]; they can be picked again later. */
+    fun letPhotosGo() {
+        val uris = orphanPhotos.value
+        orphanPhotos.value = emptyList()
+        viewModelScope.launch(Dispatchers.IO) { uris.forEach(::releaseGrant) }
     }
 
     private val library = MediaLibrary(app)
@@ -303,6 +377,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
          */
         val GRANT_CEILING = Platform.grantCeiling(android.os.Build.VERSION.SDK_INT)
         val GRANT_WARN_AT = Platform.grantWarnAt(android.os.Build.VERSION.SDK_INT)
+
+        /** Unreadable photos tried per app open; each may fetch a cloud item. */
+        const val MAX_RECHECK = 64
     }
 
     /** How many photos the system picker hands over per pick; the cloud has no bulk road. */

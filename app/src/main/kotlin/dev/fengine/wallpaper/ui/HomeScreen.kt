@@ -69,6 +69,9 @@ fun HomeScreen(
     onExportLog: () -> Unit = {},
     onTurnOnMotion: () -> Unit = {},
     onDismissMotionLost: () -> Unit = {},
+    orphanPhotos: Int = 0,
+    onPutBackPhotos: () -> Unit = {},
+    onLetPhotosGo: () -> Unit = {},
 ) {
     var choosingFor by remember { mutableStateOf<Screen?>(null) }
     choosingFor?.let { screen ->
@@ -114,6 +117,14 @@ fun HomeScreen(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
                 TextAction("Turn Motion back on", onTurnOnMotion)
                 TextAction("Dismiss", onDismissMotionLost)
+            }
+        }
+        if (orphanPhotos > 0) {
+            Spacer(Modifier.height(Space.md))
+            Caption(Format.orphanPhotos(orphanPhotos))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                TextAction("Put them back", onPutBackPhotos)
+                TextAction("Let them go", onLetPhotosGo)
             }
         }
         Spacer(Modifier.height(Space.section))

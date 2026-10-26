@@ -89,7 +89,7 @@ class LedgerProperties {
         assertEquals(rot.size, s.rotations)
         assertEquals(rot.count { it.result == "failed" }, s.failed)
         assertEquals(rot.count { it.result == "unreadable" }, s.removed)
-        if (s.removed > 0) assertTrue(Ledger.sentence(s).contains("could no longer be read"))
+        if (s.removed > 0) assertTrue(Ledger.sentence(s).contains("could not be read"))
         assertEquals(rot.count { it.source in Ledger.Source.manual }, s.manual)
         assertEquals(w.count { it is Event.NoFrame }, s.noFrame)
         assertEquals(w.count { it == Event.AbandonedBlend }, s.abandonedBlends)

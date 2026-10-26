@@ -131,7 +131,7 @@ object Rotation {
                             .map { g ->
                                 pass.unreadable
                                     .filter { it.first == g.id }
-                                    .fold(g) { acc, (_, uri) -> acc.withoutPhoto(uri) }
+                                    .fold(g) { acc, (_, uri) -> acc.markUnreadable(uri) }
                             },
                     lastResult =
                         if (pass.failures.isEmpty()) "Changed at $stamp"
@@ -141,7 +141,8 @@ object Rotation {
                     lastAttemptAt = System.currentTimeMillis(),
                 )
             }
-            // A dropped photo leaves its screen on the old picture: try the next one right away.
+            // An unreadable photo leaves its screen on the old picture: try the next one right
+            // away.
             if (pass.unreadable.isEmpty()) break
             // Only groups that hit an unreadable photo move on; the others keep what they just
             // showed (a pinned "Show now" photo included).
@@ -239,10 +240,20 @@ object Rotation {
                     changed = true
                 }
                 is WallpaperApplier.Result.Unreadable -> {
-                    val why = "${outcome.reason} ${Uri.parse(write.uri).authority.orEmpty()}".trim()
+                    // Whether the grant is still held tells "access lost" from "not there right
+                    // now"
+                    // (a cloud resync, an offline item); the next export shows which.
+                    val held = runCatching {
+                        context.contentResolver.persistedUriPermissions.any {
+                            it.uri.toString() == write.uri
+                        }
+                    }
+                        .getOrDefault(false)
+                    val why =
+                        "${outcome.reason} ${Uri.parse(write.uri).authority.orEmpty()} ${if (held) "grant" else "nogrant"}"
                     Log.w(
                         TAG,
-                        "${group.name}: photo ${write.index + 1} unreadable ($why); dropped from the group",
+                        "${group.name}: photo ${write.index + 1} unreadable ($why); kept, left out of rotation",
                     )
                     ledger.record(
                         Ledger.Event.Rotation(

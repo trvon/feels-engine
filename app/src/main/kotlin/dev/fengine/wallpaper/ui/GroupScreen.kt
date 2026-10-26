@@ -5,43 +5,38 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import dev.fengine.wallpaper.ui.design.PhotoImage
-import dev.fengine.wallpaper.ui.design.Radius
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.delay
 import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.smart.AiReadiness
-import dev.fengine.wallpaper.wallpaper.ClockLegibility
 import dev.fengine.wallpaper.ui.design.ActionBar
 import dev.fengine.wallpaper.ui.design.BodyMuted
 import dev.fengine.wallpaper.ui.design.Caption
@@ -49,21 +44,29 @@ import dev.fengine.wallpaper.ui.design.ChipRow
 import dev.fengine.wallpaper.ui.design.Page
 import dev.fengine.wallpaper.ui.design.PhotoGrid
 import dev.fengine.wallpaper.ui.design.PhotoGridLimit
+import dev.fengine.wallpaper.ui.design.PhotoImage
+import dev.fengine.wallpaper.ui.design.Radius
 import dev.fengine.wallpaper.ui.design.Section
 import dev.fengine.wallpaper.ui.design.Sheet
 import dev.fengine.wallpaper.ui.design.Size
 import dev.fengine.wallpaper.ui.design.Space
 import dev.fengine.wallpaper.ui.design.StatusCard
 import dev.fengine.wallpaper.ui.design.SwitchRow
-import dev.fengine.wallpaper.ui.design.TextAction
+import dev.fengine.wallpaper.wallpaper.ClockLegibility
+import kotlinx.coroutines.delay
 
-private enum class Screens { BOTH, HOME, LOCK, NEITHER }
+private enum class Screens {
+    BOTH,
+    HOME,
+    LOCK,
+    NEITHER,
+}
 
 /**
  * One group. Top to bottom: actions, the name as the headline, which screens it feeds, then one
- * photo grid that holds everything the group will show, with found photos badged. Described
- * groups end with what they look for, where they look (one line, not a card) and whether
- * on-device AI is ready. Photos come before the machinery because they are what the owner came to see.
+ * photo grid that holds everything the group will show, with found photos badged. Described groups
+ * end with what they look for, where they look (one line, not a card) and whether on-device AI is
+ * ready. Photos come before the machinery because they are what the owner came to see.
  */
 @Composable
 fun GroupScreen(
@@ -99,12 +102,17 @@ fun GroupScreen(
     val feedsLock = settings.lockGroupId == group.id
     var name by remember(group.id) { mutableStateOf(group.name) }
 
-    // Everything on this screen saves the moment it changes. Say so, and flash "Saved" after each change
+    // Everything on this screen saves the moment it changes. Say so, and flash "Saved" after each
+    // change
     // so the owner never wonders whether a Done or Save tap is still needed.
     var savedTick by remember(group.id) { mutableStateOf(0) }
     var showSaved by remember { mutableStateOf(false) }
     LaunchedEffect(savedTick) {
-        if (savedTick > 0) { showSaved = true; delay(1_500); showSaved = false }
+        if (savedTick > 0) {
+            showSaved = true
+            delay(1_500)
+            showSaved = false
+        }
     }
     LaunchedEffect(group) { if (group != settings.group(group.id)) savedTick++ }
     val saved = { savedTick++ }
@@ -112,61 +120,126 @@ fun GroupScreen(
     chosen?.let { uri ->
         var verdict by remember(uri) { mutableStateOf<ClockLegibility.Verdict?>(null) }
         var checked by remember(uri) { mutableStateOf(false) }
-        LaunchedEffect(uri) { verdict = clockCheck(uri); checked = true }
+        LaunchedEffect(uri) {
+            verdict = clockCheck(uri)
+            checked = true
+        }
         PhotoSheet(
             uri = uri,
             isCover = uri == group.cover,
             feeds = feedsHome || feedsLock,
             skipped = group.isSkipped(uri),
-            clock = if (!checked) "Checking the area behind the clock..." else when (verdict?.legible) {
-                true -> "The clock reads well on this photo."
-                false -> "The area behind the clock is busy, so the time may be hard to read. You can keep the photo and leave it out of rotation."
-                null -> null
+            unreadable = group.isUnreadable(uri),
+            clock =
+                if (!checked) "Checking the area behind the clock..."
+                else
+                    when (verdict?.legible) {
+                        true -> "The clock reads well on this photo."
+                        false ->
+                            "The area behind the clock is busy, so the time may be hard to read. You can keep the photo and leave it out of rotation."
+                        null -> null
+                    },
+            onShowNow = {
+                onShowNow(uri)
+                chosen = null
             },
-            onShowNow = { onShowNow(uri); chosen = null },
-            onMakeCover = { onSetCover(uri); saved(); chosen = null },
-            onSetSkipped = { onSetSkipped(uri, it); saved() },
+            onMakeCover = {
+                onSetCover(uri)
+                saved()
+                chosen = null
+            },
+            onSetSkipped = {
+                onSetSkipped(uri, it)
+                saved()
+            },
             onDismiss = { chosen = null },
         )
     }
 
     val focus = LocalFocusManager.current
     Page {
-        ActionBar("Done" to { focus.clearFocus(); onBack() }, "Delete group" to onDelete)
+        ActionBar(
+            "Done" to
+                {
+                    focus.clearFocus()
+                    onBack()
+                },
+            "Delete group" to onDelete,
+        )
         Spacer(Modifier.height(Space.sm))
         BasicTextField(
             value = name,
-            onValueChange = { name = it; onRename(it); saved() },
-            textStyle = MaterialTheme.typography.displaySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+            onValueChange = {
+                name = it
+                onRename(it)
+                saved()
+            },
+            textStyle =
+                MaterialTheme.typography.displaySmall.copy(
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
             modifier = Modifier.fillMaxWidth(),
         )
-        Caption(if (showSaved) "Saved" else "Tap the name to rename. Changes save as you make them.")
+        Caption(
+            if (showSaved) "Saved" else "Tap the name to rename. Changes save as you make them."
+        )
         Spacer(Modifier.height(Space.section))
 
         Section("Shows on") {
             ChipRow(
-                options = listOf(Screens.BOTH to "Both screens", Screens.HOME to "Home", Screens.LOCK to "Lock", Screens.NEITHER to "Neither"),
-                selected = when {
-                    feedsHome && feedsLock -> Screens.BOTH
-                    feedsHome -> Screens.HOME
-                    feedsLock -> Screens.LOCK
-                    else -> Screens.NEITHER
+                options =
+                    listOf(
+                        Screens.BOTH to "Both screens",
+                        Screens.HOME to "Home",
+                        Screens.LOCK to "Lock",
+                        Screens.NEITHER to "Neither",
+                    ),
+                selected =
+                    when {
+                        feedsHome && feedsLock -> Screens.BOTH
+                        feedsHome -> Screens.HOME
+                        feedsLock -> Screens.LOCK
+                        else -> Screens.NEITHER
+                    },
+                onSelect = {
+                    onAssign(
+                        it == Screens.BOTH || it == Screens.HOME,
+                        it == Screens.BOTH || it == Screens.LOCK,
+                    )
                 },
-                onSelect = { onAssign(it == Screens.BOTH || it == Screens.HOME, it == Screens.BOTH || it == Screens.LOCK) },
             )
             Spacer(Modifier.height(Space.md))
-            SwitchRow("Screen saver", checked = settings.dreamGroupId == group.id, onChange = { onSetDream(it); saved() })
-            Caption(if (settings.dreamGroupId == group.id) "Plays while the phone charges, once Feels Engine photos is chosen under Screen saver in Settings." else "Off: the home screen's group plays instead.")
+            SwitchRow(
+                "Screen saver",
+                checked = settings.dreamGroupId == group.id,
+                onChange = {
+                    onSetDream(it)
+                    saved()
+                },
+            )
+            Caption(
+                if (settings.dreamGroupId == group.id)
+                    "Plays while the phone charges, once Feels Engine photos is chosen under Screen saver in Settings."
+                else "Off: the home screen's group plays instead."
+            )
             if (hasCoverScreen) {
                 Spacer(Modifier.height(Space.md))
-                SwitchRow("Cover screen", checked = settings.coverGroupId == group.id, onChange = { onSetCoverScreen(it); saved() })
+                SwitchRow(
+                    "Cover screen",
+                    checked = settings.coverGroupId == group.id,
+                    onChange = {
+                        onSetCoverScreen(it)
+                        saved()
+                    },
+                )
                 Caption(
-                    if (settings.coverGroupId == group.id) "The cover screen shows this group; the inner screen shows its own."
-                    else "Off: the cover screen shows the same photo as the inner screen.",
+                    if (settings.coverGroupId == group.id)
+                        "The cover screen shows this group; the inner screen shows its own."
+                    else "Off: the cover screen shows the same photo as the inner screen."
                 )
             }
         }
@@ -178,7 +251,7 @@ fun GroupScreen(
         ) {
             if (shown.isEmpty()) {
                 BodyMuted(
-                    "Add photos you would be happy to see all day, or describe below what the phone should find. Portraits with the subject low in the frame leave room for the clock.",
+                    "Add photos you would be happy to see all day, or describe below what the phone should find. Portraits with the subject low in the frame leave room for the clock."
                 )
             } else {
                 val found = group.matched.toSet()
@@ -187,11 +260,24 @@ fun GroupScreen(
                 Spacer(Modifier.height(Space.sm))
                 PhotoGrid(
                     uris = shown,
-                    badge = { uri -> when { group.isSkipped(uri) -> "Skipped"; uri == cover -> "Cover"; uri in found -> "Found"; else -> null } },
-                    onRemove = { uri -> if (uri in found) onExcludePhoto(uri) else onRemovePhoto(uri) },
+                    badge = { uri ->
+                        when {
+                            group.isUnreadable(uri) -> "Can't be read"
+                            group.isSkipped(uri) -> "Skipped"
+                            uri == cover -> "Cover"
+                            uri in found -> "Found"
+                            else -> null
+                        }
+                    },
+                    onRemove = { uri ->
+                        if (uri in found) onExcludePhoto(uri) else onRemovePhoto(uri)
+                    },
                     onClick = { uri -> chosen = uri },
                 )
-                if (shown.size > PhotoGridLimit) Caption("And ${"%,d".format(shown.size - PhotoGridLimit)} more. The rotation uses all of them.")
+                if (shown.size > PhotoGridLimit)
+                    Caption(
+                        "And ${"%,d".format(shown.size - PhotoGridLimit)} more. The rotation uses all of them."
+                    )
             }
         }
 
@@ -199,8 +285,9 @@ fun GroupScreen(
             Spacer(Modifier.height(Space.md))
             StatusCard(
                 title = "Close to Android's limit for picked photos",
-                body = "Android lets an app keep access to ${MainViewModel.GRANT_CEILING} picked photos at most, and quietly drops the oldest after that. " +
-                    "This app holds ${"%,d".format(persistedGrants)}. For a large collection, keep the photos on this phone and describe them instead: the description looks through all of them.",
+                body =
+                    "Android lets an app keep access to ${MainViewModel.GRANT_CEILING} picked photos at most, and quietly drops the oldest after that. " +
+                        "This app holds ${"%,d".format(persistedGrants)}. For a large collection, keep the photos on this phone and describe them instead: the description looks through all of them.",
                 tone = MaterialTheme.colorScheme.errorContainer,
             )
         }
@@ -208,100 +295,173 @@ fun GroupScreen(
         run {
             Section("Also find") {
                 var rule by remember(group.id) { mutableStateOf(group.rule.orEmpty()) }
-                val commitRule = { if (rule.trim() != group.rule) { onSetRule(rule.trim()); saved() } }
+                val commitRule = {
+                    if (rule.trim() != group.rule) {
+                        onSetRule(rule.trim())
+                        saved()
+                    }
+                }
                 OutlinedTextField(
                     value = rule,
                     onValueChange = { rule = it },
                     placeholder = { Text("my dog at the beach, sunsets, the kids playing") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { commitRule(); focus.clearFocus() }),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { if (!it.isFocused) commitRule() },
+                    keyboardActions =
+                        KeyboardActions(
+                            onDone = {
+                                commitRule()
+                                focus.clearFocus()
+                            }
+                        ),
+                    modifier =
+                        Modifier.fillMaxWidth().onFocusChanged { if (!it.isFocused) commitRule() },
                 )
                 Spacer(Modifier.height(Space.md))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-                    FilledTonalButton(onClick = { commitRule(); onFindPhotos() }, enabled = rule.isNotBlank() && !scanning) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Space.md),
+                ) {
+                    FilledTonalButton(
+                        onClick = {
+                            commitRule()
+                            onFindPhotos()
+                        },
+                        enabled = rule.isNotBlank() && !scanning,
+                    ) {
                         Text(if (scanning) "Looking..." else "Find photos")
                     }
-                    if (scanning) CircularProgressIndicator(modifier = Modifier.size(Size.progress), strokeWidth = Size.progressStroke)
+                    if (scanning)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(Size.progress),
+                            strokeWidth = Size.progressStroke,
+                        )
                 }
                 Spacer(Modifier.height(Space.sm))
-                Caption(aiStatus ?: group.scanNote.ifBlank { null } ?: "Describe what to look for, then tap Find photos and choose photos to look through, up to ${"$"}pickerMax at a time, from this phone or Google Photos. The phone keeps the ones that match. Runs on this phone only.")
-                if (group.hasDescription) indexProgress?.let { (done, total) ->
-                    if (total > 0) Caption(
-                        when {
-                            done < total -> "Labeled ${"%,d".format(done)} of ${"%,d".format(total)} photos on this phone" + (if (indexing) ", still going." else ".")
-                            else -> "All ${"%,d".format(total)} photos on this phone are labeled; new ones get labeled twice a day."
-                        },
-                    )
-                }
-                if (group.hasDescription) aiReadiness?.let {
-                    Spacer(Modifier.height(Space.lg))
-                    StatusCard(
-                        title = it.headline,
-                        body = it.detail,
-                        tone = when (it.level) {
-                            AiReadiness.Level.READY -> MaterialTheme.colorScheme.primaryContainer
-                            AiReadiness.Level.DOWNLOADABLE, AiReadiness.Level.DOWNLOADING -> MaterialTheme.colorScheme.secondaryContainer
-                            else -> MaterialTheme.colorScheme.surfaceVariant
-                        },
-                        action = it.action?.let { a ->
-                            when (a) {
-                                AiReadiness.Action.DOWNLOAD -> "Set up on-device AI"
-                                AiReadiness.Action.OPEN_PLAY_STORE -> "Open AICore in Play Store"
-                                AiReadiness.Action.CHECK_AGAIN -> "Check again"
-                            } to { onAiAction(a) }
-                        },
-                    )
-                }
+                Caption(
+                    aiStatus
+                        ?: group.scanNote.ifBlank { null }
+                        ?: "Describe what to look for, then tap Find photos and choose photos to look through, up to ${"$"}pickerMax at a time, from this phone or Google Photos. The phone keeps the ones that match. Runs on this phone only."
+                )
+                if (group.hasDescription)
+                    indexProgress?.let { (done, total) ->
+                        if (total > 0)
+                            Caption(
+                                when {
+                                    done < total ->
+                                        "Labeled ${"%,d".format(done)} of ${"%,d".format(total)} photos on this phone" +
+                                            (if (indexing) ", still going." else ".")
+                                    else ->
+                                        "All ${"%,d".format(total)} photos on this phone are labeled; new ones get labeled twice a day."
+                                }
+                            )
+                    }
+                if (group.hasDescription)
+                    aiReadiness?.let {
+                        Spacer(Modifier.height(Space.lg))
+                        StatusCard(
+                            title = it.headline,
+                            body = it.detail,
+                            tone =
+                                when (it.level) {
+                                    AiReadiness.Level.READY ->
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    AiReadiness.Level.DOWNLOADABLE,
+                                    AiReadiness.Level.DOWNLOADING ->
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    else -> MaterialTheme.colorScheme.surfaceVariant
+                                },
+                            action =
+                                it.action?.let { a ->
+                                    when (a) {
+                                        AiReadiness.Action.DOWNLOAD -> "Set up on-device AI"
+                                        AiReadiness.Action.OPEN_PLAY_STORE ->
+                                            "Open AICore in Play Store"
+                                        AiReadiness.Action.CHECK_AGAIN -> "Check again"
+                                    } to { onAiAction(a) }
+                                },
+                        )
+                    }
             }
         }
-
     }
 }
 
 /** What one photo can do: go up on the screens now, or stand for the group on the home rail. */
 @Composable
 private fun PhotoSheet(
-    uri: String, isCover: Boolean, feeds: Boolean, skipped: Boolean, clock: String?,
-    onShowNow: () -> Unit, onMakeCover: () -> Unit, onSetSkipped: (Boolean) -> Unit, onDismiss: () -> Unit,
+    uri: String,
+    isCover: Boolean,
+    feeds: Boolean,
+    skipped: Boolean,
+    unreadable: Boolean,
+    clock: String?,
+    onShowNow: () -> Unit,
+    onMakeCover: () -> Unit,
+    onSetSkipped: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
 ) {
     Sheet(onDismiss = onDismiss) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
+        Box(
+            modifier =
+                Modifier.fillMaxWidth()
                     .height(Size.sheetPreview)
                     .clip(RoundedCornerShape(Radius.card))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-            ) { PhotoImage(uri, Modifier.fillMaxSize(), contentDescription = "Photo") }
-            clock?.let { Spacer(Modifier.height(Space.sm)); Caption(it) }
-            Spacer(Modifier.height(Space.md))
-            SwitchRow("Use in rotation", checked = !skipped, onChange = { onSetSkipped(!it) })
-            if (!skipped) SheetAction(
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            PhotoImage(uri, Modifier.fillMaxSize(), contentDescription = "Photo")
+        }
+        if (unreadable) {
+            Spacer(Modifier.height(Space.sm))
+            Caption(
+                "The last change could not read this photo. It stays in the group and sits out " +
+                    "until it reads again; the app checks each time it opens. If it was deleted, " +
+                    "remove it."
+            )
+        } else
+            clock?.let {
+                Spacer(Modifier.height(Space.sm))
+                Caption(it)
+            }
+        Spacer(Modifier.height(Space.md))
+        SwitchRow("Use in rotation", checked = !skipped, onChange = { onSetSkipped(!it) })
+        if (!skipped)
+            SheetAction(
                 if (feeds) "Show now" else "Show now on both screens",
-                if (feeds) "Goes up on the screens this group feeds. The rotation carries on from here." else "Makes this group active and puts this photo up.",
+                if (feeds)
+                    "Goes up on the screens this group feeds. The rotation carries on from here."
+                else "Makes this group active and puts this photo up.",
                 onShowNow,
             )
-            SheetAction(
-                if (isCover) "This is the cover" else "Make the cover",
-                "The photo that stands for the group on the home rail, and the first one up when the group is set active.",
-                onMakeCover,
-                enabled = !isCover,
-            )
+        SheetAction(
+            if (isCover) "This is the cover" else "Make the cover",
+            "The photo that stands for the group on the home rail, and the first one up when the group is set active.",
+            onMakeCover,
+            enabled = !isCover,
+        )
     }
 }
 
 @Composable
-private fun SheetAction(title: String, caption: String, onClick: () -> Unit, enabled: Boolean = true) {
+private fun SheetAction(
+    title: String,
+    caption: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = Space.md),
+        modifier =
+            Modifier.fillMaxWidth()
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(vertical = Space.md)
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            color =
+                if (enabled) MaterialTheme.colorScheme.onSurface
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Caption(caption)
     }
 }

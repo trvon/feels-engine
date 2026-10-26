@@ -138,7 +138,7 @@ object Ledger {
     data class Summary(
         val rotations: Int,
         val failed: Int,
-        /** Photos that could no longer be read and were removed from their group. */
+        /** Photo reads that failed; the photo stays in its group, out of rotation. */
         val removed: Int,
         val manual: Int,
         val firstFrames: Int,
@@ -277,7 +277,7 @@ object Ledger {
         if (s.failed > 0) append(", ${s.failed} failed")
         if (s.removed > 0)
             append(
-                ", ${if (s.removed == 1) "1 photo" else "${s.removed} photos"} could no longer be read and ${if (s.removed == 1) "was" else "were"} removed"
+                ", ${if (s.removed == 1) "1 photo" else "${s.removed} photos"} could not be read"
             )
         if (s.manual > 0) append(", ${s.manual} by hand")
         if (s.firstFrames > 0)

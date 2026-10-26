@@ -32,6 +32,12 @@ object Format {
         }
 
     /** The Home notice after Android turned Motion off (MotionWatch). */
+    /** Home notice for picked photos no group refers to any more. */
+    fun orphanPhotos(n: Int): String =
+        (if (n == 1) "1 photo you picked was" else "$n photos you picked were") +
+            " taken out of ${if (n == 1) "its group" else "their groups"} after a failed read. " +
+            "${if (n == 1) "It" else "They"} can go back in."
+
     fun motionLost(atMs: Long): String =
         "Motion stopped on ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(atMs))}. " +
             "Another wallpaper replaced it, or Android turned it off after the app was stopped " +

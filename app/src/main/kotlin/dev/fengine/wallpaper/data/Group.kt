@@ -37,6 +37,12 @@ data class Group(
     val coverUri: String? = null,
     /** Photos kept in the group but left out of rotation (a busy area behind the clock, say). */
     val skipped: List<String> = emptyList(),
+    /**
+     * Photos that could not be read at the last try (grant gone, photo deleted, cloud item out of
+     * reach). They stay in the group, left out of rotation, until a later check reads them again or
+     * the user removes them; a read failure never deletes a photo the user chose.
+     */
+    val unreadable: List<String> = emptyList(),
 ) {
     /**
      * Everything the rotation may show: picked first, then found, one entry per photo (see
@@ -56,8 +62,8 @@ data class Group(
     val rotation: List<String>
         get() {
             val all = allPhotos
-            if (skipped.isEmpty()) return all
-            val out = skipped.map(PhotoId::identity).toHashSet()
+            if (skipped.isEmpty() && unreadable.isEmpty()) return all
+            val out = (skipped + unreadable).map(PhotoId::identity).toHashSet()
             return all.filterNot { PhotoId.identity(it) in out }.ifEmpty { all }
         }
 
@@ -76,11 +82,44 @@ data class Group(
                 matched = matched.drop(),
                 pool = pool.drop(),
                 skipped = skipped.drop(),
+                unreadable = unreadable.drop(),
                 coverUri = coverUri?.takeUnless { PhotoId.identity(it) == id },
             )
         val moved = if (at in 0..cursor) cursor - 1 else cursor
         return next.copy(cursor = if (moved in next.rotation.indices) moved else -1)
     }
+
+    /**
+     * The group with [uri] marked unreadable: kept, out of rotation. Keeps the place in the group
+     * the same way [withoutPhoto] does.
+     */
+    fun markUnreadable(uri: String): Group {
+        val id = PhotoId.identity(uri)
+        if (unreadable.any { PhotoId.identity(it) == id }) return this
+        if (allPhotos.none { PhotoId.identity(it) == id }) return this
+        val at = rotation.indexOfFirst { PhotoId.identity(it) == id }
+        val next = copy(unreadable = unreadable + uri)
+        val moved = if (at in 0..cursor) cursor - 1 else cursor
+        return next.copy(cursor = if (moved in next.rotation.indices) moved else -1)
+    }
+
+    /** The group with [uris] readable again: back in rotation, still showing the same photo. */
+    fun markReadable(uris: Collection<String>): Group {
+        val ids = uris.map(PhotoId::identity).toHashSet()
+        if (unreadable.none { PhotoId.identity(it) in ids }) return this
+        val shown = rotation.getOrNull(cursor)?.let(PhotoId::identity)
+        val next = copy(unreadable = unreadable.filterNot { PhotoId.identity(it) in ids })
+        val at = shown?.let { s -> next.rotation.indexOfFirst { PhotoId.identity(it) == s } } ?: -1
+        return next.copy(cursor = at)
+    }
+
+    fun isUnreadable(uri: String): Boolean = unreadable.any {
+        PhotoId.identity(it) == PhotoId.identity(uri)
+    }
+
+    /** Every URI this group refers to, for matching persisted grants. */
+    val allUris: Set<String>
+        get() = (photos + matched + pool + skipped + unreadable + excluded).toSet()
 
     /**
      * The group without photos it found by reading the phone's library directly. Those URIs need
@@ -130,6 +169,7 @@ data class Group(
             .put("coverUri", coverUri ?: JSONObject.NULL)
             .put("scanNote", scanNote)
             .put("skipped", JSONArray(skipped))
+            .put("unreadable", JSONArray(unreadable))
 
     companion object {
         /**
@@ -153,6 +193,7 @@ data class Group(
                 coverUri = if (o.isNull("coverUri")) null else o.optString("coverUri"),
                 scanNote = o.optString("scanNote", ""),
                 skipped = o.strings("skipped"),
+                unreadable = o.strings("unreadable"),
             )
 
         fun encode(groups: List<Group>): String = JSONArray(groups.map(Group::toJson)).toString()

@@ -59,6 +59,7 @@ private fun FengineApp(vm: MainViewModel) {
     val context = LocalContext.current
     val screenSaverWeek by vm.screenSaverWeek.collectAsStateWithLifecycle()
     val diagnostics by vm.diagnostics.collectAsStateWithLifecycle()
+    val orphanPhotos by vm.orphanPhotos.collectAsStateWithLifecycle()
     LaunchedEffect(openGroupId, settings.lastResult) {
         if (openGroupId == null) vm.refreshDiagnostics()
     }
@@ -204,6 +205,9 @@ private fun FengineApp(vm: MainViewModel) {
             onExportLog = { exportLog.launch("feels-engine-log.jsonl") },
             onTurnOnMotion = turnOnMotion,
             onDismissMotionLost = vm::dismissMotionLost,
+            orphanPhotos = orphanPhotos.size,
+            onPutBackPhotos = vm::putBackPhotos,
+            onLetPhotosGo = vm::letPhotosGo,
         )
     }
 }
