@@ -121,6 +121,8 @@ class PhotoWallpaperService : WallpaperService() {
         @Volatile private var backdropTinted = false
         @Volatile private var backdropColor = Color.BLACK
         @Volatile private var photoColors: WallpaperColors? = null
+        /** The photo [photoColors] came from: a resize or fold re-decodes, the colours stay. */
+        @Volatile private var colorsFor: String? = null
         @Volatile private var tapToChange = false
         private var lastTap: ChangeTriggers.Tap? = null
         private val mainHandler = Handler(android.os.Looper.getMainLooper())
@@ -340,11 +342,13 @@ class PhotoWallpaperService : WallpaperService() {
             load =
                 scope.launch(Dispatchers.IO) {
                     val bitmap = decode(uri, w, h) ?: return@launch
-                    val colors = PhotoColors.of(applicationContext, uri)
+                    val colors =
+                        if (uri == colorsFor) null else PhotoColors.of(applicationContext, uri)
                     // A destroyed engine's looper has quit: the post is refused, release here.
                     val posted = render.post {
                         if (colors != null && state.wanted == uri) {
                             photoColors = colors
+                            colorsFor = uri
                             backdropColor = Palette.backdrop(colors.primaryColor.toArgb())
                             // Android asks onComputeColors for the new palette (Material You
                             // follows Motion).

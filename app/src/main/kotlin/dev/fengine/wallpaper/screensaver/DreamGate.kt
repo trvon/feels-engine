@@ -21,16 +21,27 @@ object DreamGate {
     }
 
     /**
-     * What the screen shows. A veto used to call finish(), and on a charger Android restarted the
-     * screen saver about every 5 seconds (184 restarts in 16 minutes on the owner's Fold). A vetoed
-     * screen saver now stays as a dim black screen with no work, until touch or the normal timeout.
+     * What a start does. A veto ends the screen saver ([END]): stock Android then puts the phone to
+     * sleep as if there were no screen saver. Staying black instead kept the screen on, dreaming,
+     * for as long as the cable was in (fe_phone, Android 16, 2026-10-25). But the owner's Fold
+     * restarted an ended screen saver about every 5 seconds (184 restarts in 16 minutes), so a veto
+     * within [RESTART_WINDOW_MS] of the last one stays black at minimum brightness ([BLACK]).
      */
     enum class Show {
         PHOTOS,
+        END,
         BLACK,
     }
 
-    fun show(v: Verdict): Show = if (v == Verdict.PLAY) Show.PHOTOS else Show.BLACK
+    const val RESTART_WINDOW_MS = 60_000L
+
+    /** [lastVetoAt]: when the previous start was vetoed, or null for none this process. */
+    fun show(v: Verdict, lastVetoAt: Long? = null, now: Long = 0): Show =
+        when {
+            v == Verdict.PLAY -> Show.PHOTOS
+            lastVetoAt != null && now - lastVetoAt in 0 until RESTART_WINDOW_MS -> Show.BLACK
+            else -> Show.END
+        }
 
     fun decide(carMode: Boolean, plugged: Int, wirelessOnly: Boolean, hasPhotos: Boolean): Verdict =
         when {

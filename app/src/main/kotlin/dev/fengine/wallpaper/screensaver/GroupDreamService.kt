@@ -122,12 +122,33 @@ class GroupDreamService : DreamService() {
             if (Ledger.shouldRecordScreenSaver(store.lastScreenSaver(), verdict.name, plugged, now))
                 store.record(Ledger.Event.ScreenSaver(verdict.name, plugged), now)
         }
-        if (DreamGate.show(verdict) == DreamGate.Show.BLACK) {
-            // Not finish(): Android restarts a screen saver that ends itself while the phone
-            // charges.
-            Log.i(TAG, "not playing: $verdict (plugged=$plugged); staying black")
-            isScreenBright = false
-            return
+        val now = android.os.SystemClock.elapsedRealtime()
+        when (DreamGate.show(verdict, lastVetoAt, now)) {
+            DreamGate.Show.PHOTOS -> Unit
+            DreamGate.Show.END -> {
+                // Stock Android then sleeps as if there were no screen saver.
+                lastVetoAt = now
+                Log.i(TAG, "not playing: $verdict (plugged=$plugged); ending")
+                finish()
+                return
+            }
+            DreamGate.Show.BLACK -> {
+                // Restarted within a minute: this phone restarts ended screen savers. Black at
+                // minimum backlight (OLED pixels off) until touch or unplug, without a loop.
+                lastVetoAt = now
+                Log.i(TAG, "not playing: $verdict (plugged=$plugged); restarted, staying black")
+                isScreenBright = false
+                runCatching {
+                    window?.let { w ->
+                        w.attributes =
+                            w.attributes.apply {
+                                screenBrightness =
+                                    android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_OFF
+                            }
+                    }
+                }
+                return
+            }
         }
         val order = DreamPlan.order(photos, settings.shuffle, group!!.cursor, System.nanoTime())
         Log.i(TAG, "playing ${group.name}: ${order.size} photos")
@@ -190,43 +211,65 @@ class GroupDreamService : DreamService() {
             .start()
     }
 
+    private var still: android.view.View.OnLayoutChangeListener? = null
+    private var stillView: ImageView? = null
+
     private fun startDrift(view: ImageView, bitmap: Bitmap, whole: Boolean = false) {
         drift?.cancel()
+        drift = null
+        still?.let { stillView?.removeOnLayoutChangeListener(it) }
+        still = null
         val rnd = Random(System.nanoTime())
         val from = KenBurns.Focal(0.3f + rnd.nextFloat() * 0.4f, 0.3f + rnd.nextFloat() * 0.4f)
         val to = KenBurns.Focal(0.3f + rnd.nextFloat() * 0.4f, 0.3f + rnd.nextFloat() * 0.4f)
         val matrix = Matrix()
+        fun place(t: Float) {
+            val w = view.width
+            val h = view.height
+            if (w == 0 || h == 0 || bitmap.isRecycled) return
+            val f =
+                KenBurns.frame(
+                    bitmap.width,
+                    bitmap.height,
+                    w,
+                    h,
+                    t,
+                    DreamPlan.ZOOM_FROM,
+                    DreamPlan.ZOOM_TO,
+                    from,
+                    to,
+                    whole = whole,
+                )
+            matrix.reset()
+            matrix.postScale(f.scale, f.scale)
+            matrix.postTranslate(f.dx, f.dy)
+            view.imageMatrix = matrix
+        }
+        if (whole) {
+            // A whole photo does not drift: place it once, and again when the layout changes (a
+            // fold mid-session), instead of 60 identical frames a second.
+            val l =
+                android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place(0f) }
+            view.addOnLayoutChangeListener(l)
+            still = l
+            stillView = view
+            place(0f)
+            view.post { place(0f) }
+            return
+        }
         drift =
             ValueAnimator.ofFloat(0f, 1f).apply {
                 duration = DreamPlan.PHOTO_MS + DreamPlan.FADE_MS
                 interpolator = LinearInterpolator()
-                addUpdateListener { a ->
-                    val w = view.width
-                    val h = view.height
-                    if (w == 0 || h == 0 || bitmap.isRecycled) return@addUpdateListener
-                    val f =
-                        KenBurns.frame(
-                            bitmap.width,
-                            bitmap.height,
-                            w,
-                            h,
-                            a.animatedValue as Float,
-                            DreamPlan.ZOOM_FROM,
-                            DreamPlan.ZOOM_TO,
-                            from,
-                            to,
-                            whole = whole,
-                        )
-                    matrix.reset()
-                    matrix.postScale(f.scale, f.scale)
-                    matrix.postTranslate(f.dx, f.dy)
-                    view.imageMatrix = matrix
-                }
+                addUpdateListener { a -> place(a.animatedValue as Float) }
                 start()
             }
     }
 
     companion object {
         const val TAG = "GroupDreamService"
+
+        /** Last vetoed start in this process (elapsedRealtime), to spot a restarting phone. */
+        @Volatile private var lastVetoAt: Long? = null
     }
 }

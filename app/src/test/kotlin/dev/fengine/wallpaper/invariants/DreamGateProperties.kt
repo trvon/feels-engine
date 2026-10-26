@@ -36,18 +36,29 @@ class DreamGateProperties {
         )
     }
 
-    /** Only PLAY shows photos; every veto shows black (and never ends the screen saver). */
-    @Property(tries = 500)
-    fun everyVetoShowsBlack(
+    /**
+     * Only PLAY shows photos. A veto ends the screen saver, unless the last veto was under a minute
+     * ago (a phone that restarts ended screen savers), where it stays black: at most one restart
+     * per minute, never a loop.
+     */
+    @Property(tries = 1000)
+    fun aVetoEndsUnlessItKeepsRestarting(
         @ForAll car: Boolean,
         @ForAll @IntRange(min = 0, max = 15) plugged: Int,
         @ForAll wirelessOnly: Boolean,
         @ForAll photos: Boolean,
+        @ForAll @IntRange(min = 0, max = 200_000) sinceLast: Int,
+        @ForAll first: Boolean,
     ) {
         val v = DreamGate.decide(car, plugged, wirelessOnly, photos)
-        assertEquals(
-            if (v == Verdict.PLAY) DreamGate.Show.PHOTOS else DreamGate.Show.BLACK,
-            DreamGate.show(v),
-        )
+        val now = 1_000_000L
+        val last = if (first) null else now - sinceLast
+        val expected =
+            when {
+                v == Verdict.PLAY -> DreamGate.Show.PHOTOS
+                last != null && sinceLast < DreamGate.RESTART_WINDOW_MS -> DreamGate.Show.BLACK
+                else -> DreamGate.Show.END
+            }
+        assertEquals(expected, DreamGate.show(v, last, now))
     }
 }
