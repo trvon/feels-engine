@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.5.0](https://github.com/trvon/feels-engine/compare/v0.4.0...v0.5.0) (2026-10-26)
+
+
+### Features
+
+* **rotation:** any interval from 15 minutes to a week; change on double tap or light/dark switch ([2fa06b0](https://github.com/trvon/feels-engine/commit/2fa06b01f44b8d2bbdc65c62a36d58f41cb966fa))
+* **rotation:** darker photos in dark mode ([381bab7](https://github.com/trvon/feels-engine/commit/381bab7194cef6b24c61d86f496f14109efaf525))
+* **settings:** segmented choices, time picker, and appearance that follows the photo ([a7296ce](https://github.com/trvon/feels-engine/commit/a7296ce21f2f20c9d980f06642e3de2c937c5b11))
+
+
+### Fixes
+
+* **crash:** nothing in the engine, screen saver or alarm path can end the process ([cbe5807](https://github.com/trvon/feels-engine/commit/cbe5807d45a65b16cba1103e4ba89a93f89976d7))
+* **live:** notice when Android turns Motion off; log process exits and crashes ([d74451a](https://github.com/trvon/feels-engine/commit/d74451a94f71028c9438663ab7a0482dfe5996b2))
+* **log:** one change per run, exits imported once, no message text, safe halving ([ff15b0d](https://github.com/trvon/feels-engine/commit/ff15b0dbf4f6b4cc64635a38145e655fc0474baf))
+* **log:** This week says when photos could no longer be read and were removed ([6684e86](https://github.com/trvon/feels-engine/commit/6684e8660b6846c3356ef8c3b3cd070fc575529d))
+* **schedule:** daylight saving, failure backoff, clock jumps, retries that keep the place ([8c415e8](https://github.com/trvon/feels-engine/commit/8c415e8ec4baf060b4b2f6c556417f0c8d9df37f))
+* **schedule:** scheduled changes survive app standby: chained alarms, inline rotation ([3af11b0](https://github.com/trvon/feels-engine/commit/3af11b09f57b58439345fd2f8085a3f36d2ece04))
+* **screensaver,live:** a vetoed screen saver lets the phone sleep; fewer wasted frames ([8435651](https://github.com/trvon/feels-engine/commit/84356516545e57fd83738a13a03cc4cd336ba523))
+* **screensaver:** a vetoed screen saver stays black instead of restarting every 5 s ([00b5263](https://github.com/trvon/feels-engine/commit/00b5263325857d156cc00273449a771e9a437e00))
+* **ui:** readable photo colours, slider and switch accessibility, 12/24 h, main-thread work ([e523af8](https://github.com/trvon/feels-engine/commit/e523af87848b21c37b80c5cb5ad8e621bc1a9785))
+
+
+### Performance
+
+* **schedule:** re-arm the alarm after every change; profile round on fe_phone ([d9fb2ba](https://github.com/trvon/feels-engine/commit/d9fb2ba7760647683fa2283543a223dbba704c99))
+
 ## [0.4.0](https://github.com/trvon/feels-engine/compare/v0.3.0...v0.4.0) (2026-10-21)
 
 

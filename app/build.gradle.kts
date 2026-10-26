@@ -25,7 +25,7 @@ val releaseStore =
 
 // release-please rewrites this line from the release PR; versionCode follows it
 // (major*10000 + minor*100 + patch), so 0.2.2 is 202 and every release is higher.
-val appVersion = "0.4.0" // x-release-please-version
+val appVersion = "0.5.0" // x-release-please-version
 val appVersionCode =
     appVersion.split('.').map(String::toInt).let { (major, minor, patch) ->
         major * 10000 + minor * 100 + patch
