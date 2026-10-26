@@ -10,14 +10,18 @@ import java.io.File
  */
 class LedgerStore(context: Context) {
     private val file = File(context.filesDir, "ledger.jsonl")
+    private val tmp = File(context.filesDir, "ledger.jsonl.tmp")
+    private val exitMark = File(context.filesDir, "ledger-exits")
 
     fun record(event: Ledger.Event, atMs: Long = System.currentTimeMillis()) =
         synchronized(LOCK) {
             runCatching {
                 file.appendText(Ledger.encode(Ledger.Entry(atMs, event)) + "\n")
                 if (file.length() > MAX_BYTES) {
+                    // Write the kept half aside, then swap: a kill mid-write never loses the file.
                     val lines = file.readLines()
-                    file.writeText(lines.drop(lines.size / 2).joinToString("\n", postfix = "\n"))
+                    tmp.writeText(lines.drop(lines.size / 2).joinToString("\n", postfix = "\n"))
+                    if (!tmp.renameTo(file)) tmp.delete()
                 }
             }
         }
@@ -31,8 +35,19 @@ class LedgerStore(context: Context) {
     fun lastScreenSaver(): Ledger.Entry? =
         entries().lastOrNull { it.event is Ledger.Event.ScreenSaver }
 
-    /** Time of the newest recorded process exit, so each exit is imported once. */
-    fun lastExitAt(): Long? = entries().lastOrNull { it.event is Ledger.Event.Exit }?.atMs
+    /**
+     * Time of the newest imported process exit, so each exit is imported once. Kept beside the
+     * ledger too: halving can drop every exit line.
+     */
+    fun lastExitAt(): Long? =
+        synchronized(LOCK) {
+            val mark = runCatching { exitMark.readText().trim().toLong() }.getOrNull()
+            val inLog = entries().filter { it.event is Ledger.Event.Exit }.maxOfOrNull { it.atMs }
+            listOfNotNull(mark, inLog).maxOrNull()
+        }
+
+    fun markExitsUpTo(atMs: Long) =
+        synchronized(LOCK) { runCatching { exitMark.writeText(atMs.toString()) } }
 
     /** The raw file, for export. */
     fun text(): String = synchronized(LOCK) { runCatching { file.readText() }.getOrDefault("") }

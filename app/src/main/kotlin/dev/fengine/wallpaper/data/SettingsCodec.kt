@@ -92,16 +92,22 @@ object SettingsCodec {
                 prefs[Keys.mode]?.let { runCatching { Mode.valueOf(it) }.getOrNull() }
                     ?: defaults.mode,
             intervalMinutes = prefs[Keys.intervalMinutes] ?: defaults.intervalMinutes,
+            // Slots inside a day, once each; none left means the defaults, never an empty schedule.
             timesOfDay =
-                prefs[Keys.timesOfDay]?.lines()?.mapNotNull { it.toIntOrNull() }?.sorted()
-                    ?: defaults.timesOfDay,
+                prefs[Keys.timesOfDay]
+                    ?.lines()
+                    ?.mapNotNull { it.toIntOrNull() }
+                    ?.filter { it in 0 until 24 * 60 }
+                    ?.distinct()
+                    ?.sorted()
+                    ?.ifEmpty { null } ?: defaults.timesOfDay,
             shuffle = prefs[Keys.shuffle] ?: defaults.shuffle,
-            // Never written: a new install gets the default; an install that already had groups
-            // played on any charger before this setting existed and keeps doing so.
             themeMode = enumOr(prefs[Keys.themeMode], defaults.themeMode),
             colorSource = enumOr(prefs[Keys.colorSource], defaults.colorSource),
             backdrop = enumOr(prefs[Keys.backdrop], defaults.backdrop),
             photoFit = enumOr(prefs[Keys.photoFit], defaults.photoFit),
+            // Missing on installs from before the setting: a new install gets the default; one that
+            // already had groups played on any charger and keeps doing so.
             dreamWirelessOnly =
                 prefs[Keys.dreamWirelessOnly] ?: (defaults.dreamWirelessOnly && groups.isEmpty()),
             enabled = prefs[Keys.enabled] ?: defaults.enabled,

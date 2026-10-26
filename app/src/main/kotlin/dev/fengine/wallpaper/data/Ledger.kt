@@ -22,6 +22,11 @@ object Ledger {
             val lateMs: Long? = null,
             /** Why a photo could not be used (exception class and URI authority, never the URI). */
             val reason: String? = null,
+            /**
+             * The run this write belongs to (its start time): one change can write several screens
+             * and retry after an unreadable photo. Null on lines from before 0.5.
+             */
+            val run: Long? = null,
         ) : Event
 
         /** A shown screen got its first engine frame after [latencyMs]. */
@@ -82,6 +87,7 @@ object Ledger {
                         if (ev.bucket >= 0) put("bucket", ev.bucket)
                         ev.lateMs?.let { put("late_ms", it) }
                         ev.reason?.let { put("reason", it) }
+                        ev.run?.let { put("run", it) }
                     }
             is Event.FirstFrame -> o.put("type", "first_frame").put("ms", ev.latencyMs)
             is Event.NoFrame -> o.put("type", "no_frame").put("ms", ev.shownMs)
@@ -114,6 +120,7 @@ object Ledger {
                         bucket = o.optInt("bucket", -1),
                         lateMs = if (o.has("late_ms")) o.getLong("late_ms") else null,
                         reason = if (o.has("reason")) o.getString("reason") else null,
+                        run = if (o.has("run")) o.getLong("run") else null,
                     )
                 "first_frame" -> Event.FirstFrame(o.getLong("ms"))
                 "no_frame" -> Event.NoFrame(o.getLong("ms"))
@@ -149,18 +156,20 @@ object Ledger {
      * The `ApplicationExitInfo` reasons worth a line: the ones that say the app failed or was
      * stopped. Plain exits, cached-process kills and package updates are routine and skipped.
      */
-    fun exitReason(code: Int): String? =
+    fun exitReason(code: Int, sdk: Int = 34): String? =
         when (code) {
+            // Before Android 14 an app update also reads as "user requested".
+            10 -> if (sdk >= 34) "user_requested" else null
             3 -> "low_memory"
             4 -> "crash"
             5 -> "native_crash"
             6 -> "anr"
             7 -> "init_failure"
             9 -> "excessive_resources"
-            10 -> "user_requested"
             11 -> "user_stopped"
             12 -> "dependency_died"
             14 -> "freezer"
+            17 -> "memory_limiter"
             else -> null
         }
 
@@ -168,11 +177,15 @@ object Ledger {
      * Exits not yet in the ledger: those after [lastRecordedMs] with a reason worth a line, oldest
      * first. [exits] are (timestamp, reason code, importance) as Android returns them.
      */
-    fun newExits(exits: List<Triple<Long, Int, Int>>, lastRecordedMs: Long?): List<Entry> =
+    fun newExits(
+        exits: List<Triple<Long, Int, Int>>,
+        lastRecordedMs: Long?,
+        sdk: Int = 34,
+    ): List<Entry> =
         exits
             .filter { (t, _, _) -> lastRecordedMs == null || t > lastRecordedMs }
             .mapNotNull { (t, code, imp) ->
-                exitReason(code)?.let { Entry(t, Event.Exit(it, imp)) }
+                exitReason(code, sdk)?.let { Entry(t, Event.Exit(it, imp)) }
             }
             .sortedBy { it.atMs }
 
@@ -199,8 +212,10 @@ object Ledger {
      * an obfuscated name; the release mapping file turns it back.
      */
     fun crashSite(rootClass: String, frames: List<String>): String {
-        val ours = frames.firstOrNull { f -> libraryFrames.none { f.startsWith(it) } }
-        return if (ours == null) rootClass else "$rootClass at $ours"
+        // R8 also renames library classes, so one "ours" frame can be a renamed library frame:
+        // keep the first three candidates for the mapping file to sort out.
+        val ours = frames.filter { f -> libraryFrames.none { f.startsWith(it) } }.take(3)
+        return if (ours.isEmpty()) rootClass else "$rootClass at ${ours.joinToString(" < ")}"
     }
 
     /**
@@ -231,12 +246,15 @@ object Ledger {
     fun summarize(entries: List<Entry>, fromMs: Long, toMs: Long): Summary {
         val inWindow = entries.filter { it.atMs in fromMs..toMs }.map { it.event }
         val rot = inWindow.filterIsInstance<Event.Rotation>()
+        // One change per run (several screens and retries write several lines); old lines count
+        // alone.
+        val runs = rot.withIndex().groupBy({ (i, r) -> r.run ?: -(i + 1L) }, { it.value }).values
         val ff = inWindow.filterIsInstance<Event.FirstFrame>().map { it.latencyMs }.sorted()
         return Summary(
-            rotations = rot.size,
-            failed = rot.count { it.result == "failed" },
+            rotations = runs.size,
+            failed = runs.count { lines -> lines.any { it.result == "failed" } },
             removed = rot.count { it.result == "unreadable" },
-            manual = rot.count { it.source in Source.manual },
+            manual = runs.count { lines -> lines.first().source in Source.manual },
             firstFrames = ff.size,
             firstFrameP50 = percentile(ff, 50),
             firstFrameP95 = percentile(ff, 95),

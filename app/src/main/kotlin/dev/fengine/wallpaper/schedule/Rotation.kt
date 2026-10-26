@@ -113,6 +113,7 @@ object Rotation {
                     ledger,
                     bucket,
                     lateMs.takeIf { hop == 0 },
+                    run = now,
                 )
                     ?: return@withLock if (changed) Outcome.Done(failures)
                     else
@@ -170,6 +171,7 @@ object Rotation {
         ledger: LedgerStore,
         bucket: Int,
         lateMs: Long?,
+        run: Long,
     ): Pass? {
         val live =
             if (forceStatic) LiveWallpaper.State(false, false, false, false)
@@ -212,7 +214,7 @@ object Rotation {
         var changed = false
         for ((id, index) in plan.cursors) if (plan.writes.none { it.groupId == id }) {
             Log.i(TAG, "${settings.group(id)?.name}: photo ${index + 1} -> live engine")
-            ledger.record(Ledger.Event.Rotation(source, 0, 0, "live", bucket, lateMs))
+            ledger.record(Ledger.Event.Rotation(source, 0, 0, "live", bucket, lateMs, run = run))
             changed = true
         }
         for (write in plan.writes) {
@@ -231,6 +233,7 @@ object Rotation {
                             "applied",
                             bucket,
                             lateMs,
+                            run = run,
                         )
                     )
                     changed = true
@@ -250,6 +253,7 @@ object Rotation {
                             bucket,
                             lateMs,
                             why,
+                            run = run,
                         )
                     )
                     unreadable += write.groupId to write.uri
@@ -264,6 +268,7 @@ object Rotation {
                             bucket,
                             lateMs,
                             outcome.reason.take(80),
+                            run = run,
                         )
                     )
                     Log.w(TAG, "${group.name}: ${outcome.reason}")

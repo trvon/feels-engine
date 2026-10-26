@@ -52,7 +52,9 @@ class FengineApp : Application() {
                     Triple(it.timestamp, it.reason, it.importance)
                 }
             val ledger = LedgerStore(this)
-            Ledger.newExits(exits, ledger.lastExitAt()).forEach { ledger.record(it.event, it.atMs) }
+            val fresh = Ledger.newExits(exits, ledger.lastExitAt(), Build.VERSION.SDK_INT)
+            fresh.forEach { ledger.record(it.event, it.atMs) }
+            exits.maxOfOrNull { it.first }?.let(ledger::markExitsUpTo)
         }
     }
 }

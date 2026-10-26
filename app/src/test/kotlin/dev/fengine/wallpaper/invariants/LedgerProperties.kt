@@ -185,17 +185,47 @@ class LedgerProperties {
     @Property(tries = 300)
     fun crashSiteSkipsLibraryFrames(@ForAll("frames") frames: List<String>) {
         val site = Ledger.crashSite("java.lang.IllegalStateException", frames)
-        val ours = frames.firstOrNull {
-            !it.startsWith("java.") &&
-                !it.startsWith("android") &&
-                !it.startsWith("kotlin") &&
-                !it.startsWith("com.google.")
-        }
+        val ours =
+            frames
+                .filter {
+                    !it.startsWith("java.") &&
+                        !it.startsWith("android") &&
+                        !it.startsWith("kotlin") &&
+                        !it.startsWith("com.google.")
+                }
+                .take(3)
         assertEquals(
-            if (ours == null) "java.lang.IllegalStateException"
-            else "java.lang.IllegalStateException at $ours",
+            if (ours.isEmpty()) "java.lang.IllegalStateException"
+            else "java.lang.IllegalStateException at ${ours.joinToString(" < ")}",
             site,
         )
+    }
+
+    /** One change per run: a run's several lines (screens, retries) count once. */
+    @Property(tries = 500)
+    fun aRunCountsAsOneChange(
+        @ForAll @IntRange(min = 1, max = 5) runs: Int,
+        @ForAll @IntRange(min = 1, max = 4) linesPerRun: Int,
+    ) {
+        val es =
+            (0 until runs).flatMap { r ->
+                (0 until linesPerRun).map { l ->
+                    Ledger.Entry(
+                        1000L * r + l,
+                        Event.Rotation(
+                            if (r == 0) "next" else "alarm",
+                            l + 1,
+                            0,
+                            if (l == 0 && r == 1) "failed" else "applied",
+                            run = 1000L * r,
+                        ),
+                    )
+                }
+            }
+        val s = Ledger.summarize(es, 0, Long.MAX_VALUE)
+        assertEquals(runs, s.rotations)
+        assertEquals(1, s.manual)
+        assertEquals(if (runs > 1) 1 else 0, s.failed)
     }
 
     @Provide

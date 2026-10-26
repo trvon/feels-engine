@@ -53,7 +53,12 @@ class SettingsCodecProperties {
                     pick,
                     Arbitraries.of(Mode.entries),
                     Arbitraries.integers().between(1, 24 * 60),
-                    Arbitraries.integers().between(0, 24 * 60 - 1).list().ofMaxSize(6),
+                    Arbitraries.integers()
+                        .between(0, 24 * 60 - 1)
+                        .list()
+                        .ofMinSize(1)
+                        .ofMaxSize(6)
+                        .uniqueElements(),
                     Arbitraries.of(true, false),
                     Arbitraries.of(true, false),
                     text,
@@ -127,8 +132,10 @@ class SettingsCodecProperties {
                 )
                 .dreamGroupId,
         )
-        assertEquals(times.sorted(), out.timesOfDay)
-        assertTrue(out.timesOfDay.zipWithNext().all { (a, b) -> a <= b })
+        // Slots inside a day, once each, sorted; none valid means the defaults, never empty.
+        val valid = times.filter { it in 0 until 24 * 60 }.distinct().sorted()
+        assertEquals(valid.ifEmpty { Settings().timesOfDay }, out.timesOfDay)
+        assertTrue(out.timesOfDay.zipWithNext().all { (a, b) -> a < b })
     }
 
     @Property(tries = 1000)

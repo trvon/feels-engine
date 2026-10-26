@@ -492,7 +492,8 @@ class PhotoWallpaperService : WallpaperService() {
                     is FrameHealth.Record.NoFrame -> Ledger.Event.NoFrame(r.shownMs)
                     FrameHealth.Record.AbandonedBlend -> Ledger.Event.AbandonedBlend
                 }
-            ledger.record(ev)
+            // File I/O (and the halving at 512 KB) stays off the render thread.
+            scope.launch(Dispatchers.IO) { ledger.record(ev) }
         }
 
         private fun drawPhoto(canvas: Canvas, bitmap: Bitmap, alpha: Int) {

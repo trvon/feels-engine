@@ -446,7 +446,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             val app = getApplication<Application>()
             runCatching {
-                app.contentResolver.openOutputStream(target)?.use {
+                // "wt": truncate, so overwriting a longer file leaves no stale tail.
+                app.contentResolver.openOutputStream(target, "wt")?.use {
                     it.write(LedgerStore(app).text().toByteArray())
                 }
             }
