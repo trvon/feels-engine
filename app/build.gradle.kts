@@ -57,6 +57,9 @@ android {
 
     buildTypes {
         debug {
+            // Installs beside the Play build (different signing key), so device tests keep the owner's data.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
             // JaCoCo for the JVM suite: ./gradlew :app:createDebugUnitTestCoverageReport
             enableUnitTestCoverage = true
         }
