@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import com.google.mlkit.genai.common.FeatureStatus
 
 /**
@@ -24,6 +25,7 @@ data class AiReadiness(
 
     companion object {
         const val AICORE_PACKAGE = "com.google.android.aicore"
+        private const val TAG = "AiReadiness"
 
         /** Device families on Google's ML Kit GenAI Prompt API list (developers.google.com/ml-kit/genai, read 2026-10-13). */
         private val listedModels = listOf(
@@ -40,10 +42,22 @@ data class AiReadiness(
 
         fun isStub(version: String?): Boolean = version == null || version.contains("stub", ignoreCase = true)
 
+        /** One line for the card and the log: exception class and message, never a stack. */
+        fun describe(e: Throwable): String =
+            listOfNotNull(e.javaClass.simpleName.ifEmpty { e.javaClass.name }, e.message?.trim()?.takeIf { it.isNotEmpty() })
+                .joinToString(": ")
+
         suspend fun check(context: Context): AiReadiness {
             val version = aicoreVersion(context)
             val listed = deviceListed()
-            val status = runCatching { NanoMatcher().use { it.status() } }.getOrElse { FeatureStatus.UNAVAILABLE }
+            // A failed check used to read as plain "unavailable" with no trace; keep the reason.
+            var error: Throwable? = null
+            val status = runCatching { NanoMatcher().use { it.status() } }.getOrElse { e ->
+                error = e
+                Log.w(TAG, "Gemini Nano status check failed (AICore $version)", e)
+                FeatureStatus.UNAVAILABLE
+            }
+            val failure = error
             return when {
                 status == FeatureStatus.AVAILABLE -> AiReadiness(
                     Level.READY, "On-device AI is ready",
@@ -58,6 +72,12 @@ data class AiReadiness(
                     Level.DOWNLOADABLE, "On-device AI can be set up",
                     "A one-time download, best on Wi-Fi. Until then, finding photos uses labels only.",
                     Action.DOWNLOAD,
+                )
+                failure != null && !isStub(version) -> AiReadiness(
+                    Level.UNAVAILABLE, "On-device AI could not be checked",
+                    "AICore ($version) answered with an error: ${describe(failure)}. Finding photos uses labels " +
+                        "until it works.",
+                    Action.CHECK_AGAIN,
                 )
                 isStub(version) && listed -> AiReadiness(
                     Level.NEEDS_AICORE, "Android AICore needs an update",
