@@ -57,8 +57,9 @@ android {
 
     buildTypes {
         debug {
-            // Opt-in: -PsideBySide installs beside the Play build (different signing key) without wiping
-            // its data. Off by default: scripts/ and the device loop address dev.fengine.wallpaper.
+            // Opt-in: -PsideBySide installs beside the Play build (different signing key) without
+            // wiping its data. Off by default: scripts/ and the device loop address
+            // dev.fengine.wallpaper.
             if (providers.gradleProperty("sideBySide").isPresent) {
                 applicationIdSuffix = ".debug"
                 versionNameSuffix = "-debug"
