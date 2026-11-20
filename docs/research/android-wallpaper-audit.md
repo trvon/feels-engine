@@ -347,7 +347,7 @@ taps "Find photos".
 1. The user describes a group in words.
 2. ML Kit base image labeling (bundled, 430 labels) labels every library photo
    once; labels are cached per MediaStore id.
-3. Gemini Nano through the ML Kit GenAI Prompt API (`genai-prompt` 1.0.0-beta4)
+3. Gemini Nano through the ML Kit GenAI Prompt API (`genai-prompt` 1.0.0-beta5)
    maps the description to relevant labels (one text prompt) and then judges
    each candidate photo with an image prompt ("Does this photo match ...? YES
    or NO"). Verdicts are cached per rule.
