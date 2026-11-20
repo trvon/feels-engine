@@ -1,5 +1,6 @@
 package dev.fengine.wallpaper.wallpaper.live
 
+import dev.fengine.wallpaper.wallpaper.ClockSafe
 import kotlin.math.ceil
 import kotlin.math.max
 
@@ -26,7 +27,9 @@ object LiveFrame {
 
     /**
      * [xOffset] is the launcher page offset in 0..1 (0.5 when a launcher reports none), [zoom] the
-     * system zoom in 0..1, [parallax] the overscan fraction (0 disables parallax).
+     * system zoom in 0..1, [parallax] the overscan fraction (0 disables parallax). [faces], in
+     * bitmap fractions, moves the photo up or down so they sit below the lock screen clock
+     * ([ClockSafe.BAND]) when there is room; null keeps it centred.
      */
     fun frame(
         bitmapW: Int,
@@ -38,6 +41,7 @@ object LiveFrame {
         parallax: Float = PARALLAX,
         zoomRange: Float = ZOOM,
         whole: Boolean = false,
+        faces: ClockSafe.Box? = null,
     ): Frame {
         if (whole) {
             // The whole photo, centred, touching two edges; the backdrop fills the rest. No
@@ -59,7 +63,22 @@ object LiveFrame {
         val pan = (surfaceW * p).coerceAtMost(w - surfaceW)
         val centred = (w - surfaceW - pan) / 2f
         val dx = (-centred - pan * xOffset.coerceIn(0f, 1f)).coerceIn(surfaceW - w, 0f)
-        val dy = (-(h - surfaceH) * 0.5f).coerceIn(surfaceH - h, 0f)
+        val centredY = (h - surfaceH) * 0.5f
+        val startY =
+            if (faces == null) centredY
+            else {
+                // The bitmap is centred in h when it is shorter (never, at cover scale): offset.
+                val off = (h - bitmapH * scale) / 2f
+                ClockSafe.start(
+                    h,
+                    surfaceH.toFloat(),
+                    off + faces.top * bitmapH * scale,
+                    off + faces.bottom * bitmapH * scale,
+                    centredY,
+                    ClockSafe.BAND,
+                )
+            }
+        val dy = (-startY).coerceIn(surfaceH - h, 0f)
         return Frame(scale, dx, dy)
     }
 

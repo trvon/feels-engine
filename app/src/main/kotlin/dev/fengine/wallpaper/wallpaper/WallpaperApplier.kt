@@ -59,10 +59,20 @@ class WallpaperApplier(private val context: Context) {
             val targets =
                 if (panels != 0 && SamsungDisplays.hasDisplayBits()) listOf(which or panels)
                 else SamsungDisplays.expand(which)
+            // Lock screens keep faces out from under the clock; found once, only when needed.
+            val faces by lazy { Faces.detect(bitmap) }
             val ids = targets.map { expanded ->
                 val target = displays.forWhich(expanded)
                 val crop =
-                    WallpaperCrop.fit(bitmap.width, bitmap.height, target.width, target.height)
+                    if (expanded and WallpaperManager.FLAG_LOCK != 0)
+                        ClockSafe.crop(
+                            bitmap.width,
+                            bitmap.height,
+                            target.width,
+                            target.height,
+                            faces,
+                        )
+                    else WallpaperCrop.fit(bitmap.width, bitmap.height, target.width, target.height)
                 val hint = Rect(crop.left, crop.top, crop.right, crop.bottom)
                 val id =
                     try {

@@ -19,6 +19,7 @@ import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.animation.LinearInterpolator
+import androidx.core.net.toUri
 import dev.fengine.wallpaper.FengineApp
 import dev.fengine.wallpaper.data.Backdrop
 import dev.fengine.wallpaper.data.ChangeTriggers
@@ -28,6 +29,8 @@ import dev.fengine.wallpaper.data.PhotoFit
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.schedule.Rotation
 import dev.fengine.wallpaper.ui.Palette
+import dev.fengine.wallpaper.wallpaper.ClockSafe
+import dev.fengine.wallpaper.wallpaper.Faces
 import dev.fengine.wallpaper.wallpaper.PhotoColors
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -124,6 +127,10 @@ class PhotoWallpaperService : WallpaperService() {
         /** The photo [photoColors] came from: a resize or fold re-decodes, the colours stay. */
         @Volatile private var colorsFor: String? = null
         @Volatile private var tapToChange = false
+        /**
+         * Faces per held bitmap (render thread only), so a lock screen keeps them below the clock.
+         */
+        private val faces = java.util.IdentityHashMap<Bitmap, ClockSafe.Box?>()
         private var lastTap: ChangeTriggers.Tap? = null
         private val mainHandler = Handler(android.os.Looper.getMainLooper())
         private val ledger by lazy { LedgerStore(applicationContext) }
@@ -312,7 +319,7 @@ class PhotoWallpaperService : WallpaperService() {
                 fade?.cancel()
                 load?.cancel()
                 hidden()
-                slots.onDestroy().forEach(Bitmap::recycle)
+                slots.onDestroy().forEach(::release)
             }
             renderThread.quitSafely()
             super.onDestroy()
@@ -342,6 +349,9 @@ class PhotoWallpaperService : WallpaperService() {
             load =
                 scope.launch(Dispatchers.IO) {
                     val bitmap = decode(uri, w, h) ?: return@launch
+                    val found =
+                        if (drawsLock()) ClockSafe.union(Faces.detect(contentResolver, uri.toUri()))
+                        else null
                     val colors =
                         if (uri == colorsFor) null else PhotoColors.of(applicationContext, uri)
                     // A destroyed engine's looper has quit: the post is refused, release here.
@@ -360,7 +370,8 @@ class PhotoWallpaperService : WallpaperService() {
                             return@post
                         } // stale
                         fade?.cancel() // ends through finishFade, which releases the old previous
-                        slots.onDecoded(bitmap, fade = decision.startFade).forEach(Bitmap::recycle)
+                        faces[bitmap] = found
+                        slots.onDecoded(bitmap, fade = decision.startFade).forEach(::release)
                         if (!decision.startFade) fadeAlpha = 1f
                         act(decision)
                     }
@@ -423,7 +434,7 @@ class PhotoWallpaperService : WallpaperService() {
                 )
             fade = null
             fadeAlpha = 1f
-            slots.onFadeFinished().forEach(Bitmap::recycle)
+            slots.onFadeFinished().forEach(::release)
         }
 
         /** One frame. The state already decided it is wanted and the surface is visible. */
@@ -447,10 +458,12 @@ class PhotoWallpaperService : WallpaperService() {
                 slots
                     .convert { b ->
                         if (b.config == Bitmap.Config.HARDWARE && !b.isRecycled)
-                            b.copy(Bitmap.Config.ARGB_8888, false) ?: b
+                            (b.copy(Bitmap.Config.ARGB_8888, false) ?: b).also {
+                                faces[it] = faces[b]
+                            }
                         else b
                     }
-                    .forEach(Bitmap::recycle)
+                    .forEach(::release)
             val blended = previous != null && fadeAlpha < 1f
             try {
                 c.drawColor(if (fitWhole && backdropTinted) backdropColor else Color.BLACK)
@@ -500,6 +513,16 @@ class PhotoWallpaperService : WallpaperService() {
             scope.launch(Dispatchers.IO) { ledger.record(ev) }
         }
 
+        private fun release(bitmap: Bitmap) {
+            faces.remove(bitmap)
+            bitmap.recycle()
+        }
+
+        /** True when this engine draws a lock screen (Android 14+ says; older: it draws both). */
+        private fun drawsLock(): Boolean =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE ||
+                wallpaperFlags and WallpaperManager.FLAG_LOCK != 0
+
         private fun drawPhoto(canvas: Canvas, bitmap: Bitmap, alpha: Int) {
             if (bitmap.isRecycled) return
             val f =
@@ -511,6 +534,7 @@ class PhotoWallpaperService : WallpaperService() {
                     state.xOffset,
                     state.zoom,
                     whole = fitWhole,
+                    faces = faces[bitmap],
                 )
             matrix.reset()
             matrix.postScale(f.scale, f.scale)
