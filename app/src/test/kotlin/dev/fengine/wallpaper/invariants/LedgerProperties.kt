@@ -57,6 +57,20 @@ class LedgerProperties {
                     )
                     .map { Event.Crash(it) },
                 Arbitraries.just(Event.MotionLost),
+                Combinators.combine(
+                        Arbitraries.of("ready", "downloading", "stalled", "failed", "unavailable"),
+                        Arbitraries.integers().between(0, 700).injectNull(0.5),
+                    )
+                    .`as` { s: String, c: Int? -> Event.Ai(s, c) },
+                Arbitraries.integers().between(0, 500).list().ofSize(3).map {
+                    Event.Scan(it[0], it[1], it[2])
+                },
+                Arbitraries.integers().between(0, 500).list().ofSize(3).map {
+                    Event.Copy(it[0], it[1], it[2])
+                },
+                Arbitraries.integers().between(-1, 512).list().ofSize(3).map {
+                    Event.Grants(it[0], it[1], it[2])
+                },
             )
         return Combinators.combine(Arbitraries.longs().between(0, 10_000_000), ev)
             .`as` { t: Long, e: Event -> Ledger.Entry(t, e) }

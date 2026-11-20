@@ -126,21 +126,12 @@ object Rotation {
             store.update { cur ->
                 cur.copy(
                     groups =
-                        cur.groups
-                            // By photo, not index: the group may have been edited since `s`.
-                            .map { g ->
-                                pass.cursors[g.id]?.let { i ->
-                                    g.showing(s.group(g.id)?.rotation?.getOrNull(i), i)
-                                } ?: g
-                            }
-                            .map { g ->
-                                pass.unreadable
-                                    .filter { it.first == g.id }
-                                    .fold(g) { acc, (_, uri) -> acc.markUnreadable(uri) }
-                            },
+                        RotationPlan.settle(cur.groups, s::group, pass.cursors, pass.unreadable),
                     lastResult =
                         if (pass.failures.isEmpty()) "Changed at $stamp"
-                        else "Problem at $stamp: ${pass.failures.joinToString("; ")}",
+                        // No time in the text: Home dates it from lastAttemptAt
+                        // (Format.lastResult).
+                        else "Problem: ${pass.failures.joinToString("; ")}",
                     lastRotationAt =
                         if (pass.changed) System.currentTimeMillis() else cur.lastRotationAt,
                     lastAttemptAt = System.currentTimeMillis(),

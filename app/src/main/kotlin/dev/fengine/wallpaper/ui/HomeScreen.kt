@@ -72,6 +72,9 @@ fun HomeScreen(
     orphanPhotos: Int = 0,
     onPutBackPhotos: () -> Unit = {},
     onLetPhotosGo: () -> Unit = {},
+    health: dev.fengine.wallpaper.data.Health.Line? = null,
+    onHealthFix: (dev.fengine.wallpaper.data.Health.Line) -> Unit = {},
+    onDismissMotionOffer: () -> Unit = {},
 ) {
     var choosingFor by remember { mutableStateOf<Screen?>(null) }
     choosingFor?.let { screen ->
@@ -109,7 +112,35 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(Space.sm))
         val is24 = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
-        Headline(Format.status(settings, is24), caption = settings.lastResult.ifBlank { null })
+        Headline(
+            Format.status(settings, is24),
+            caption = Format.lastResult(settings, System.currentTimeMillis(), is24),
+        )
+        // Only when something is wrong: the worst single fact and its one fix (Health).
+        health?.let { line ->
+            Spacer(Modifier.height(Space.md))
+            Caption(line.text)
+            TextAction(
+                when (line.fix) {
+                    dev.fengine.wallpaper.data.Health.Fix.APP_SLEEP -> "Open app settings"
+                    dev.fengine.wallpaper.data.Health.Fix.GROUP -> "Open the group"
+                }
+            ) {
+                onHealthFix(line)
+            }
+        }
+        // Once, after the first change: Motion is the app's headline look, and lives in Settings.
+        if (!settings.motionOffered && !settings.motionOn && settings.lastRotationAt > 0) {
+            Spacer(Modifier.height(Space.md))
+            Caption("Make it move: Motion pans each photo as you swipe and fades between them.")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                TextAction("Try Motion") {
+                    onDismissMotionOffer()
+                    onTurnOnMotion()
+                }
+                TextAction("Not now", onDismissMotionOffer)
+            }
+        }
         if (settings.motionLostAt > 0 && !settings.motionOn) {
             Spacer(Modifier.height(Space.md))
             Caption(Format.motionLost(settings.motionLostAt))

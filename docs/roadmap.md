@@ -19,7 +19,26 @@
 
 Done since: the live engine (0.2.0), Next photo as a Quick Settings tile and
 a 1x1 widget (0.3.0), faces kept out from under the lock screen clock
-(`wallpaper/ClockSafe.kt`, framework `FaceDetector`; 0.6.0).
+(`wallpaper/ClockSafe.kt`, framework `FaceDetector`; 0.6.0). Screen-sized
+copies of every photo in groups (`wallpaper/PhotoCopies.kt`), so photos keep
+showing after Google Photos' "Free up space" deletes the originals; Settings >
+Photos turns them off. Finding photos no longer waits on a Gemini Nano
+download that AICore never starts (seen on the Fold 8, 2026-11-20, while
+AICore's own data package update sat at DOWNLOADED_PENDING_ACTIVATION).
+Product review 2026-11-20 (`docs/product/2026-11-20-product-review.md`), items
+1-10 in code: Motion and the screen saver set aside unreadable photos like the
+static path (`wallpaper/LostPhotos.kt`); scans survive a bad photo and retry
+failed labels; picker grants kept for shown photos, look-through grants
+released near the ceiling (`data/GrantPlan.kt`); a dated Home caption and a
+health line only when something is wrong (`data/Health.kt`); ledger events for
+AI, scans, copies and grants; "Pick it again"; the first Set active starts the
+rotation and Motion is offered once; Android's unused-app restriction read and
+linked (`schedule/AppSleep.kt`); store and in-app text match the picker-only
+app; every call into AICore and ML Kit has a deadline (`smart/Outside.kt`).
+Fuzzed: `OutsideProperties` (virtual time), `PhotoLifecycleProperties`
+(model-based), `CopyPlanProperties`, `HealthAndGrantProperties`.
+Still owed by the owner: a 14-day log export from each phone, and copy storage
+per 100 photos on the Fold and Pixel (review items 5, 6).
 
 Next:
 

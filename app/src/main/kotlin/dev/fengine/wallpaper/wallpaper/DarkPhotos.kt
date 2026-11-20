@@ -2,7 +2,6 @@ package dev.fengine.wallpaper.wallpaper
 
 import android.content.Context
 import android.graphics.ImageDecoder
-import android.net.Uri
 import dev.fengine.wallpaper.data.Brightness
 import dev.fengine.wallpaper.smart.PhotoIndex
 
@@ -32,9 +31,7 @@ class DarkPhotos(
 
     private fun measure(uri: String): Boolean? = runCatching {
         val small =
-            ImageDecoder.decodeBitmap(
-                ImageDecoder.createSource(context.contentResolver, Uri.parse(uri))
-            ) { d, info, _ ->
+            PhotoCopies.decode(context, uri) { d, info, _ ->
                 val s = EDGE.toFloat() / maxOf(info.size.width, info.size.height)
                 if (s < 1f)
                     d.setTargetSize(

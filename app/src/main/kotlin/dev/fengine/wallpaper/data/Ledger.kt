@@ -55,6 +55,31 @@ object Ledger {
 
         /** Motion was on and is now off without the owner choosing Still (see MotionWatch). */
         data object MotionLost : Event
+
+        /**
+         * On-device AI changed state: [state] is ready, downloading, stalled, failed or
+         * unavailable; [code] is GenAiException's error code when there is one.
+         */
+        data class Ai(val state: String, val code: Int? = null) : Event
+
+        /**
+         * A description scan finished: photos [found], photos [judged] by the model, [failed]
+         * reads.
+         */
+        data class Scan(val found: Int, val judged: Int, val failed: Int) : Event
+
+        /**
+         * A copy run: copies [saved], photos it could not read ([missing]), and reads served from a
+         * copy since the last run ([used]) because the original was gone.
+         */
+        data class Copy(val saved: Int, val missing: Int, val used: Int) : Event
+
+        /**
+         * Daily upkeep: persisted picker grants held, how many were released near the ceiling, and
+         * Android's unused-app restriction status for the app (androidx
+         * UnusedAppRestrictionsConstants; -1 unknown).
+         */
+        data class Grants(val held: Int, val released: Int, val sleep: Int) : Event
     }
 
     object Source {
@@ -69,6 +94,10 @@ object Ledger {
         const val WIDGET = "widget"
         const val TAP = "tap"
         const val THEME = "theme"
+        /** The live engine found a photo unreadable while drawing (LostPhotos). */
+        const val ENGINE = "engine"
+        /** The screen saver found a photo unreadable while playing (LostPhotos). */
+        const val DREAM = "dream"
         val manual = setOf(NEXT, SHOW_NOW, SET_ACTIVE, TILE, WIDGET, TAP)
     }
 
@@ -98,6 +127,25 @@ object Ledger {
                 o.put("type", "exit").put("reason", ev.reason).put("importance", ev.importance)
             is Event.Crash -> o.put("type", "crash").put("site", ev.site)
             Event.MotionLost -> o.put("type", "motion_lost")
+            is Event.Ai ->
+                o.put("type", "ai").put("state", ev.state).apply {
+                    ev.code?.let { put("code", it) }
+                }
+            is Event.Scan ->
+                o.put("type", "scan")
+                    .put("found", ev.found)
+                    .put("judged", ev.judged)
+                    .put("failed", ev.failed)
+            is Event.Copy ->
+                o.put("type", "copy")
+                    .put("saved", ev.saved)
+                    .put("missing", ev.missing)
+                    .put("used", ev.used)
+            is Event.Grants ->
+                o.put("type", "grants")
+                    .put("held", ev.held)
+                    .put("released", ev.released)
+                    .put("sleep", ev.sleep)
         }
         return o.toString()
     }
@@ -129,6 +177,11 @@ object Ledger {
                 "exit" -> Event.Exit(o.getString("reason"), o.getInt("importance"))
                 "crash" -> Event.Crash(o.getString("site"))
                 "motion_lost" -> Event.MotionLost
+                "ai" ->
+                    Event.Ai(o.getString("state"), if (o.has("code")) o.getInt("code") else null)
+                "scan" -> Event.Scan(o.getInt("found"), o.getInt("judged"), o.getInt("failed"))
+                "copy" -> Event.Copy(o.getInt("saved"), o.getInt("missing"), o.getInt("used"))
+                "grants" -> Event.Grants(o.getInt("held"), o.getInt("released"), o.getInt("sleep"))
                 else -> return null
             }
         Entry(t, ev)

@@ -24,6 +24,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.fengine.wallpaper.smart.AiReadiness
 import dev.fengine.wallpaper.ui.FengineTheme
+import dev.fengine.wallpaper.ui.Format
 import dev.fengine.wallpaper.ui.GroupScreen
 import dev.fengine.wallpaper.ui.HomeScreen
 import dev.fengine.wallpaper.ui.MainViewModel
@@ -78,6 +79,15 @@ private fun FengineApp(vm: MainViewModel) {
     LaunchedEffect(openGroupId, openGroup?.hasDescription) {
         if (openGroup?.hasDescription == true) vm.refreshAi()
     }
+    // "Pick it again" for a photo that can no longer be read: one photo, which takes its place.
+    var repicking by rememberSaveable { mutableStateOf<String?>(null) }
+    val repicker =
+        rememberLauncherForActivityResult(PickVisualMedia()) { uri ->
+            val old = repicking
+            repicking = null
+            if (old != null) openGroupId?.let { vm.replacePhoto(it, old, uri) }
+        }
+    val appSleep by vm.appSleepRestricted.collectAsStateWithLifecycle()
     // Find photos hands the description a batch from the system picker; no broad photo permission.
     val findPicker =
         rememberLauncherForActivityResult(PickMultipleVisualMedia(vm.pickerMax())) { uris ->
@@ -111,6 +121,7 @@ private fun FengineApp(vm: MainViewModel) {
         }
         // Still, a rotation or a Motion check changes these; other settings edits do not need it.
         LaunchedEffect(settings.lastResult, settings.motionOn) { vm.refreshMotion() }
+        val copies by vm.copies.collectAsStateWithLifecycle()
         SettingsScreen(
             settings = settings,
             onBack = { settingsOpen = false },
@@ -128,6 +139,8 @@ private fun FengineApp(vm: MainViewModel) {
             onSetTapToChange = vm::setTapToChange,
             onSetChangeOnTheme = vm::setChangeOnTheme,
             onSetDarkAtNight = vm::setDarkAtNight,
+            copies = copies,
+            onSetKeepCopies = vm::setKeepCopies,
             hasCoverScreen = vm.hasCoverScreen(),
             dreamConfigured = dreamConfigured,
             motion = motion,
@@ -176,6 +189,10 @@ private fun FengineApp(vm: MainViewModel) {
             clockCheck = vm::clockCheck,
             hasCoverScreen = vm.hasCoverScreen(),
             onSetCoverScreen = { vm.setCoverGroup(openGroup.id, it) },
+            onPickAgain = { uri ->
+                repicking = uri
+                repicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
+            },
             scanning = scanning,
             indexing = indexing,
             persistedGrants = persistedGrants,
@@ -208,6 +225,21 @@ private fun FengineApp(vm: MainViewModel) {
             orphanPhotos = orphanPhotos.size,
             onPutBackPhotos = vm::putBackPhotos,
             onLetPhotosGo = vm::letPhotosGo,
+            health =
+                dev.fengine.wallpaper.data.Health.line(
+                    settings,
+                    System.currentTimeMillis(),
+                    java.time.ZoneId.systemDefault(),
+                    ago = { at -> Format.ago(at, System.currentTimeMillis()) },
+                    restricted = appSleep,
+                ),
+            onHealthFix = { line ->
+                when (line.fix) {
+                    dev.fengine.wallpaper.data.Health.Fix.APP_SLEEP -> vm.openAppSleepSettings()
+                    dev.fengine.wallpaper.data.Health.Fix.GROUP -> openGroupId = line.groupId
+                }
+            },
+            onDismissMotionOffer = vm::dismissMotionOffer,
         )
     }
 }

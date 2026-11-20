@@ -97,6 +97,7 @@ fun GroupScreen(
     clockCheck: suspend (String) -> ClockLegibility.Verdict? = { null },
     hasCoverScreen: Boolean = false,
     onSetCoverScreen: (Boolean) -> Unit = {},
+    onPickAgain: (String) -> Unit = {},
 ) {
     val feedsHome = settings.homeGroupId == group.id
     val feedsLock = settings.lockGroupId == group.id
@@ -151,6 +152,10 @@ fun GroupScreen(
             onSetSkipped = {
                 onSetSkipped(uri, it)
                 saved()
+            },
+            onPickAgain = {
+                onPickAgain(uri)
+                chosen = null
             },
             onDismiss = { chosen = null },
         )
@@ -286,8 +291,10 @@ fun GroupScreen(
             StatusCard(
                 title = "Close to Android's limit for picked photos",
                 body =
-                    "Android lets an app keep access to ${MainViewModel.GRANT_CEILING} picked photos at most, and quietly drops the oldest after that. " +
-                        "This app holds ${"%,d".format(persistedGrants)}. For a large collection, keep the photos on this phone and describe them instead: the description looks through all of them.",
+                    "${"%,d".format(persistedGrants)} of ${MainViewModel.GRANT_CEILING} used. Android lets an app keep access to " +
+                        "${MainViewModel.GRANT_CEILING} picked photos and quietly drops the oldest after that. The app keeps the " +
+                        "photos your groups show at the front of the line and lets go of photos a description looked through " +
+                        "but did not keep. Picked photos past the limit stop showing unless a copy is kept (Settings, Photos).",
                 tone = MaterialTheme.colorScheme.errorContainer,
             )
         }
@@ -338,9 +345,9 @@ fun GroupScreen(
                         )
                 }
                 Spacer(Modifier.height(Space.sm))
+                // The scan result always shows; on-device AI speaks in its own card below.
                 Caption(
-                    aiStatus
-                        ?: group.scanNote.ifBlank { null }
+                    group.scanNote.ifBlank { null }
                         ?: "Describe what to look for, then tap Find photos and choose photos to look through, up to ${"$"}pickerMax at a time, from this phone or Google Photos. The phone keeps the ones that match. Runs on this phone only."
                 )
                 if (group.hasDescription)
@@ -361,7 +368,7 @@ fun GroupScreen(
                         Spacer(Modifier.height(Space.lg))
                         StatusCard(
                             title = it.headline,
-                            body = it.detail,
+                            body = aiStatus?.let { s -> "$s\n\n${it.detail}" } ?: it.detail,
                             tone =
                                 when (it.level) {
                                     AiReadiness.Level.READY ->
@@ -399,6 +406,7 @@ private fun PhotoSheet(
     onShowNow: () -> Unit,
     onMakeCover: () -> Unit,
     onSetSkipped: (Boolean) -> Unit,
+    onPickAgain: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     Sheet(onDismiss = onDismiss) {
@@ -414,9 +422,14 @@ private fun PhotoSheet(
         if (unreadable) {
             Spacer(Modifier.height(Space.sm))
             Caption(
-                "The last change could not read this photo. It stays in the group and sits out " +
-                    "until it reads again; the app checks each time it opens. If it was deleted, " +
-                    "remove it."
+                "This photo could not be read: Google Photos may have freed up space, or it " +
+                    "was deleted. It stays in the group and sits out until it reads again. Pick " +
+                    "it again from Google Photos to bring it back in the same place."
+            )
+            SheetAction(
+                "Pick it again",
+                "Opens the photo picker. The photo you choose takes this one's place.",
+                onPickAgain,
             )
         } else
             clock?.let {

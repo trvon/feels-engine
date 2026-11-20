@@ -3,7 +3,6 @@ package dev.fengine.wallpaper.wallpaper
 import android.app.WallpaperColors
 import android.content.Context
 import android.graphics.ImageDecoder
-import android.net.Uri
 
 /**
  * A photo's colours from a tiny software decode (about 96 px): cheap, and readable by
@@ -14,9 +13,7 @@ import android.net.Uri
 object PhotoColors {
     fun of(context: Context, uri: String): WallpaperColors? = runCatching {
         val small =
-            ImageDecoder.decodeBitmap(
-                ImageDecoder.createSource(context.contentResolver, Uri.parse(uri))
-            ) { d, info, _ ->
+            PhotoCopies.decode(context, uri) { d, info, _ ->
                 val s = 96f / maxOf(info.size.width, info.size.height)
                 if (s < 1f)
                     d.setTargetSize(

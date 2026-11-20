@@ -2,16 +2,18 @@ package dev.fengine.wallpaper.smart
 
 import android.graphics.Bitmap
 import android.util.Log
+import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.GenerativeModel
 import com.google.mlkit.genai.prompt.ImagePart
 import com.google.mlkit.genai.prompt.TextPart
 import com.google.mlkit.genai.prompt.generateContentRequest
+import kotlinx.coroutines.flow.map
 
 /**
- * Turns a description into photo matches in two stages: pick the ML Kit labels that could
- * appear in matching photos (cheap prefilter), then judge each candidate image.
+ * Turns a description into photo matches in two stages: pick the ML Kit labels that could appear in
+ * matching photos (cheap prefilter), then judge each candidate image.
  */
 interface DescriptionMatcher {
     val name: String
@@ -24,36 +26,67 @@ interface DescriptionMatcher {
 }
 
 /**
- * Fallback without a language model: label names that share a word with the description, plus a
- * few synonyms. Candidates are accepted as matches without looking at pixels.
+ * Fallback without a language model: label names that share a word with the description, plus a few
+ * synonyms. Candidates are accepted as matches without looking at pixels.
  */
 class KeywordMatcher : DescriptionMatcher {
     override val name = "labels only"
 
-    override suspend fun relevantLabels(description: String, labels: Collection<String>): Set<String> =
-        select(description, labels)
+    override suspend fun relevantLabels(
+        description: String,
+        labels: Collection<String>,
+    ): Set<String> = select(description, labels)
 
     override suspend fun judge(bitmap: Bitmap, description: String): Boolean? = null
 
     companion object {
-        private val synonyms = mapOf(
-            "kid" to listOf("child", "baby", "toddler"), "kids" to listOf("child", "baby", "toddler"),
-            "children" to listOf("child"), "dog" to listOf("dog", "puppy"), "puppy" to listOf("dog"),
-            "cat" to listOf("cat", "kitten"), "sea" to listOf("beach", "ocean", "coast"),
-            "ocean" to listOf("beach", "sea", "coast"), "mountains" to listOf("mountain"),
-            "sunset" to listOf("sunset", "sky", "dusk"), "food" to listOf("food", "dish", "meal", "cuisine"),
-            "city" to listOf("city", "skyline", "skyscraper", "street"), "night" to listOf("night", "dark"),
-            "snow" to listOf("snow", "winter"), "flowers" to listOf("flower"), "car" to listOf("car", "vehicle"),
-            // People words: the base vocabulary has no "family" or "friends", but it does see faces, smiles and crowds.
-            "family" to listOf("person", "smile", "selfie", "baby", "child", "crowd", "laugh", "love", "picnic", "fun"),
-            "friends" to listOf("person", "smile", "selfie", "crowd", "laugh", "party", "fun"),
-            "people" to listOf("person", "smile", "selfie", "crowd"), "person" to listOf("person", "selfie", "smile"),
-            "portrait" to listOf("person", "selfie", "smile", "hair", "beard"), "selfie" to listOf("selfie", "person", "smile"),
-            "baby" to listOf("baby", "child"), "wedding" to listOf("bride", "dress", "love", "party", "dance"),
-            "party" to listOf("party", "fun", "dance", "crowd"), "vacation" to listOf("vacation", "beach", "swimming", "fun"),
-            "holiday" to listOf("vacation", "beach", "swimming", "fun"), "trip" to listOf("vacation", "beach"),
-            "pet" to listOf("pet", "dog", "cat"), "pets" to listOf("pet", "dog", "cat"),
-        )
+        private val synonyms =
+            mapOf(
+                "kid" to listOf("child", "baby", "toddler"),
+                "kids" to listOf("child", "baby", "toddler"),
+                "children" to listOf("child"),
+                "dog" to listOf("dog", "puppy"),
+                "puppy" to listOf("dog"),
+                "cat" to listOf("cat", "kitten"),
+                "sea" to listOf("beach", "ocean", "coast"),
+                "ocean" to listOf("beach", "sea", "coast"),
+                "mountains" to listOf("mountain"),
+                "sunset" to listOf("sunset", "sky", "dusk"),
+                "food" to listOf("food", "dish", "meal", "cuisine"),
+                "city" to listOf("city", "skyline", "skyscraper", "street"),
+                "night" to listOf("night", "dark"),
+                "snow" to listOf("snow", "winter"),
+                "flowers" to listOf("flower"),
+                "car" to listOf("car", "vehicle"),
+                // People words: the base vocabulary has no "family" or "friends", but it does see
+                // faces, smiles and crowds.
+                "family" to
+                    listOf(
+                        "person",
+                        "smile",
+                        "selfie",
+                        "baby",
+                        "child",
+                        "crowd",
+                        "laugh",
+                        "love",
+                        "picnic",
+                        "fun",
+                    ),
+                "friends" to listOf("person", "smile", "selfie", "crowd", "laugh", "party", "fun"),
+                "people" to listOf("person", "smile", "selfie", "crowd"),
+                "person" to listOf("person", "selfie", "smile"),
+                "portrait" to listOf("person", "selfie", "smile", "hair", "beard"),
+                "selfie" to listOf("selfie", "person", "smile"),
+                "baby" to listOf("baby", "child"),
+                "wedding" to listOf("bride", "dress", "love", "party", "dance"),
+                "party" to listOf("party", "fun", "dance", "crowd"),
+                "vacation" to listOf("vacation", "beach", "swimming", "fun"),
+                "holiday" to listOf("vacation", "beach", "swimming", "fun"),
+                "trip" to listOf("vacation", "beach"),
+                "pet" to listOf("pet", "dog", "cat"),
+                "pets" to listOf("pet", "dog", "cat"),
+            )
 
         fun select(description: String, labels: Collection<String>): Set<String> {
             val words = description.lowercase().split(Regex("[^a-z]+")).filter { it.length > 2 }
@@ -64,7 +97,9 @@ class KeywordMatcher : DescriptionMatcher {
                 synonyms[w]?.let { wanted += it }
             }
             return labels.filterTo(HashSet()) { label ->
-                label.lowercase().split(Regex("[^a-z]+")).any { it in wanted || it.removeSuffix("s") in wanted }
+                label.lowercase().split(Regex("[^a-z]+")).any {
+                    it in wanted || it.removeSuffix("s") in wanted
+                }
             }
         }
     }
@@ -76,35 +111,111 @@ class NanoMatcher : DescriptionMatcher, AutoCloseable {
 
     private val model: GenerativeModel = Generation.getClient()
 
-    suspend fun status(): Int = model.checkStatus().also {
-        Log.i(TAG, "checkStatus=$it (AVAILABLE=${FeatureStatus.AVAILABLE}, DOWNLOADABLE=${FeatureStatus.DOWNLOADABLE}, UNAVAILABLE=${FeatureStatus.UNAVAILABLE})")
-    }
-    fun download() = model.download()
-    suspend fun isAvailable(): Boolean = runCatching { status() == FeatureStatus.AVAILABLE }
-        .onFailure { Log.w(TAG, "checkStatus failed", it) }.getOrDefault(false)
+    /**
+     * Set by the first prompt that times out: AICore is not answering, so the rest of this run uses
+     * labels instead of waiting out the deadline once per photo.
+     */
+    @Volatile private var silent = false
 
-    override suspend fun relevantLabels(description: String, labels: Collection<String>): Set<String> {
+    private suspend fun <T> ask(what: String, call: suspend () -> T): Result<T> {
+        if (silent) return Result.failure(Outside.TimedOut(what, 0))
+        return Outside.within(Outside.PROMPT_MS, what) { call() }
+            .onFailure { if (it is Outside.TimedOut) silent = true }
+    }
+
+    /** Bounded: AICore can take its time or not answer at all (see [Outside]). */
+    suspend fun status(): Int =
+        Outside.within(Outside.STATUS_MS, "AICore status") { model.checkStatus() }
+            .getOrThrow()
+            .also {
+                Log.i(
+                    TAG,
+                    "checkStatus=$it (AVAILABLE=${FeatureStatus.AVAILABLE}, DOWNLOADABLE=${FeatureStatus.DOWNLOADABLE}, UNAVAILABLE=${FeatureStatus.UNAVAILABLE})",
+                )
+            }
+
+    fun download() = model.download()
+
+    /** [download] in the app's terms, for [Outside.watch]. */
+    fun downloadEvents(): kotlinx.coroutines.flow.Flow<Outside.Download> =
+        model.download().map { st ->
+            when (st) {
+                is DownloadStatus.DownloadStarted -> Outside.Download.Started(st.bytesToDownload)
+                is DownloadStatus.DownloadProgress ->
+                    Outside.Download.Progress(st.totalBytesDownloaded)
+                is DownloadStatus.DownloadCompleted -> Outside.Download.Completed
+                is DownloadStatus.DownloadFailed -> Outside.Download.Failed(st.e)
+                else -> Outside.Download.Started(0)
+            }
+        }
+
+    suspend fun isAvailable(): Boolean = runCatching {
+        status() == FeatureStatus.AVAILABLE
+    }
+        .onFailure { Log.w(TAG, "checkStatus failed", it) }
+        .getOrDefault(false)
+
+    override suspend fun relevantLabels(
+        description: String,
+        labels: Collection<String>,
+    ): Set<String> {
         val sorted = labels.sorted()
-        val prompt = "Photo labels: ${sorted.joinToString(", ")}.\n" +
-            "Which of these labels could appear in photos matching \"$description\"? " +
-            "Reply with only a comma-separated list of labels copied from the list, up to 25."
-        val text = runCatching {
-            model.generateContent(generateContentRequest(TextPart(prompt)) { temperature = 0f; maxOutputTokens = 256 }).candidates.first().text
-        }.getOrElse { e -> Log.w(TAG, "label prompt failed", e); return KeywordMatcher.select(description, labels) }
+        val prompt =
+            "Photo labels: ${sorted.joinToString(", ")}.\n" +
+                "Which of these labels could appear in photos matching \"$description\"? " +
+                "Reply with only a comma-separated list of labels copied from the list, up to 25."
+        val text =
+            ask("Gemini Nano labels") {
+                    model
+                        .generateContent(
+                            generateContentRequest(TextPart(prompt)) {
+                                temperature = 0f
+                                maxOutputTokens = 256
+                            }
+                        )
+                        .candidates
+                        .first()
+                        .text
+                }
+                .getOrElse { e ->
+                    Log.w(TAG, "label prompt failed", e)
+                    return KeywordMatcher.select(description, labels)
+                }
         val byLower = sorted.associateBy { it.lowercase() }
-        val picked = text.split(',', '\n').mapNotNull { byLower[it.trim().trim('.', '"').lowercase()] }.toSet()
+        val picked =
+            text
+                .split(',', '\n')
+                .mapNotNull { byLower[it.trim().trim('.', '"').lowercase()] }
+                .toSet()
         return if (picked.isEmpty()) KeywordMatcher.select(description, labels) else picked
     }
 
     override suspend fun judge(bitmap: Bitmap, description: String): Boolean? {
-        val prompt = "Does this photo match the description \"$description\"? Answer with YES or NO only."
-        val text = runCatching {
-            model.generateContent(generateContentRequest(ImagePart(bitmap), TextPart(prompt)) { temperature = 0f; maxOutputTokens = 8 }).candidates.first().text
-        }.getOrElse { e -> Log.w(TAG, "judge failed", e); return null }
+        val prompt =
+            "Does this photo match the description \"$description\"? Answer with YES or NO only."
+        val text =
+            ask("Gemini Nano judge") {
+                    model
+                        .generateContent(
+                            generateContentRequest(ImagePart(bitmap), TextPart(prompt)) {
+                                temperature = 0f
+                                maxOutputTokens = 8
+                            }
+                        )
+                        .candidates
+                        .first()
+                        .text
+                }
+                .getOrElse { e ->
+                    Log.w(TAG, "judge failed", e)
+                    return null
+                }
         return text.trim().uppercase().startsWith("YES")
     }
 
     override fun close() = model.close()
 
-    private companion object { const val TAG = "NanoMatcher" }
+    private companion object {
+        const val TAG = "NanoMatcher"
+    }
 }

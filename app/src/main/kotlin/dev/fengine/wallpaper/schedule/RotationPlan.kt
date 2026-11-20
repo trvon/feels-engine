@@ -1,5 +1,6 @@
 package dev.fengine.wallpaper.schedule
 
+import dev.fengine.wallpaper.data.Group
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -285,4 +286,26 @@ object RotationPlan {
      */
     fun sane(nowMs: Long, lastChangeMs: Long): Long =
         if (lastChangeMs > nowMs + MIN_ALARM_DELAY_MS) 0 else lastChangeMs
+
+    /**
+     * The groups after one rotation pass, saved over [current] (what the store holds now, possibly
+     * edited by the person since the pass read [before]). Each cursor is placed by photo, not
+     * index, so an edit in between never moves it to another photo; photos the pass could not read
+     * are then marked unreadable, kept in their group and out of rotation.
+     */
+    fun settle(
+        current: List<Group>,
+        before: (String) -> Group?,
+        cursors: Map<String, Int>,
+        unreadable: List<Pair<String, String>>,
+    ): List<Group> =
+        current
+            .map { g ->
+                cursors[g.id]?.let { i -> g.showing(before(g.id)?.rotation?.getOrNull(i), i) } ?: g
+            }
+            .map { g ->
+                unreadable
+                    .filter { it.first == g.id }
+                    .fold(g) { acc, (_, uri) -> acc.markUnreadable(uri) }
+            }
 }
