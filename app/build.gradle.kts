@@ -127,6 +127,8 @@ dependencies {
     // Invariant / fuzz suite: jqwik properties on the JUnit platform; JUnit 4 tests keep running
     // via vintage.
     testImplementation(libs.jqwik)
+    // Virtual time for the outside-call fuzz suite (deadlines, stalled downloads).
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
     // Real org.json for JVM tests; android.jar ships stubs that throw.

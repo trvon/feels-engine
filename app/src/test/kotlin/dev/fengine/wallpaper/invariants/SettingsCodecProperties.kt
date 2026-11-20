@@ -96,6 +96,8 @@ class SettingsCodecProperties {
                         tapToChange = shuffle,
                         changeOnTheme = enabled,
                         darkAtNight = shuffle != enabled,
+                        keepCopies = interval % 5 != 0,
+                        motionOffered = interval % 7 == 0,
                     )
                 }
         }

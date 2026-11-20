@@ -8,7 +8,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
 import dev.fengine.wallpaper.FengineApp
 import dev.fengine.wallpaper.data.Backdrop
@@ -25,17 +24,21 @@ import dev.fengine.wallpaper.data.Screen
 import dev.fengine.wallpaper.data.Screens
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.data.ThemeMode
+import dev.fengine.wallpaper.schedule.AppSleep
 import dev.fengine.wallpaper.schedule.Rotation
 import dev.fengine.wallpaper.schedule.RotationScheduler
 import dev.fengine.wallpaper.smart.AiReadiness
 import dev.fengine.wallpaper.smart.IndexLibraryWorker
 import dev.fengine.wallpaper.smart.MediaLibrary
 import dev.fengine.wallpaper.smart.NanoMatcher
+import dev.fengine.wallpaper.smart.Outside
 import dev.fengine.wallpaper.smart.PhotoIndex
 import dev.fengine.wallpaper.smart.SmartGroupWorker
 import dev.fengine.wallpaper.wallpaper.ClockLegibility
 import dev.fengine.wallpaper.wallpaper.Displays
 import dev.fengine.wallpaper.wallpaper.PhotoAccess
+import dev.fengine.wallpaper.wallpaper.PhotoCopies
+import dev.fengine.wallpaper.wallpaper.PhotoCopyWorker
 import dev.fengine.wallpaper.wallpaper.SamsungDisplays
 import dev.fengine.wallpaper.wallpaper.WallpaperCrop
 import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
@@ -89,6 +92,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         .filter { it.isReadPermission }
                         .map { it.uri.toString() }
                 orphanPhotos.value = PhotoRecovery.orphans(granted, store.read().groups)
+                // While the originals are still here, keep copies for when they are not.
+                PhotoCopyWorker.enqueue(app)
+                refreshCopies()
+                appSleepRestricted.value = AppSleep.restricted(AppSleep.status(app))
             }
                 .onFailure { android.util.Log.w("MainViewModel", "photo check failed", it) }
         }
@@ -192,7 +199,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val aiReadiness = MutableStateFlow<AiReadiness?>(null)
 
     fun refreshAi() {
-        viewModelScope.launch { aiReadiness.value = AiReadiness.check(getApplication()) }
+        viewModelScope.launch {
+            val r = AiReadiness.check(getApplication())
+            aiReadiness.value = r
+            logAi(r.level.name.lowercase())
+        }
+    }
+
+    /** Last AI state written to the ledger by this process, so a re-check writes no duplicate. */
+    private var loggedAi: String? = null
+
+    private fun logAi(state: String, code: Int? = null) {
+        if (state == loggedAi) return
+        loggedAi = state
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { LedgerStore(getApplication()).record(Ledger.Event.Ai(state, code)) }
+        }
     }
 
     /** Download the on-device model now (reports through [aiStatus]), then re-check. */
@@ -200,15 +222,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val nano = NanoMatcher()
             try {
-                aiStatus.value = "Preparing on-device AI..."
-                nano.download().collect { st ->
+                // AICore can accept a download and never start it (seen on a Fold 8 while its own
+                // update waited to activate): Outside.watch says so instead of "Preparing" forever.
+                Outside.watch(nano.downloadEvents(), Outside.STALL) { view ->
                     aiStatus.value =
-                        when (st) {
-                            is DownloadStatus.DownloadProgress ->
-                                "Downloading on-device AI, ${st.totalBytesDownloaded / 1_000_000} MB"
-                            is DownloadStatus.DownloadCompleted -> null
-                            is DownloadStatus.DownloadFailed -> failure(st.e)
-                            else -> aiStatus.value
+                        when (view) {
+                            Outside.DownloadView.Preparing -> "Preparing on-device AI..."
+                            is Outside.DownloadView.Downloading ->
+                                "Downloading on-device AI, ${view.bytes / 1_000_000} MB"
+                            Outside.DownloadView.Stalled -> AI_STALLED.also { logAi("stalled") }
+                            Outside.DownloadView.Done,
+                            Outside.DownloadView.Ended -> null
+                            is Outside.DownloadView.Failed ->
+                                failure(view.error).also {
+                                    logAi(
+                                        "failed",
+                                        (view.error
+                                                as? com.google.mlkit.genai.common.GenAiException)
+                                            ?.errorCode,
+                                    )
+                                }
                         }
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -306,7 +339,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         .isSuccess
                 }
                 .map(Uri::toString)
-        updateGroup(groupId) { it.copy(photos = (it.photos + kept).distinct()) }
+        updateGroup(groupId) { it.withPhotos(kept) }
+        PhotoCopyWorker.enqueue(getApplication())
     }
 
     fun removePhoto(groupId: String, uri: String) {
@@ -332,9 +366,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val app = getApplication<Application>()
                 val target = Displays(app).largest
                 val bmp =
-                    android.graphics.ImageDecoder.decodeBitmap(
-                        android.graphics.ImageDecoder.createSource(app.contentResolver, uri.toUri())
-                    ) { d, info, _ ->
+                    PhotoCopies.decode(app, uri) { d, info, _ ->
                         val scale = 360f / maxOf(info.size.width, info.size.height)
                         if (scale < 1f)
                             d.setTargetSize(
@@ -375,6 +407,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 .map(Uri::toString)
         updateGroup(groupId) { it.copy(pool = (it.pool + kept).distinct()) }
+        // Look-through grants count against Android's ceiling: the upkeep releases the oldest of
+        // them before picked photos are at risk (GrantPlan).
+        PhotoCopyWorker.enqueue(getApplication())
         findPhotos()
     }
 
@@ -390,6 +425,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
         /** Unreadable photos tried per app open; each may fetch a cloud item. */
         const val MAX_RECHECK = 64
+
+        const val AI_STALLED =
+            "AICore has not started the download. It is often finishing an update of its own: " +
+                "leave the phone charging on Wi-Fi with the screen off for a while, then check " +
+                "again. Finding photos uses labels meanwhile."
     }
 
     /** How many photos the system picker hands over per pick; the cloud has no bulk road. */
@@ -452,38 +492,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun findPhotos() {
         viewModelScope.launch {
-            val nano = NanoMatcher()
-            try {
-                when (nano.status()) {
-                    FeatureStatus.AVAILABLE -> aiStatus.value = null
-                    FeatureStatus.DOWNLOADABLE,
-                    FeatureStatus.DOWNLOADING -> {
-                        aiStatus.value = "Preparing on-device AI..."
-                        nano.download().collect { st ->
-                            aiStatus.value =
-                                when (st) {
-                                    is DownloadStatus.DownloadProgress ->
-                                        "Downloading on-device AI, ${st.totalBytesDownloaded / 1_000_000} MB"
-                                    is DownloadStatus.DownloadCompleted -> null
-                                    is DownloadStatus.DownloadFailed ->
-                                        "On-device AI unavailable; using labels only"
-                                    else -> aiStatus.value
-                                }
-                        }
-                    }
-                    else -> aiStatus.value = "This phone has no on-device AI; using labels only"
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("MainViewModel", "Gemini Nano preparation failed", e)
-                aiStatus.value = "On-device AI unavailable; using labels only"
-            } finally {
-                nano.close()
+            val status = runCatching {
+                NanoMatcher().use { it.status() }
             }
+                .onFailure { android.util.Log.w("MainViewModel", "Gemini Nano status failed", it) }
+                .getOrDefault(FeatureStatus.UNAVAILABLE)
+            // The download runs on its own; the scan starts now with labels and judges with
+            // Gemini Nano on later scans once it lands. Waiting here hung the scan whenever
+            // AICore never started the download.
+            if (status == FeatureStatus.DOWNLOADABLE || status == FeatureStatus.DOWNLOADING)
+                downloadAi()
             if (library.hasAccess()) scheduler.indexNow()
             scheduler.scanNow()
-            // From here the scan note speaks; the readiness card already explains the labels-only
-            // case.
-            aiStatus.value = null
         }
     }
 
@@ -498,6 +518,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setChangeOnTheme(on: Boolean) = update { it.copy(changeOnTheme = on) }
 
     fun setDarkAtNight(on: Boolean) = update { it.copy(darkAtNight = on) }
+
+    /**
+     * Copies kept and their size, for Settings; refreshed when the app opens or the switch moves.
+     */
+    val copies = MutableStateFlow(0 to 0L)
+
+    private fun refreshCopies() {
+        viewModelScope.launch(Dispatchers.IO) { copies.value = PhotoCopies.usage(getApplication()) }
+    }
+
+    /** Off deletes every copy; on saves them again in the background. */
+    fun setKeepCopies(on: Boolean) {
+        viewModelScope.launch {
+            store.update { it.copy(keepCopies = on) }
+            if (!on) withContext(Dispatchers.IO) { PhotoCopies.clear(getApplication()) }
+            else PhotoCopyWorker.enqueue(getApplication())
+            refreshCopies()
+        }
+    }
 
     fun setIntervalMinutes(minutes: Int) = update {
         it.copy(intervalMinutes = minutes.coerceAtLeast(Settings.MIN_INTERVAL_MINUTES))
@@ -532,6 +571,42 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Home's one-time "Make it move" line: shown once, gone after a tap either way. */
+    fun dismissMotionOffer() = update { it.copy(motionOffered = true) }
+
+    /** Android will pause the app while it goes unused (AppSleep); refreshed when the app opens. */
+    val appSleepRestricted = MutableStateFlow(false)
+
+    fun openAppSleepSettings() {
+        val app = getApplication<Application>()
+        runCatching { app.startActivity(AppSleep.settingsIntent(app)) }
+    }
+
+    /**
+     * "Pick it again": [picked] takes [old]'s place in the group, keeping its position, cover and
+     * the photo on screen. The old grant goes when nothing else uses it.
+     */
+    fun replacePhoto(groupId: String, old: String, picked: Uri?) {
+        picked ?: return
+        val app = getApplication<Application>()
+        val ok = runCatching {
+            app.contentResolver.takePersistableUriPermission(
+                picked,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        }
+            .isSuccess
+        if (!ok) return
+        val new = picked.toString()
+        updateGroup(groupId) { it.replacePhoto(old, new) }
+        val stillUsed =
+            settings.value.groups.any { g ->
+                g.id != groupId && g.allUris.any { PhotoId.identity(it) == PhotoId.identity(old) }
+            }
+        if (!stillUsed && PhotoId.identity(old) != PhotoId.identity(new)) releaseGrant(old)
+        PhotoCopyWorker.enqueue(app)
+    }
+
     fun dismissMotionLost() {
         viewModelScope.launch { MotionCheck.dismiss(getApplication()) }
     }
@@ -561,7 +636,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 ?: pool.indexOf(group.cover).takeIf { it >= 0 }
                 ?: group.cursor.coerceIn(0, (pool.size - 1).coerceAtLeast(0))
         viewModelScope.launch {
-            store.update { it.copy(homeGroupId = groupId, lockGroupId = groupId) }
+            // The first Set active on an install that has never changed a photo also starts the
+            // rotation: a new person should not see one photo and then "Paused." (review item 7).
+            store.update {
+                it.copy(
+                    homeGroupId = groupId,
+                    lockGroupId = groupId,
+                    enabled = it.enabled || it.lastRotationAt <= 0,
+                )
+            }
             scheduler.sync(store.read())
             if (pool.isNotEmpty())
                 scheduler.rotateNow(

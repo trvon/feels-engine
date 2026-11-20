@@ -10,7 +10,6 @@ import android.graphics.Color
 import android.graphics.ImageDecoder
 import android.graphics.Matrix
 import android.graphics.Paint
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -19,7 +18,6 @@ import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.animation.LinearInterpolator
-import androidx.core.net.toUri
 import dev.fengine.wallpaper.FengineApp
 import dev.fengine.wallpaper.data.Backdrop
 import dev.fengine.wallpaper.data.ChangeTriggers
@@ -31,7 +29,9 @@ import dev.fengine.wallpaper.schedule.Rotation
 import dev.fengine.wallpaper.ui.Palette
 import dev.fengine.wallpaper.wallpaper.ClockSafe
 import dev.fengine.wallpaper.wallpaper.Faces
+import dev.fengine.wallpaper.wallpaper.LostPhotos
 import dev.fengine.wallpaper.wallpaper.PhotoColors
+import dev.fengine.wallpaper.wallpaper.PhotoCopies
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -348,9 +348,22 @@ class PhotoWallpaperService : WallpaperService() {
             val h = state.height
             load =
                 scope.launch(Dispatchers.IO) {
-                    val bitmap = decode(uri, w, h) ?: return@launch
+                    val bitmap =
+                        decode(uri, w, h).getOrElse { e ->
+                            // A photo that is gone is set aside like the static path does; the
+                            // settings change brings the previous photo back as the wanted one, so
+                            // the old frame stays up instead of a blank (LostPhotos).
+                            if (LostPhotos.isLost(e))
+                                LostPhotos.report(
+                                    application as FengineApp,
+                                    uri,
+                                    Ledger.Source.ENGINE,
+                                    e,
+                                )
+                            return@launch
+                        }
                     val found =
-                        if (drawsLock()) ClockSafe.union(Faces.detect(contentResolver, uri.toUri()))
+                        if (drawsLock()) ClockSafe.union(Faces.detect(applicationContext, uri))
                         else null
                     val colors =
                         if (uri == colorsFor) null else PhotoColors.of(applicationContext, uri)
@@ -384,10 +397,9 @@ class PhotoWallpaperService : WallpaperService() {
          * 2803x2116 bitmap (24 MB as a hardware bitmap), not the 49 MB a power-of-two sample size
          * would leave. The sample size does the cheap part, the target size the rest.
          */
-        private fun decode(uri: String, w: Int, h: Int): Bitmap? = runCatching {
+        private fun decode(uri: String, w: Int, h: Int): kotlin.Result<Bitmap> = runCatching {
             val (tw, th) = LiveFrame.decodeTarget(w, h)
-            val source = ImageDecoder.createSource(contentResolver, Uri.parse(uri))
-            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+            PhotoCopies.decode(applicationContext, uri) { decoder, info, _ ->
                 val (dw, dh) = LiveFrame.decodeSize(info.size.width, info.size.height, tw, th)
                 decoder.setTargetSize(dw, dh)
                 decoder.allocator =
@@ -395,8 +407,7 @@ class PhotoWallpaperService : WallpaperService() {
                     else ImageDecoder.ALLOCATOR_DEFAULT
             }
         }
-            .onFailure { Log.w(TAG, "decode failed for $uri", it) }
-            .getOrNull()
+            .onFailure { Log.w(TAG, "decode failed: ${it.javaClass.simpleName}") }
 
         private fun startFade() {
             fadeAlpha = 0f

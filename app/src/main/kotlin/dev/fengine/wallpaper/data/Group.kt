@@ -126,6 +126,37 @@ data class Group(
         return copy(cursor = if (at >= 0) at else if (fallback in rot.indices) fallback else -1)
     }
 
+    /**
+     * The group with [uris] added after its photos, still showing the same photo. Adding can shrink
+     * the rotation (when every photo was set aside the rotation falls back to all of them; a
+     * readable newcomer ends that), so the cursor is placed again by photo.
+     */
+    fun withPhotos(uris: List<String>): Group {
+        val shown = rotation.getOrNull(cursor)
+        return copy(photos = PhotoId.distinct(photos + uris)).showing(shown, -1)
+    }
+
+    /**
+     * "Pick it again": [new] takes [old]'s place (same list, same position, its cover and skip
+     * marks), and is readable. The cursor keeps naming the same photo, or [new] when [old] was the
+     * one shown. Re-picking a Google Photos cloud item through the picker reads again without any
+     * network permission in this app.
+     */
+    fun replacePhoto(old: String, new: String): Group {
+        val id = PhotoId.identity(old)
+        val shown = rotation.getOrNull(cursor)?.let { if (PhotoId.identity(it) == id) new else it }
+        fun List<String>.swap() = map { if (PhotoId.identity(it) == id) new else it }
+        val next =
+            copy(
+                photos = PhotoId.distinct(photos.swap()),
+                matched = PhotoId.distinct(matched.swap()),
+                skipped = skipped.swap(),
+                unreadable = unreadable.filterNot { PhotoId.identity(it) == id },
+                coverUri = coverUri?.let { if (PhotoId.identity(it) == id) new else it },
+            )
+        return next.showing(shown, -1)
+    }
+
     fun isUnreadable(uri: String): Boolean = unreadable.any {
         PhotoId.identity(it) == PhotoId.identity(uri)
     }

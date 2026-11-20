@@ -57,6 +57,13 @@ data class Settings(
     val changeOnTheme: Boolean = false,
     /** While the phone is dark, changes prefer the group's darker photos (DarkPhotos). */
     val darkAtNight: Boolean = false,
+    /**
+     * Keep a screen-sized copy of every photo in app storage, so photos removed from the phone
+     * (Google Photos' "Free up space") keep showing (PhotoCopies).
+     */
+    val keepCopies: Boolean = true,
+    /** Home's one-time "Make it move" line was shown and dismissed or used. */
+    val motionOffered: Boolean = false,
 ) {
     fun group(id: String?): Group? = id?.let { g -> groups.firstOrNull { it.id == g } }
 

@@ -45,9 +45,8 @@ class WallpaperApplier(private val context: Context) {
             try {
                 decode(uri)
             } catch (e: Exception) {
-                // SecurityException here means the persisted URI grant was lost (e.g. photo deleted
-                // or
-                // the 5000-grant cap evicted it). The caller should drop the photo and re-prompt.
+                // SecurityException here means the persisted URI grant was lost (photo deleted, or
+                // the grant cap evicted it) and no saved copy exists (PhotoCopies).
                 Log.w(TAG, "decode failed for $uri", e)
                 return if (e is SecurityException || e is java.io.FileNotFoundException)
                     Result.Unreadable(e.javaClass.simpleName)
@@ -107,8 +106,7 @@ class WallpaperApplier(private val context: Context) {
      */
     private fun decode(uri: Uri): Bitmap {
         val target = Displays(context).largest
-        val source = ImageDecoder.createSource(context.contentResolver, uri)
-        return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+        return PhotoCopies.decode(context, uri.toString()) { decoder, info, _ ->
             decoder.setTargetSampleSize(
                 WallpaperCrop.sampleSize(
                     info.size.width,

@@ -24,6 +24,7 @@ import dev.fengine.wallpaper.data.Screen
 import dev.fengine.wallpaper.data.Screens
 import dev.fengine.wallpaper.smart.Images
 import dev.fengine.wallpaper.ui.Palette
+import dev.fengine.wallpaper.wallpaper.LostPhotos
 import dev.fengine.wallpaper.wallpaper.PhotoColors
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -167,7 +168,17 @@ class GroupDreamService : DreamService() {
             val bitmap =
                 withContext(Dispatchers.IO) {
                     runCatching { Images.decode(this@GroupDreamService, Uri.parse(uri), edge) }
-                        .onFailure { Log.w(TAG, "decode failed for $uri", it) }
+                        .onFailure { e ->
+                            Log.w(TAG, "decode failed: ${e.javaClass.simpleName}")
+                            // Gone for good: set aside and logged, as the static path does.
+                            if (LostPhotos.isLost(e))
+                                LostPhotos.report(
+                                    application as FengineApp,
+                                    uri,
+                                    Ledger.Source.DREAM,
+                                    e,
+                                )
+                        }
                         .getOrNull()
                 }
             if (bitmap == null) {

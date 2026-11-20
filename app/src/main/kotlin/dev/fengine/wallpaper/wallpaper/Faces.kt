@@ -1,11 +1,10 @@
 package dev.fengine.wallpaper.wallpaper
 
-import android.content.ContentResolver
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.graphics.PointF
 import android.media.FaceDetector
-import android.net.Uri
 import android.util.Log
 
 /**
@@ -23,8 +22,8 @@ object Faces {
      * Faces in the photo at [uri], from its own small software decode: cheaper than copying a
      * full-size hardware bitmap down.
      */
-    fun detect(resolver: ContentResolver, uri: Uri): List<ClockSafe.Box> = runCatching {
-        ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, uri)) { d, info, _ ->
+    fun detect(context: Context, uri: String): List<ClockSafe.Box> = runCatching {
+        PhotoCopies.decode(context, uri) { d, info, _ ->
             val w = info.size.width
             if (w > WIDTH)
                 d.setTargetSize(

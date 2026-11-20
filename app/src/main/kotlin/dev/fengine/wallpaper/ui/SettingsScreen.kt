@@ -83,6 +83,8 @@ fun SettingsScreen(
     onSetTapToChange: (Boolean) -> Unit = {},
     onSetChangeOnTheme: (Boolean) -> Unit = {},
     onSetDarkAtNight: (Boolean) -> Unit = {},
+    copies: Pair<Int, Long> = 0 to 0L,
+    onSetKeepCopies: (Boolean) -> Unit = {},
 ) {
     val moving = motion.innerHome || motion.innerLock || motion.coverHome || motion.coverLock
     Page {
@@ -232,6 +234,20 @@ fun SettingsScreen(
                 if (settings.colorSource == ColorSource.PHOTO)
                     "The app takes its colours from the photo on your home screen and changes with it."
                 else "The app uses your phone's own colour palette."
+            )
+        }
+
+        PreferenceGroup("Photos") {
+            SwitchRow("Keep copies of photos", settings.keepCopies, onSetKeepCopies)
+            val (count, bytes) = copies
+            Caption(
+                if (settings.keepCopies)
+                    "A screen-sized copy of each photo stays in the app, so photos keep showing " +
+                        "after Google Photos frees up space or the original is deleted." +
+                        (if (count > 0) " $count saved, ${Format.megabytes(bytes)}." else "")
+                else
+                    "Photos show only while their originals are on the phone. Turning this on " +
+                        "saves copies in the background."
             )
         }
 

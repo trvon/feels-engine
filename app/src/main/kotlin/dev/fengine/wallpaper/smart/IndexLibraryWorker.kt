@@ -15,11 +15,12 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Labels the whole reachable library, newest first, a budgeted slice per run, and re-enqueues
- * itself until every photo has a row in [PhotoIndex]. Labels are computed once per photo, ever;
- * a photo that is already indexed costs one hash lookup. After each slice a described-group scan
- * runs so matches appear while the index is still filling.
+ * itself until every photo has a row in [PhotoIndex]. Labels are computed once per photo, ever; a
+ * photo that is already indexed costs one hash lookup. After each slice a described-group scan runs
+ * so matches appear while the index is still filling.
  */
-class IndexLibraryWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
+class IndexLibraryWorker(appContext: Context, params: WorkerParameters) :
+    CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
         val library = MediaLibrary(applicationContext)
@@ -36,31 +37,52 @@ class IndexLibraryWorker(appContext: Context, params: WorkerParameters) : Corout
             Log.i(TAG, "library ${all.size}, indexed ${all.size - todo}, to do $todo")
             for (chunk in pending.take(SLICE).chunked(BATCH)) {
                 val results = chunk.map { uri ->
-                    uri to runCatching { labeler.label(Images.decode(applicationContext, Uri.parse(uri), DECODE_EDGE)) }
-                        .getOrElse { e -> Log.w(TAG, "label failed for $uri", e); emptyMap() }
+                    uri to
+                        runCatching {
+                            labeler.label(
+                                Images.decode(applicationContext, Uri.parse(uri), DECODE_EDGE)
+                            )
+                        }
+                            .onFailure { e -> Log.w(TAG, "label failed for $uri", e) }
+                            .getOrNull()
                 }
-                index.transaction { results.forEach { (uri, labels) -> index.putLabels(uri, labels) } }
+                // Failures are retried on a later run rather than stored as "no labels".
+                index.transaction {
+                    results.forEach { (uri, labels) ->
+                        if (labels != null) index.putLabels(uri, labels)
+                    }
+                }
                 labeled += chunk.size
-                setProgress(workDataOf(KEY_DONE to (all.size - todo + labeled), KEY_TOTAL to all.size))
+                setProgress(
+                    workDataOf(KEY_DONE to (all.size - todo + labeled), KEY_TOTAL to all.size)
+                )
                 if (SystemClock.elapsedRealtime() - started > TIME_BUDGET_MS) break
             }
         } finally {
-            labeler.close(); index.close()
+            labeler.close()
+            index.close()
         }
         val remaining = todo - labeled
-        Log.i(TAG, "labeled $labeled in ${SystemClock.elapsedRealtime() - started} ms, remaining $remaining")
+        Log.i(
+            TAG,
+            "labeled $labeled in ${SystemClock.elapsedRealtime() - started} ms, remaining $remaining",
+        )
         val app = applicationContext as FengineApp
-        if (app.settings.read().hasDescribedGroups && labeled > 0) SmartGroupWorker.enqueue(applicationContext)
+        if (app.settings.read().hasDescribedGroups && labeled > 0)
+            SmartGroupWorker.enqueue(applicationContext)
         if (remaining > 0) continueSoon()
         return Result.success(workDataOf(KEY_DONE to labeled, KEY_TOTAL to todo))
     }
 
     private fun continueSoon() {
-        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-            UNIQUE_NAME,
-            ExistingWorkPolicy.APPEND_OR_REPLACE,
-            OneTimeWorkRequestBuilder<IndexLibraryWorker>().setInitialDelay(5, TimeUnit.SECONDS).build(),
-        )
+        WorkManager.getInstance(applicationContext)
+            .enqueueUniqueWork(
+                UNIQUE_NAME,
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                OneTimeWorkRequestBuilder<IndexLibraryWorker>()
+                    .setInitialDelay(5, TimeUnit.SECONDS)
+                    .build(),
+            )
     }
 
     companion object {
@@ -69,7 +91,10 @@ class IndexLibraryWorker(appContext: Context, params: WorkerParameters) : Corout
         const val PERIODIC_NAME = "index-library-periodic"
         const val KEY_DONE = "done"
         const val KEY_TOTAL = "total"
-        /** Photos labeled per run; with the time budget below a run stays well inside WorkManager's limit. */
+        /**
+         * Photos labeled per run; with the time budget below a run stays well inside WorkManager's
+         * limit.
+         */
         const val SLICE = 600
         const val BATCH = 20
         const val TIME_BUDGET_MS = 8 * 60_000L
@@ -77,9 +102,12 @@ class IndexLibraryWorker(appContext: Context, params: WorkerParameters) : Corout
         const val DECODE_EDGE = 640
 
         fun enqueue(context: Context) {
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                UNIQUE_NAME, ExistingWorkPolicy.KEEP, OneTimeWorkRequestBuilder<IndexLibraryWorker>().build(),
-            )
+            WorkManager.getInstance(context)
+                .enqueueUniqueWork(
+                    UNIQUE_NAME,
+                    ExistingWorkPolicy.KEEP,
+                    OneTimeWorkRequestBuilder<IndexLibraryWorker>().build(),
+                )
         }
     }
 }
