@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.0](https://github.com/trvon/feels-engine/compare/v0.6.0...v0.7.0) (2026-11-20)
+
+
+### Features
+
+* **home:** say when changes stall or photos cannot be read, with the fix ([4186df5](https://github.com/trvon/feels-engine/commit/4186df5fd70caad60f56ae21721ad71fea750f2b))
+* **photos:** keep photos showing after Google Photos frees up space ([4f05c36](https://github.com/trvon/feels-engine/commit/4f05c366c983597e5f93f43a94533d98d29588f7))
+* **photos:** keep photos showing after Google Photos frees up space ([4186df5](https://github.com/trvon/feels-engine/commit/4186df5fd70caad60f56ae21721ad71fea750f2b))
+
+
+### Fixes
+
+* **ai:** finding photos no longer hangs when AICore never starts the download ([4186df5](https://github.com/trvon/feels-engine/commit/4186df5fd70caad60f56ae21721ad71fea750f2b))
+* **motion:** an unreadable photo no longer leaves a stale or blank screen ([4186df5](https://github.com/trvon/feels-engine/commit/4186df5fd70caad60f56ae21721ad71fea750f2b))
+* **scan:** one unreadable photo no longer fails a description scan ([4186df5](https://github.com/trvon/feels-engine/commit/4186df5fd70caad60f56ae21721ad71fea750f2b))
+
 ## [0.6.0](https://github.com/trvon/feels-engine/compare/v0.5.0...v0.6.0) (2026-11-20)
 
 
