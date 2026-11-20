@@ -127,7 +127,12 @@ object Rotation {
                 cur.copy(
                     groups =
                         cur.groups
-                            .map { g -> pass.cursors[g.id]?.let { g.copy(cursor = it) } ?: g }
+                            // By photo, not index: the group may have been edited since `s`.
+                            .map { g ->
+                                pass.cursors[g.id]?.let { i ->
+                                    g.showing(s.group(g.id)?.rotation?.getOrNull(i), i)
+                                } ?: g
+                            }
                             .map { g ->
                                 pass.unreadable
                                     .filter { it.first == g.id }

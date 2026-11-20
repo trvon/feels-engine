@@ -113,6 +113,19 @@ data class Group(
         return next.copy(cursor = at)
     }
 
+    /**
+     * The group with its cursor on [uri], the photo a rotation just showed. A rotation reads the
+     * group, writes the wallpaper, then saves the cursor; an edit in between (a photo added, one
+     * removed) shifts indices, so the photo is found again by identity. When it is gone, [fallback]
+     * (the index the rotation chose) is kept if it still names a photo.
+     */
+    fun showing(uri: String?, fallback: Int): Group {
+        val id = uri?.let(PhotoId::identity)
+        val rot = rotation
+        val at = id?.let { i -> rot.indexOfFirst { PhotoId.identity(it) == i } } ?: -1
+        return copy(cursor = if (at >= 0) at else if (fallback in rot.indices) fallback else -1)
+    }
+
     fun isUnreadable(uri: String): Boolean = unreadable.any {
         PhotoId.identity(it) == PhotoId.identity(uri)
     }
