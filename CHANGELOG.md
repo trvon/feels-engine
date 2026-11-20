@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0](https://github.com/trvon/feels-engine/compare/v0.5.0...v0.6.0) (2026-11-20)
+
+
+### Features
+
+* **lock:** keep faces out from under the lock screen clock ([25f08a0](https://github.com/trvon/feels-engine/commit/25f08a0374a870f433e8a39047df97f8a14f129d))
+
+
+### Fixes
+
+* **ai:** Gemini Nano download no longer dies on completion or cancel ([8a61823](https://github.com/trvon/feels-engine/commit/8a6182319ed1b618f2db7fc127d5d397ed843a9b))
+* **ai:** show why on-device AI is unavailable; ML Kit GenAI Prompt beta5 ([059233d](https://github.com/trvon/feels-engine/commit/059233da9fccca57ccc61381426632a1feb56fb4))
+* **groups:** a photo that fails to read is kept, not deleted; put back dropped photos ([41e73b5](https://github.com/trvon/feels-engine/commit/41e73b574548e1ad79b0feda1633b6f2b663a73e))
+* **rotation:** the saved cursor names the photo shown, even if the group changed during the write ([6803a6e](https://github.com/trvon/feels-engine/commit/6803a6e2715558ba4f0eee00dea40a5d04698c01))
+
 ## [0.5.0](https://github.com/trvon/feels-engine/compare/v0.4.0...v0.5.0) (2026-10-26)
 
 
