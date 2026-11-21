@@ -34,22 +34,31 @@ import dev.fengine.wallpaper.wallpaper.live.LiveWallpaper
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
 
+    companion object {
+        /** Group id to open and look through photos for (see ShareActivity). */
+        const val EXTRA_FIND_IN = "dev.fengine.wallpaper.FIND_IN"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Keep system-bar icons legible when the Compose theme follows the phone.
         enableEdgeToEdge()
+        // A share handed photos to a description: open its group and look through them now, while
+        // the app is on screen (Gemini Nano refuses background use).
+        val openAt = if (savedInstanceState == null) intent.getStringExtra(EXTRA_FIND_IN) else null
+        if (openAt != null) viewModel.findPhotos()
         setContent {
             val s by viewModel.settings.collectAsStateWithLifecycle()
-            FengineTheme(s.themeMode, s.colorSource) { FengineApp(viewModel) }
+            FengineTheme(s.themeMode, s.colorSource) { FengineApp(viewModel, openAt) }
         }
     }
 }
 
 /** Home, groups and secondary Settings. Navigation state is local and survives recreation. */
 @Composable
-private fun FengineApp(vm: MainViewModel) {
+private fun FengineApp(vm: MainViewModel, openAt: String? = null) {
     val settings by vm.settings.collectAsStateWithLifecycle()
-    var openGroupId by rememberSaveable { mutableStateOf<String?>(null) }
+    var openGroupId by rememberSaveable { mutableStateOf(openAt) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val openGroup = settings.group(openGroupId)
 

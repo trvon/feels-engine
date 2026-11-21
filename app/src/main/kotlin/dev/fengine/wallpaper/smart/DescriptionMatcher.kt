@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.util.Log
 import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
+import com.google.mlkit.genai.common.GenAiException
 import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.GenerativeModel
 import com.google.mlkit.genai.prompt.ImagePart
@@ -143,7 +144,15 @@ class NanoMatcher : DescriptionMatcher, AutoCloseable {
     private suspend fun <T> ask(what: String, call: suspend () -> T): Result<T> {
         if (silent) return Result.failure(Outside.TimedOut(what, 0))
         return Outside.within(Outside.PROMPT_MS, what) { call() }
-            .onFailure { if (it is Outside.TimedOut) silent = true }
+            .onFailure {
+                // AICore answers only while the app is on screen (error 30, Fold 8, 2026-11-20):
+                // once refused, the rest of a background run would be refused too.
+                if (
+                    it is Outside.TimedOut ||
+                        (it as? GenAiException)?.errorCode == BACKGROUND_BLOCKED
+                )
+                    silent = true
+            }
     }
 
     /** Bounded: AICore can take its time or not answer at all (see [Outside]). */
@@ -255,5 +264,6 @@ class NanoMatcher : DescriptionMatcher, AutoCloseable {
 
     private companion object {
         const val TAG = "NanoMatcher"
+        const val BACKGROUND_BLOCKED = 30
     }
 }

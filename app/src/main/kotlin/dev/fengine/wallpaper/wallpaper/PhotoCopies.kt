@@ -72,33 +72,37 @@ object PhotoCopies {
     fun save(context: Context, uri: String): Boolean {
         val out = file(context, uri)
         if (out.isFile) return true
+        return runCatching { write(context, uri.toUri(), out) }
+            .onFailure { Log.w(TAG, "no copy yet: ${it.javaClass.simpleName}") }
+            .isSuccess
+    }
+
+    /**
+     * Writes a screen-sized JPEG of [source] to [out]; throws when [source] cannot be read. Shared
+     * photos ([SharePlan]) are saved the same way.
+     */
+    fun write(context: Context, source: android.net.Uri, out: File) {
         val panel = Displays(context).largest
         val (tw, th) = LiveFrame.decodeTarget(panel.width, panel.height)
-        return runCatching {
-                val bitmap =
-                    ImageDecoder.decodeBitmap(
-                        ImageDecoder.createSource(context.contentResolver, uri.toUri())
-                    ) { d, info, _ ->
-                        val (w, h) = LiveFrame.decodeSize(info.size.width, info.size.height, tw, th)
-                        d.setTargetSize(w, h)
-                        d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                        d.isMutableRequired = false
-                    }
-                out.parentFile?.mkdirs()
-                // Written aside and renamed, so a stopped run never leaves half a JPEG behind.
-                val tmp = File(out.parentFile, out.name + ".tmp")
-                try {
-                    tmp.outputStream().use {
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY, it)
-                    }
-                } finally {
-                    bitmap.recycle()
-                }
-                check(tmp.renameTo(out)) { "rename failed" }
-                true
+        val bitmap =
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, source)) {
+                d,
+                info,
+                _ ->
+                val (w, h) = LiveFrame.decodeSize(info.size.width, info.size.height, tw, th)
+                d.setTargetSize(w, h)
+                d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                d.isMutableRequired = false
             }
-            .onFailure { Log.w(TAG, "no copy yet: ${it.javaClass.simpleName}") }
-            .getOrDefault(false)
+        out.parentFile?.mkdirs()
+        // Written aside and renamed, so a stopped run never leaves half a JPEG behind.
+        val tmp = File(out.parentFile, out.name + ".tmp")
+        try {
+            tmp.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY, it) }
+        } finally {
+            bitmap.recycle()
+        }
+        check(tmp.renameTo(out)) { "rename failed" }
     }
 
     /** File names of the copies kept now. */

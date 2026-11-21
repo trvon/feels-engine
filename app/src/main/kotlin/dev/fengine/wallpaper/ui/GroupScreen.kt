@@ -298,7 +298,7 @@ fun GroupScreen(
                 // judges.
                 if (group.hasDescription)
                     Caption(
-                        "Tip: in the picker, search Google Photos first, for a person's name or a word like kids or beach, then select all the results. The phone can only look through photos you hand it."
+                        "Tip: in Google Photos, search for a person's name or a word like kids or beach, select the results, then Share › Feels Engine. Sharing has no limit on how many. The phone can only look through photos you hand it."
                     )
                 if (group.hasDescription)
                     indexProgress?.let { (done, total) ->
