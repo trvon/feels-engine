@@ -130,10 +130,18 @@ data class Group(
      * The group with [uris] added after its photos, still showing the same photo. Adding can shrink
      * the rotation (when every photo was set aside the rotation falls back to all of them; a
      * readable newcomer ends that), so the cursor is placed again by photo.
+     *
+     * A picked photo the group already has is a re-pick: it takes the old one's place with the
+     * fresh URI and grant, and is readable again, as "Pick it again" does. Before, the old (dead)
+     * URI stayed and the photo stayed set aside, so picking it again from Add photos did nothing.
      */
     fun withPhotos(uris: List<String>): Group {
-        val shown = rotation.getOrNull(cursor)
-        return copy(photos = PhotoId.distinct(photos + uris)).showing(shown, -1)
+        val have = allPhotos.associateBy(PhotoId::identity)
+        val (again, fresh) = PhotoId.distinct(uris).partition { PhotoId.identity(it) in have }
+        val repicked =
+            again.fold(this) { g, u -> g.replacePhoto(have.getValue(PhotoId.identity(u)), u) }
+        val shown = repicked.rotation.getOrNull(repicked.cursor)
+        return repicked.copy(photos = PhotoId.distinct(repicked.photos + fresh)).showing(shown, -1)
     }
 
     /**

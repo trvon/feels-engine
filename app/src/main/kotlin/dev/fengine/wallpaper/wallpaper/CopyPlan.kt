@@ -23,7 +23,8 @@ object CopyPlan {
         name: (String) -> String = PhotoCopies::name,
     ): Plan {
         if (!keep) return Plan(emptyList(), existing.sorted())
-        val wanted = PhotoId.distinct(photos)
+        // A shared photo is already a copy in the app's storage (SharePlan).
+        val wanted = PhotoId.distinct(photos).filterNot(SharePlan::isShared)
         val names = wanted.map(name)
         val keepNames = names.toHashSet()
         return Plan(

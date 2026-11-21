@@ -36,6 +36,32 @@
             </intent-filter>
         </activity>
 
+        <!-- Share > Feels Engine from Google Photos: no 100-photo limit, and a Google Photos search
+             reaches the whole library. The share grant ends with this screen, so it saves a copy
+             of each photo at once (SharePlan). -->
+        <activity
+            android:name=".share.ShareActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- Serves the shared copies to the app itself (thumbnails, wallpaper, Gemini Nano). Not
+             exported; nothing outside the app can read them. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.photos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/shared_photos" />
+        </provider>
+
         <receiver
             android:name=".schedule.TimeOfDayAlarmReceiver"
             android:exported="false" />

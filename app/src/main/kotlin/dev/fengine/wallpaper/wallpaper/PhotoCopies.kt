@@ -25,6 +25,14 @@ object PhotoCopies {
     private const val DIR = "copies"
     private const val QUALITY = 90
 
+    /** WebP 80 at copy size: 0.6-1.7 MB against 1.5-2.6 MB for JPEG 90 (Fold 8, 2026-11-20). */
+    private const val WEBP_QUALITY = 80
+
+    @Suppress("DEPRECATION")
+    private fun webpFormat(): Bitmap.CompressFormat =
+        if (android.os.Build.VERSION.SDK_INT >= 30) Bitmap.CompressFormat.WEBP_LOSSY
+        else Bitmap.CompressFormat.WEBP
+
     fun dir(context: Context): File = File(context.filesDir, DIR)
 
     fun file(context: Context, uri: String): File = File(dir(context), name(uri))
@@ -72,33 +80,40 @@ object PhotoCopies {
     fun save(context: Context, uri: String): Boolean {
         val out = file(context, uri)
         if (out.isFile) return true
+        return runCatching { write(context, uri.toUri(), out) }
+            .onFailure { Log.w(TAG, "no copy yet: ${it.javaClass.simpleName}") }
+            .isSuccess
+    }
+
+    /**
+     * Writes a screen-sized image of [source] to [out]: JPEG, or WebP with [webp] (shared photos,
+     * [SharePlan]: about half the size at the same pixels). Throws when [source] cannot be read.
+     */
+    fun write(context: Context, source: android.net.Uri, out: File, webp: Boolean = false) {
         val panel = Displays(context).largest
         val (tw, th) = LiveFrame.decodeTarget(panel.width, panel.height)
-        return runCatching {
-                val bitmap =
-                    ImageDecoder.decodeBitmap(
-                        ImageDecoder.createSource(context.contentResolver, uri.toUri())
-                    ) { d, info, _ ->
-                        val (w, h) = LiveFrame.decodeSize(info.size.width, info.size.height, tw, th)
-                        d.setTargetSize(w, h)
-                        d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                        d.isMutableRequired = false
-                    }
-                out.parentFile?.mkdirs()
-                // Written aside and renamed, so a stopped run never leaves half a JPEG behind.
-                val tmp = File(out.parentFile, out.name + ".tmp")
-                try {
-                    tmp.outputStream().use {
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY, it)
-                    }
-                } finally {
-                    bitmap.recycle()
-                }
-                check(tmp.renameTo(out)) { "rename failed" }
-                true
+        val bitmap =
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, source)) {
+                d,
+                info,
+                _ ->
+                val (w, h) = LiveFrame.decodeSize(info.size.width, info.size.height, tw, th)
+                d.setTargetSize(w, h)
+                d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                d.isMutableRequired = false
             }
-            .onFailure { Log.w(TAG, "no copy yet: ${it.javaClass.simpleName}") }
-            .getOrDefault(false)
+        out.parentFile?.mkdirs()
+        // Written aside and renamed, so a stopped run never leaves half a JPEG behind.
+        val tmp = File(out.parentFile, out.name + ".tmp")
+        try {
+            tmp.outputStream().use {
+                if (webp) bitmap.compress(webpFormat(), WEBP_QUALITY, it)
+                else bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY, it)
+            }
+        } finally {
+            bitmap.recycle()
+        }
+        check(tmp.renameTo(out)) { "rename failed" }
     }
 
     /** File names of the copies kept now. */

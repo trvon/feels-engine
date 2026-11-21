@@ -156,6 +156,40 @@ class HealthAndGrantProperties {
         assertTrue(r.cursor in -1 until r.rotation.size)
     }
 
+    @Property(tries = 2000)
+    fun addingAnUnreadablePhotoAgainBringsItBack(
+        @ForAll @IntRange(min = 1, max = 10) n: Int,
+        @ForAll @IntRange(min = 0, max = 30) which: Int,
+        @ForAll @IntRange(min = 0, max = 10) bad: Int,
+        @ForAll @IntRange(min = -1, max = 30) cursor: Int,
+        @ForAll @IntRange(min = 0, max = 3) extra: Int,
+    ) {
+        val photos = (0 until n).map(::uri)
+        val g =
+            photos
+                .take(bad)
+                .fold(Group(id = "g", name = "G", photos = photos)) { acc, u ->
+                    acc.markUnreadable(u)
+                }
+                .let { it.copy(cursor = cursor.coerceIn(-1, it.rotation.size - 1)) }
+        val old = photos[which % n]
+        // The same photo back under another URI string with the same identity.
+        val again =
+            old.replace("picker/0/com.android.providers.media.photopicker", "external/images")
+        val added = (0 until extra).map { uri(1000 + it) }
+        val shown = g.rotation.getOrNull(g.cursor)
+        val r = g.withPhotos(listOf(again) + added)
+        assertFalse("readable again", r.isUnreadable(again))
+        assertEquals("same place", photos.indexOf(old), r.photos.indexOf(again))
+        assertEquals("no duplicate", n + extra, r.photos.size)
+        assertTrue("new photos appended", r.photos.takeLast(extra) == added)
+        if (
+            shown != null && PhotoId.identity(shown) != PhotoId.identity(old) && shown in r.rotation
+        )
+            assertEquals(shown, r.rotation.getOrNull(r.cursor))
+        assertTrue(r.cursor in -1 until r.rotation.size)
+    }
+
     @Property(tries = 1000)
     fun aCaptionNeverShowsABareTimeForAnotherDay(
         @ForAll @LongRange(min = 0, max = 10 * 24) hoursAgo: Long,

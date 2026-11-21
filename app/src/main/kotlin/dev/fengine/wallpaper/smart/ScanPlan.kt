@@ -36,6 +36,14 @@ object ScanPlan {
     fun settled(matched: List<String>, confirmed: ((String) -> Boolean?)?): List<String> =
         if (confirmed == null) matched else matched.filter { confirmed(it) == true }
 
+    /** Said after the scan note when the near-duplicate filter ([Similar]) left photos out. */
+    fun similarNote(similar: Int): String =
+        when {
+            similar <= 0 -> ""
+            similar == 1 -> " 1 look-alike was left out."
+            else -> " $similar look-alikes were left out."
+        }
+
     data class Pass(
         /** New matches, in judging order. */
         val found: List<String>,
