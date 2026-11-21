@@ -163,7 +163,6 @@ private fun FengineApp(vm: MainViewModel) {
             group = openGroup,
             onBack = { openGroupId = null },
             onRename = { vm.renameGroup(openGroup.id, it) },
-            onAssign = { home, lock -> vm.assign(openGroup.id, home, lock) },
             onAddPhotos = { picker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
             onRemovePhoto = { vm.removePhoto(openGroup.id, it) },
             onDelete = {
@@ -175,7 +174,6 @@ private fun FengineApp(vm: MainViewModel) {
             pickerMax = vm.pickerMax(),
             onExcludePhoto = { vm.excludePhoto(openGroup.id, it) },
             onSetCover = { vm.setCover(openGroup.id, it) },
-            onSetDream = { vm.setDreamGroup(openGroup.id, it) },
             onShowNow = { uri ->
                 // One rotation either way: making the group active already puts the tapped photo
                 // up.
@@ -187,8 +185,6 @@ private fun FengineApp(vm: MainViewModel) {
             },
             onSetSkipped = { uri, skip -> vm.setSkipped(openGroup.id, uri, skip) },
             clockCheck = vm::clockCheck,
-            hasCoverScreen = vm.hasCoverScreen(),
-            onSetCoverScreen = { vm.setCoverGroup(openGroup.id, it) },
             onPickAgain = { uri ->
                 repicking = uri
                 repicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
@@ -215,7 +211,7 @@ private fun FengineApp(vm: MainViewModel) {
             onOpenSettings = { settingsOpen = true },
             onSetEnabled = vm::setEnabled,
             onChangeNow = vm::rotateNow,
-            onSetActive = vm::setActive,
+            onStart = vm::start,
             hasCoverScreen = vm.hasCoverScreen(),
             onAssignScreen = vm::assignScreen,
             diagnostics = diagnostics,

@@ -288,11 +288,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun renameGroup(id: String, name: String) =
         updateGroup(id) { it.copy(name = name.trim().ifBlank { it.name }) }
 
-    /** Changing the description discards previous matches; the next scan rebuilds them. */
-    fun setRule(id: String, rule: String) =
-        updateGroup(id) {
-            if (it.rule == rule) it else it.copy(rule = rule, matched = emptyList(), scanNote = "")
+    /**
+     * Changing the description discards previous matches and looks through the photos already
+     * handed over again, so a new wording never needs them picked a second time.
+     */
+    fun setRule(id: String, rule: String) {
+        val before = settings.value.group(id) ?: return
+        if (before.rule == rule) return
+        viewModelScope.launch {
+            store.update { s ->
+                s.copy(
+                    groups =
+                        s.groups.map {
+                            if (it.id == id)
+                                it.copy(rule = rule, matched = emptyList(), scanNote = "")
+                            else it
+                        }
+                )
+            }
+            if (rule.isNotBlank() && before.pool.isNotEmpty()) findPhotos()
         }
+    }
 
     fun deleteGroup(id: String) {
         val removed = settings.value.group(id)?.let { it.photos + it.pool }.orEmpty()
@@ -448,13 +464,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
 
-    /** The group the screen saver plays; off means the home group plays. */
-    fun setDreamGroup(groupId: String, on: Boolean) = update {
-        it.copy(
-            dreamGroupId = if (on) groupId else it.dreamGroupId.takeUnless { d -> d == groupId }
-        )
-    }
-
     /** Which screens the live engine draws, per panel; refreshed off the main thread. */
     val motionState = MutableStateFlow(LiveWallpaper.State(false, false, false, false))
 
@@ -476,14 +485,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val components =
             android.provider.Settings.Secure.getString(r, "screensaver_components").orEmpty()
         return enabled && components.contains(getApplication<Application>().packageName)
-    }
-
-    /** Which screens this group feeds. Picking a screen replaces whatever group fed it before. */
-    fun assign(groupId: String, home: Boolean, lock: Boolean) = update { s ->
-        s.copy(
-            homeGroupId = if (home) groupId else s.homeGroupId.takeUnless { it == groupId },
-            lockGroupId = if (lock) groupId else s.lockGroupId.takeUnless { it == groupId },
-        )
     }
 
     /**
@@ -549,6 +550,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setEnabled(enabled: Boolean) = update { it.copy(enabled = enabled) }
 
     fun rotateNow() = scheduler.rotateNow(source = Ledger.Source.NEXT)
+
+    /** Home's one button before rotation runs: turn it on and put the next photo up now. */
+    fun start() {
+        viewModelScope.launch {
+            store.update { it.copy(enabled = true) }
+            scheduler.sync(store.read())
+            scheduler.rotateNow(source = Ledger.Source.NEXT)
+        }
+    }
 
     /** The last 7 days of the local ledger in one sentence; null before anything was recorded. */
     val diagnostics = MutableStateFlow<String?>(null)
@@ -673,16 +683,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 .filter { it.rotation.isNotEmpty() }
                 .associate { it.id to it.cursor.coerceIn(0, it.rotation.size - 1) }
         scheduler.rotateNow(pinned = pins, forceStatic = true, source = Ledger.Source.STILL)
-    }
-
-    /**
-     * On a foldable, the group the cover screen shows; off means the same photo as the inner
-     * screen.
-     */
-    fun setCoverGroup(groupId: String, on: Boolean) = update {
-        it.copy(
-            coverGroupId = if (on) groupId else it.coverGroupId.takeUnless { c -> c == groupId }
-        )
     }
 
     /**
