@@ -1,8 +1,9 @@
 package dev.fengine.wallpaper.smart
 
 import android.content.Context
-import android.net.Uri
+import android.graphics.Bitmap
 import android.util.Log
+import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -52,7 +53,7 @@ class SmartGroupWorker(appContext: Context, params: WorkerParameters) :
                 val results = chunk.map { uri ->
                     uri to
                         runCatching {
-                            labeler.label(Images.decode(applicationContext, Uri.parse(uri), 640))
+                            labeler.label(Images.decode(applicationContext, uri.toUri(), 640))
                         }
                             .onFailure { e ->
                                 Log.w(TAG, "label failed for $uri", e)
@@ -87,6 +88,22 @@ class SmartGroupWorker(appContext: Context, params: WorkerParameters) :
         val canJudge = matcher !is KeywordMatcher
         var budgetLeft = JUDGE_BUDGET
         var morePending = false
+        // What each photo looks like, for the near-duplicate filter: hashed while judging, or from
+        // a small decode for photos settled before the filter existed. Cached in the index.
+        val looks = HashMap(index.looks())
+        fun remember(uri: String, bitmap: Bitmap) {
+            runCatching { Looks.of(applicationContext, uri, bitmap) }
+                .onSuccess {
+                    index.putLook(uri, it)
+                    looks[PhotoId.identity(uri)] = it
+                }
+        }
+        fun lookOf(uri: String): Similar.Look? =
+            looks[PhotoId.identity(uri)]
+                ?: runCatching { Images.decode(applicationContext, uri.toUri(), 64) }
+                    .getOrNull()
+                    ?.let { b -> remember(uri, b).also { b.recycle() } }
+                    .let { looks[PhotoId.identity(uri)] }
         try {
             for (group in groups) {
                 val rule = group.rule ?: continue
@@ -133,32 +150,39 @@ class SmartGroupWorker(appContext: Context, params: WorkerParameters) :
                         // An unreadable photo is no verdict (labels decide, nothing cached), never
                         // a failed scan.
                         val verdict = runCatching {
-                            Images.decode(applicationContext, Uri.parse(uri), 768)
+                            Images.decode(applicationContext, uri.toUri(), 768)
                         }
                             .onFailure {
                                 Log.w(TAG, "judge decode failed: ${it.javaClass.simpleName}")
                                 failedReads++
                             }
                             .getOrNull()
+                            ?.also { remember(uri, it) }
                             ?.let { matcher.judge(it, rule) }
                         if (verdict != null) index.putVerdict(key, uri, verdict)
                         if (++judgedHere % 10 == 0) setProgress(workDataOf(KEY_LABELED to labeled))
                         verdict
                     }
                 budgetLeft -= pass.judged
-                foundTotal += pass.found.size
+                // Bursts and near-copies: one photo per moment joins the group.
+                val candidates = pass.found + (group.matched - dropped.toSet())
+                val wanted = Similar.distinct(candidates, group.photos, ::lookOf).toHashSet()
+                val similar = candidates.size - wanted.size
+                val inCandidates = candidates.toHashSet()
+                foundTotal += pass.found.count { it in wanted }
                 judgedTotal += pass.judged
                 if (pass.pending > 0) morePending = true
                 val note =
                     ScanPlan.note(
                         matcherName = matcher.name,
                         rule = rule,
-                        total = settled.size + pass.found.size,
+                        total = wanted.size,
                         libraryCount = libraryKeys.size,
                         poolCount = group.pool.size,
                         morePending = pass.pending > 0 || unlabeled > 0,
                         noVocabulary = !canJudge && relevant.isEmpty(),
                     ) +
+                        ScanPlan.similarNote(similar) +
                         // AICore refuses background use on some builds (ML Kit #1069): say labels
                         // stood in, so a foreground Find photos is known to try again.
                         (if (!canJudge && AiReadiness.deviceListed())
@@ -171,7 +195,11 @@ class SmartGroupWorker(appContext: Context, params: WorkerParameters) :
                                 if (it.id != group.id) it
                                 else
                                     it.copy(
-                                        matched = pass.found + (it.matched - dropped.toSet()),
+                                        matched =
+                                            (pass.found + (it.matched - dropped.toSet())).filter { u
+                                                ->
+                                                u in wanted || u !in inCandidates
+                                            },
                                         scanNote = note,
                                     )
                             }
@@ -179,7 +207,7 @@ class SmartGroupWorker(appContext: Context, params: WorkerParameters) :
                 }
                 Log.i(
                     TAG,
-                    "${group.name}: +${pass.found.size} (labels ${relevant.size}, judged ${pass.judged}, pending ${pass.pending})",
+                    "${group.name}: +${pass.found.size}, $similar similar left out (labels ${relevant.size}, judged ${pass.judged}, pending ${pass.pending})",
                 )
             }
         } finally {
