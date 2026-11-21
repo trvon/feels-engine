@@ -24,7 +24,7 @@ object SharedPhotos {
         val out = File(dir(context), name)
         val uri = SharePlan.uriFor(authority(context), name)
         if (out.isFile) return uri
-        return runCatching { PhotoCopies.write(context, source, out) }
+        return runCatching { PhotoCopies.write(context, source, out, webp = true) }
             .onFailure { Log.d(TAG, "not readable yet: ${it.javaClass.simpleName}") }
             .map { uri }
             .getOrNull()
@@ -36,7 +36,7 @@ object SharedPhotos {
             dir(context)
                 .listFiles()
                 .orEmpty()
-                .filter { it.name.endsWith(".jpg") }
+                .filter { it.isFile && !it.name.endsWith(".tmp") }
                 .associate {
                     it.name to it.lastModified()
                 }
@@ -47,7 +47,8 @@ object SharedPhotos {
 
     /** Shared files kept and the bytes they take. */
     fun usage(context: Context): Pair<Int, Long> {
-        val files = dir(context).listFiles().orEmpty().filter { it.name.endsWith(".jpg") }
+        val files =
+            dir(context).listFiles().orEmpty().filter { it.isFile && !it.name.endsWith(".tmp") }
         return files.size to files.sumOf { it.length() }
     }
 }

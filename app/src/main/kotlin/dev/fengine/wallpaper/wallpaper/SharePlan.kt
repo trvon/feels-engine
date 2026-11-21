@@ -25,7 +25,8 @@ object SharePlan {
     /** Saving stops when nothing new could be read for this long. */
     const val GIVE_UP_MS = 45_000L
 
-    private val shared = Regex("^content://[^/]+\\.photos/$DIR/([0-9a-f]{32}\\.jpg)$")
+    /** New copies are WebP; .jpg ones came from the first test build. */
+    private val shared = Regex("^content://[^/]+\\.photos/$DIR/([0-9a-f]{32}\\.(?:webp|jpg))$")
 
     fun isShared(uri: String): Boolean = shared.matches(uri)
 
@@ -35,7 +36,7 @@ object SharePlan {
     /** One file per shared item: sharing the same photo again finds the same copy. */
     fun nameFor(source: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(source.toByteArray())
-        return digest.take(16).joinToString("") { "%02x".format(it) } + ".jpg"
+        return digest.take(16).joinToString("") { "%02x".format(it) } + ".webp"
     }
 
     fun uriFor(authority: String, name: String) = "content://$authority/$DIR/$name"
