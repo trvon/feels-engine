@@ -90,7 +90,7 @@ class SmartGroupWorker(appContext: Context, params: WorkerParameters) :
         try {
             for (group in groups) {
                 val rule = group.rule ?: continue
-                val key = ruleKey(matcher.name, rule)
+                val key = ruleKey(matcher.verdictKey, rule)
                 val relevant =
                     matcher.relevantLabels(
                         rule,

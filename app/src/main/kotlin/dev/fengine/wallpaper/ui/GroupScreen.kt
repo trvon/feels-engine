@@ -348,7 +348,7 @@ fun GroupScreen(
                 // The scan result always shows; on-device AI speaks in its own card below.
                 Caption(
                     group.scanNote.ifBlank { null }
-                        ?: "Describe what to look for, then tap Find photos and choose photos to look through, up to ${"$"}pickerMax at a time, from this phone or Google Photos. The phone keeps the ones that match. Runs on this phone only."
+                        ?: "Describe what to look for, then tap Find photos and choose photos to look through, up to $pickerMax at a time, from this phone or Google Photos. The phone keeps the ones that match. Runs on this phone only."
                 )
                 if (group.hasDescription)
                     indexProgress?.let { (done, total) ->
