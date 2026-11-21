@@ -292,6 +292,14 @@ fun GroupScreen(
                     group.scanNote.ifBlank { null }
                         ?: "Describe what to look for, then tap Find photos and choose photos to look through, up to $pickerMax at a time, from this phone or Google Photos. The phone keeps the ones that match, one per moment. Change the words any time: the photos you handed over are looked through again. Runs on this phone only."
                 )
+                // The phone only sees what it is handed: in 45 recent photos on a Fold 8 most were
+                // screenshots and recipes, and Gemini Nano was right about every one (2026-11-20).
+                // The picker's own Google Photos search finds the candidates; the phone then
+                // judges.
+                if (group.hasDescription)
+                    Caption(
+                        "Tip: in the picker, search Google Photos first, for a person's name or a word like kids or beach, then select all the results. The phone can only look through photos you hand it."
+                    )
                 if (group.hasDescription)
                     indexProgress?.let { (done, total) ->
                         if (total > 0)
