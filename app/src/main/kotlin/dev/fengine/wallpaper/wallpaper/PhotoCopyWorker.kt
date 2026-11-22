@@ -35,7 +35,7 @@ class PhotoCopyWorker(appContext: Context, params: WorkerParameters) :
         val photos = settings.groups.flatMap { it.allPhotos }
         val plan = CopyPlan.plan(photos, PhotoCopies.names(context), settings.keepCopies)
         PhotoCopies.delete(context, plan.delete)
-        val pruned = plan.delete.size
+        val pruned = plan.delete.size + SharedPhotos.prune(context, settings.groups)
         val started = SystemClock.elapsedRealtime()
         var saved = 0
         var missing = 0

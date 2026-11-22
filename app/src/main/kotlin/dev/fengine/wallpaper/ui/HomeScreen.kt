@@ -51,7 +51,8 @@ import dev.fengine.wallpaper.ui.design.TextAction
 
 /**
  * The one main screen. Reads top to bottom like a magazine page: a headline sentence that says what
- * the app is doing, the groups as covers, screen assignments and one primary action.
+ * the app is doing, the groups as covers, which group each screen shows (the only place that is
+ * chosen) and one primary action: Start, then Next photo.
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
@@ -62,7 +63,8 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onSetEnabled: (Boolean) -> Unit,
     onChangeNow: () -> Unit,
-    onSetActive: (String) -> Unit = {},
+    /** Turns rotation on and puts a photo up now: the one button before anything runs. */
+    onStart: () -> Unit = {},
     hasCoverScreen: Boolean = false,
     onAssignScreen: (Screen, String?) -> Unit = { _, _ -> },
     diagnostics: String? = null,
@@ -87,18 +89,6 @@ fun HomeScreen(
                 onAssignScreen(screen, id)
             },
             onDismiss = { choosingFor = null },
-        )
-    }
-    var picking by remember { mutableStateOf(false) }
-    if (picking) {
-        GroupPickerSheet(
-            groups = settings.groups.filter { it.allPhotos.isNotEmpty() },
-            activeId = settings.homeGroupId.takeIf { it == settings.lockGroupId },
-            onPick = {
-                picking = false
-                onSetActive(it)
-            },
-            onDismiss = { picking = false },
         )
     }
     Page {
@@ -212,16 +202,14 @@ fun HomeScreen(
 
         HorizontalDivider()
         Spacer(Modifier.height(Space.lg))
+        // One button, the next thing to do: start the rotation, then change the photo. Which group
+        // shows where is chosen above, under Screens, and nowhere else.
         Button(
-            onClick = { picking = true },
-            enabled = settings.groups.any { it.allPhotos.isNotEmpty() },
+            onClick = if (settings.enabled) onChangeNow else onStart,
+            enabled = settings.canRotate,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Set active")
-        }
-        Spacer(Modifier.height(Space.sm))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            TextAction("Next photo", onChangeNow)
+            Text(if (settings.enabled) "Next photo" else "Start")
         }
         Spacer(Modifier.height(Space.section))
         Section("This week") {
@@ -231,49 +219,6 @@ fun HomeScreen(
                     ?: "Nothing recorded yet. Changes, motion and the screen saver are noted here, on this phone only."
             )
             if (diagnostics != null) TextAction("Export log", onExportLog)
-        }
-    }
-}
-
-/** Pick the group that both screens show from now on. Its cover goes up right away. */
-@Composable
-private fun GroupPickerSheet(
-    groups: List<Group>,
-    activeId: String?,
-    onPick: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Sheet(onDismiss = onDismiss) {
-        Eyebrow("Set active")
-        Spacer(Modifier.height(Space.sm))
-        Text(
-            "Both screens show this group, starting with its cover.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Spacer(Modifier.height(Space.lg))
-        groups.forEach { g ->
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth().clickable { onPick(g.id) }.padding(vertical = Space.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Space.md),
-            ) {
-                Box(
-                    modifier =
-                        Modifier.size(Size.sheetThumb)
-                            .clip(RoundedCornerShape(Radius.tile))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    g.cover?.let {
-                        PhotoImage(it, Modifier.fillMaxSize(), contentDescription = null)
-                    }
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(g.name, style = MaterialTheme.typography.titleMedium)
-                    Caption(coverCaption(g))
-                }
-                if (g.id == activeId) Badge("Active")
-            }
         }
     }
 }

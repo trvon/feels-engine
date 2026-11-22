@@ -35,12 +35,12 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import dev.fengine.wallpaper.data.Group
+import dev.fengine.wallpaper.data.Screen
 import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.smart.AiReadiness
 import dev.fengine.wallpaper.ui.design.ActionBar
 import dev.fengine.wallpaper.ui.design.BodyMuted
 import dev.fengine.wallpaper.ui.design.Caption
-import dev.fengine.wallpaper.ui.design.ChipRow
 import dev.fengine.wallpaper.ui.design.Page
 import dev.fengine.wallpaper.ui.design.PhotoGrid
 import dev.fengine.wallpaper.ui.design.PhotoGridLimit
@@ -52,21 +52,15 @@ import dev.fengine.wallpaper.ui.design.Size
 import dev.fengine.wallpaper.ui.design.Space
 import dev.fengine.wallpaper.ui.design.StatusCard
 import dev.fengine.wallpaper.ui.design.SwitchRow
+import dev.fengine.wallpaper.ui.design.TextAction
 import dev.fengine.wallpaper.wallpaper.ClockLegibility
 import kotlinx.coroutines.delay
 
-private enum class Screens {
-    BOTH,
-    HOME,
-    LOCK,
-    NEITHER,
-}
-
 /**
- * One group. Top to bottom: actions, the name as the headline, which screens it feeds, then one
- * photo grid that holds everything the group will show, with found photos badged. Described groups
- * end with what they look for, where they look (one line, not a card) and whether on-device AI is
- * ready. Photos come before the machinery because they are what the owner came to see.
+ * One group is its photos. Top to bottom: the name as the headline and one line saying where it
+ * shows, the photo grid with Add photos, then what the phone should find, and Delete at the very
+ * end. Which screen shows which group is chosen in one place only, Home's Screens; before, this
+ * screen had its own chips and switches for the same choice (2026-11-20 review).
  */
 @Composable
 fun GroupScreen(
@@ -74,7 +68,6 @@ fun GroupScreen(
     group: Group,
     onBack: () -> Unit,
     onRename: (String) -> Unit,
-    onAssign: (home: Boolean, lock: Boolean) -> Unit,
     onAddPhotos: () -> Unit,
     onRemovePhoto: (String) -> Unit,
     onDelete: () -> Unit,
@@ -91,12 +84,9 @@ fun GroupScreen(
     aiReadiness: AiReadiness? = null,
     onAiAction: (AiReadiness.Action) -> Unit = {},
     onSetCover: (String) -> Unit = {},
-    onSetDream: (Boolean) -> Unit = {},
     onShowNow: (String) -> Unit = {},
     onSetSkipped: (String, Boolean) -> Unit = { _, _ -> },
     clockCheck: suspend (String) -> ClockLegibility.Verdict? = { null },
-    hasCoverScreen: Boolean = false,
-    onSetCoverScreen: (Boolean) -> Unit = {},
     onPickAgain: (String) -> Unit = {},
 ) {
     val feedsHome = settings.homeGroupId == group.id
@@ -168,8 +158,7 @@ fun GroupScreen(
                 {
                     focus.clearFocus()
                     onBack()
-                },
-            "Delete group" to onDelete,
+                }
         )
         Spacer(Modifier.height(Space.sm))
         BasicTextField(
@@ -192,62 +181,9 @@ fun GroupScreen(
         Caption(
             if (showSaved) "Saved" else "Tap the name to rename. Changes save as you make them."
         )
+        Spacer(Modifier.height(Space.sm))
+        BodyMuted(showsOn(settings, group))
         Spacer(Modifier.height(Space.section))
-
-        Section("Shows on") {
-            ChipRow(
-                options =
-                    listOf(
-                        Screens.BOTH to "Both screens",
-                        Screens.HOME to "Home",
-                        Screens.LOCK to "Lock",
-                        Screens.NEITHER to "Neither",
-                    ),
-                selected =
-                    when {
-                        feedsHome && feedsLock -> Screens.BOTH
-                        feedsHome -> Screens.HOME
-                        feedsLock -> Screens.LOCK
-                        else -> Screens.NEITHER
-                    },
-                onSelect = {
-                    onAssign(
-                        it == Screens.BOTH || it == Screens.HOME,
-                        it == Screens.BOTH || it == Screens.LOCK,
-                    )
-                },
-            )
-            Spacer(Modifier.height(Space.md))
-            SwitchRow(
-                "Screen saver",
-                checked = settings.dreamGroupId == group.id,
-                onChange = {
-                    onSetDream(it)
-                    saved()
-                },
-            )
-            Caption(
-                if (settings.dreamGroupId == group.id)
-                    "Plays while the phone charges, once Feels Engine photos is chosen under Screen saver in Settings."
-                else "Off: the home screen's group plays instead."
-            )
-            if (hasCoverScreen) {
-                Spacer(Modifier.height(Space.md))
-                SwitchRow(
-                    "Cover screen",
-                    checked = settings.coverGroupId == group.id,
-                    onChange = {
-                        onSetCoverScreen(it)
-                        saved()
-                    },
-                )
-                Caption(
-                    if (settings.coverGroupId == group.id)
-                        "The cover screen shows this group; the inner screen shows its own."
-                    else "Off: the cover screen shows the same photo as the inner screen."
-                )
-            }
-        }
 
         val shown = group.allPhotos
         Section(
@@ -336,7 +272,13 @@ fun GroupScreen(
                         },
                         enabled = rule.isNotBlank() && !scanning,
                     ) {
-                        Text(if (scanning) "Looking..." else "Find photos")
+                        Text(
+                            when {
+                                scanning -> "Looking..."
+                                group.pool.isEmpty() -> "Find photos"
+                                else -> "Look through more"
+                            }
+                        )
                     }
                     if (scanning)
                         CircularProgressIndicator(
@@ -348,8 +290,16 @@ fun GroupScreen(
                 // The scan result always shows; on-device AI speaks in its own card below.
                 Caption(
                     group.scanNote.ifBlank { null }
-                        ?: "Describe what to look for, then tap Find photos and choose photos to look through, up to ${"$"}pickerMax at a time, from this phone or Google Photos. The phone keeps the ones that match. Runs on this phone only."
+                        ?: "Describe what to look for, then tap Find photos and choose photos to look through, up to $pickerMax at a time, from this phone or Google Photos. The phone keeps the ones that match, one per moment. Change the words any time: the photos you handed over are looked through again. Runs on this phone only."
                 )
+                // The phone only sees what it is handed: in 45 recent photos on a Fold 8 most were
+                // screenshots and recipes, and Gemini Nano was right about every one (2026-11-20).
+                // The picker's own Google Photos search finds the candidates; the phone then
+                // judges.
+                if (group.hasDescription)
+                    Caption(
+                        "Tip: in Google Photos, search for a person's name or a word like kids or beach, select the results, then Share › Feels Engine. Sharing has no limit on how many. The phone can only look through photos you hand it."
+                    )
                 if (group.hasDescription)
                     indexProgress?.let { (done, total) ->
                         if (total > 0)
@@ -391,7 +341,33 @@ fun GroupScreen(
                     }
             }
         }
+
+        Spacer(Modifier.height(Space.section))
+        TextAction("Delete group", onDelete)
     }
+}
+
+/**
+ * Where this group shows, in one sentence, and where to change it: Home's Screens, the one place
+ * screens are chosen.
+ */
+private fun showsOn(s: Settings, g: Group): String {
+    val on =
+        Screen.entries
+            .filter { dev.fengine.wallpaper.data.Screens.assigned(s, it) == g.id }
+            .map {
+                when (it) {
+                    Screen.HOME -> "home screen"
+                    Screen.LOCK -> "lock screen"
+                    Screen.COVER -> "cover screen"
+                    Screen.SCREEN_SAVER -> "screen saver"
+                }
+            }
+    return if (on.isEmpty()) "Not on any screen yet. Choose screens on Home, under Screens."
+    else
+        "Shows on the " +
+            (if (on.size == 1) on[0] else on.dropLast(1).joinToString(", ") + " and " + on.last()) +
+            ". Change this on Home, under Screens."
 }
 
 /** What one photo can do: go up on the screens now, or stand for the group on the home rail. */

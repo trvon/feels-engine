@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.util.Log
 import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
+import com.google.mlkit.genai.common.GenAiException
 import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.GenerativeModel
 import com.google.mlkit.genai.prompt.ImagePart
@@ -17,6 +18,12 @@ import kotlinx.coroutines.flow.map
  */
 interface DescriptionMatcher {
     val name: String
+
+    /**
+     * Names cached verdicts; changes when the judging prompt does, so old answers are not reused.
+     */
+    val verdictKey: String
+        get() = name
 
     /** Subset of [labels] that photos matching [description] would likely carry. */
     suspend fun relevantLabels(description: String, labels: Collection<String>): Set<String>
@@ -42,8 +49,6 @@ class KeywordMatcher : DescriptionMatcher {
     companion object {
         private val synonyms =
             mapOf(
-                "kid" to listOf("child", "baby", "toddler"),
-                "kids" to listOf("child", "baby", "toddler"),
                 "children" to listOf("child"),
                 "dog" to listOf("dog", "puppy"),
                 "puppy" to listOf("dog"),
@@ -86,6 +91,22 @@ class KeywordMatcher : DescriptionMatcher {
                 "trip" to listOf("vacation", "beach"),
                 "pet" to listOf("pet", "dog", "cat"),
                 "pets" to listOf("pet", "dog", "cat"),
+                // The owner's own people: no model knows who they are, only what they look like.
+                "wife" to listOf("person", "smile", "selfie", "dress", "hair"),
+                "husband" to listOf("person", "smile", "selfie", "beard", "hair"),
+                "partner" to listOf("person", "smile", "selfie"),
+                "kid" to listOf("child", "baby", "toddler", "person", "smile"),
+                "kids" to listOf("child", "baby", "toddler", "person", "smile"),
+                "son" to listOf("child", "baby", "person"),
+                "sons" to listOf("child", "baby", "person"),
+                "daughter" to listOf("child", "baby", "person"),
+                "daughters" to listOf("child", "baby", "person"),
+                "mom" to listOf("person", "smile"),
+                "dad" to listOf("person", "smile"),
+                "grandma" to listOf("person", "smile"),
+                "grandpa" to listOf("person", "smile"),
+                "me" to listOf("person", "selfie"),
+                "us" to listOf("person", "selfie", "smile", "crowd"),
             )
 
         fun select(description: String, labels: Collection<String>): Set<String> {
@@ -109,6 +130,9 @@ class KeywordMatcher : DescriptionMatcher {
 class NanoMatcher : DescriptionMatcher, AutoCloseable {
     override val name = "Gemini Nano"
 
+    /** v3: [judge] asks per part of the description, in what a photo shows (2026-11-20). */
+    override val verdictKey = "Gemini Nano v3"
+
     private val model: GenerativeModel = Generation.getClient()
 
     /**
@@ -120,7 +144,15 @@ class NanoMatcher : DescriptionMatcher, AutoCloseable {
     private suspend fun <T> ask(what: String, call: suspend () -> T): Result<T> {
         if (silent) return Result.failure(Outside.TimedOut(what, 0))
         return Outside.within(Outside.PROMPT_MS, what) { call() }
-            .onFailure { if (it is Outside.TimedOut) silent = true }
+            .onFailure {
+                // AICore answers only while the app is on screen (error 30, Fold 8, 2026-11-20):
+                // once refused, the rest of a background run would be refused too.
+                if (
+                    it is Outside.TimedOut ||
+                        (it as? GenAiException)?.errorCode == BACKGROUND_BLOCKED
+                )
+                    silent = true
+            }
     }
 
     /** Bounded: AICore can take its time or not answer at all (see [Outside]). */
@@ -187,35 +219,51 @@ class NanoMatcher : DescriptionMatcher, AutoCloseable {
                 .split(',', '\n')
                 .mapNotNull { byLower[it.trim().trim('.', '"').lowercase()] }
                 .toSet()
-        return if (picked.isEmpty()) KeywordMatcher.select(description, labels) else picked
+        // The model's pick plus the word matches: for "my wife and kids" Gemini Nano offered
+        // Beach and Picnic but not Person or Child, which the people synonyms supply.
+        return picked + KeywordMatcher.select(description, labels)
     }
 
+    /**
+     * One plain question per part of the description ([Wanted.parts]); a YES to any part is a
+     * match. Asked whole, "my wife and kids" got NO for photos Gemini Nano itself described as "a
+     * young child sitting on a yellow inflatable" (Fold 8, 2026-11-20): it cannot know the owner's
+     * people and read "and" as "all of them in one photo".
+     */
     override suspend fun judge(bitmap: Bitmap, description: String): Boolean? {
-        val prompt =
-            "Does this photo match the description \"$description\"? Answer with YES or NO only."
-        val text =
-            ask("Gemini Nano judge") {
-                    model
-                        .generateContent(
-                            generateContentRequest(ImagePart(bitmap), TextPart(prompt)) {
-                                temperature = 0f
-                                maxOutputTokens = 8
-                            }
-                        )
-                        .candidates
-                        .first()
-                        .text
-                }
-                .getOrElse { e ->
-                    Log.w(TAG, "judge failed", e)
-                    return null
-                }
-        return text.trim().uppercase().startsWith("YES")
+        var answered = false
+        for (part in Wanted.parts(description)) {
+            val text =
+                ask("Gemini Nano judge") {
+                        model
+                            .generateContent(
+                                generateContentRequest(
+                                    ImagePart(bitmap),
+                                    TextPart(Wanted.question(part)),
+                                ) {
+                                    temperature = 0f
+                                    maxOutputTokens = 8
+                                }
+                            )
+                            .candidates
+                            .first()
+                            .text
+                    }
+                    .getOrElse { e ->
+                        Log.w(TAG, "judge failed", e)
+                        null
+                    } ?: continue
+            answered = true
+            Log.d(TAG, "judge \"$part\": ${text.trim().take(12)}")
+            if (text.trim().uppercase().startsWith("YES")) return true
+        }
+        return if (answered) false else null
     }
 
     override fun close() = model.close()
 
     private companion object {
         const val TAG = "NanoMatcher"
+        const val BACKGROUND_BLOCKED = 30
     }
 }

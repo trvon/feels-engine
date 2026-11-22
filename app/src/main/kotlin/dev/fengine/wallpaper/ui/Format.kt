@@ -114,7 +114,12 @@ object Format {
         val lock = s.lockGroup?.takeIf { it.allPhotos.isNotEmpty() }
         return when {
             s.groups.isEmpty() -> "Start with a group of photos."
-            home == null && lock == null -> "Choose a group for your screens."
+            home == null && lock == null ->
+                // A screen can have a group that has no photos yet: say what is missing.
+                (s.homeGroup ?: s.lockGroup)?.let { g ->
+                    if (g.hasDescription) "${g.name} is waiting for photos to look through."
+                    else "Add photos to ${g.name} to start."
+                } ?: "Choose a group for your screens."
             !s.enabled && s.lastRotationAt <= 0 -> "Not started."
             !s.enabled -> "Paused."
             home != null && home.id == lock?.id -> "${schedule(s, is24)}, from ${home.name}."

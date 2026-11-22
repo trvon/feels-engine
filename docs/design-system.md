@@ -57,7 +57,7 @@ foldable) and `Displays` supplies the sizes, so the system never guesses.
   Radio rows explain exclusive choices; switches represent booleans. Complete
   time edits save explicitly. Appearance follows the phone, with system colors
   on Android 12+ and a light/dark fallback on older versions.
-- One filled button per page ("Set active"). Secondary actions are tonal
+- One filled button per page (Home: "Start", then "Next photo"). Secondary actions are tonal
   buttons inside a section header or text actions. Destructive actions are text.
 - Two UX lanes (`LayoutSpec.lane`). COMPACT (under 600 dp: phones, cover
   screens) puts a transient choice in a bottom sheet, under the thumb. WIDE
@@ -66,8 +66,9 @@ foldable) and `Displays` supplies the sizes, so the system never guesses.
   far from either hand. `Sheet` in `ui/design/Components.kt` picks the lane;
   screens never call `ModalBottomSheet` or `Dialog` directly. Both lanes scroll
   when choices or large text exceed the available height.
-- Choices that change the wallpaper are explicit and immediate. "Set active"
-  lists the groups and puts the chosen group's cover up on both screens. A
+- Each choice has one home. Which group a screen shows is chosen only under
+  Home > Screens; a group screen says where it shows in one line and holds its
+  photos. Choices that change the wallpaper are explicit and immediate. A
   photo's sheet offers "Show now" (that photo, now, rotation continues from it)
   and "Make the cover". Settings > Wallpaper (Still, Motion) reflects what the
   system reports, refreshed on return from Android's chooser, not a stored
