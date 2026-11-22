@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.8.0](https://github.com/trvon/feels-engine/compare/v0.7.0...v0.8.0) (2026-11-22)
+
+
+### Features
+
+* **find:** one photo per moment among found photos ([cad294e](https://github.com/trvon/feels-engine/commit/cad294e9d2234c2ade6946f5de27a2e0a82bb982))
+* **find:** tell the owner to search Google Photos in the picker ([30108bc](https://github.com/trvon/feels-engine/commit/30108bc79b83f5689d85f9bc1fc25fc23600e95f))
+* **share:** save shared copies as WebP, about half the size ([b356743](https://github.com/trvon/feels-engine/commit/b35674308e751344c8166c976e00b3f9b72efb90))
+* **share:** Share &gt; Feels Engine from Google Photos ([4cb9fd2](https://github.com/trvon/feels-engine/commit/4cb9fd2db14fdbb28ad64dcf11e2359b4486936b))
+* **ui:** one place for screens, photos first, one button on Home ([f9fd9fb](https://github.com/trvon/feels-engine/commit/f9fd9fb2ad046a718177d78321e6ffda8f48af58))
+
+
+### Fixes
+
+* **find:** find the owner's people, and bring back re-added photos ([6f65807](https://github.com/trvon/feels-engine/commit/6f65807cbe813da944ee235a21cf55ab271d7bed))
+* **photos:** picking an unreadable photo again from Add photos now ([6f65807](https://github.com/trvon/feels-engine/commit/6f65807cbe813da944ee235a21cf55ab271d7bed))
+* **ui:** the Find photos hint showed a literal "$pickerMax". ([6f65807](https://github.com/trvon/feels-engine/commit/6f65807cbe813da944ee235a21cf55ab271d7bed))
+
 ## [0.7.0](https://github.com/trvon/feels-engine/compare/v0.6.0...v0.7.0) (2026-11-20)
 
 
