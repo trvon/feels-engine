@@ -6,7 +6,9 @@ import android.content.Intent
 import dev.fengine.wallpaper.FengineApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 /**
  * The scheduled change, for both rhythms (the name predates interval alarms). Runs the rotation
@@ -17,10 +19,12 @@ class TimeOfDayAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
         val app = context.applicationContext as FengineApp
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                if (app.settings.read().enabled)
-                    Rotation.run(app, source = dev.fengine.wallpaper.data.Ledger.Source.ALARM)
+                withTimeout(8_000L) {
+                    if (app.settings.read().enabled)
+                        Rotation.run(app, source = dev.fengine.wallpaper.data.Ledger.Source.ALARM)
+                }
             } catch (e: Exception) {
                 // A crash here would also end the live engine (same process); log and carry on.
                 android.util.Log.w("TimeOfDayAlarm", "rotation failed", e)

@@ -2,9 +2,9 @@ package dev.fengine.wallpaper.smart
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.util.Log
+import androidx.core.net.toUri
 import com.google.mlkit.genai.common.FeatureStatus
 
 /**
@@ -177,7 +177,7 @@ data class AiReadiness(
         fun playStoreIntent(): Intent =
             Intent(
                     Intent.ACTION_VIEW,
-                    Uri.parse("https://play.google.com/store/apps/details?id=$AICORE_PACKAGE"),
+                    "https://play.google.com/store/apps/details?id=$AICORE_PACKAGE".toUri(),
                 )
                 .setPackage("com.android.vending")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

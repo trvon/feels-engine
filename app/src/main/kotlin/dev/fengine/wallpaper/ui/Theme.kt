@@ -1,10 +1,13 @@
 package dev.fengine.wallpaper.ui
 
-import android.app.Activity
 import android.app.WallpaperManager
+import android.graphics.Color as AndroidColor
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
@@ -16,7 +19,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,7 +29,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
 import dev.fengine.wallpaper.data.Appearance
 import dev.fengine.wallpaper.data.ColorSource
 import dev.fengine.wallpaper.data.ThemeMode
@@ -55,17 +56,21 @@ fun FengineTheme(
             dark -> darkColorScheme()
             else -> lightColorScheme()
         }
-    // Status bar icons follow the app's theme, not only the phone's, when the owner forces one.
+    // Sync edge-to-edge system bar scrims and icon contrast with the active light/dark mode.
     val view = LocalView.current
-    if (!view.isInEditMode)
-        SideEffect {
-            (view.context as? Activity)?.window?.let { w ->
-                WindowCompat.getInsetsController(w, view).run {
-                    isAppearanceLightStatusBars = !dark
-                    isAppearanceLightNavigationBars = !dark
-                }
-            }
+    if (!view.isInEditMode) {
+        DisposableEffect(dark) {
+            (view.context as? ComponentActivity)?.enableEdgeToEdge(
+                statusBarStyle =
+                    if (dark) SystemBarStyle.dark(AndroidColor.TRANSPARENT)
+                    else SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+                navigationBarStyle =
+                    if (dark) SystemBarStyle.dark(AndroidColor.TRANSPARENT)
+                    else SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+            )
+            onDispose {}
         }
+    }
     val base = Typography()
     val typography =
         base.copy(

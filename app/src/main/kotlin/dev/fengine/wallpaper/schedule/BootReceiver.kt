@@ -6,7 +6,9 @@ import android.content.Intent
 import dev.fengine.wallpaper.FengineApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 /**
  * Alarms do not survive reboot; WorkManager periodic work does. Re-sync both from settings after
@@ -17,9 +19,9 @@ class BootReceiver : BroadcastReceiver() {
         if (intent.action !in HANDLED_ACTIONS) return
         val pending = goAsync()
         val app = context.applicationContext as FengineApp
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                RotationScheduler(app).sync(app.settings.read())
+                withTimeout(8_000L) { RotationScheduler(app).sync(app.settings.read()) }
             } catch (e: Exception) {
                 android.util.Log.w("BootReceiver", "schedule sync failed", e)
             } finally {

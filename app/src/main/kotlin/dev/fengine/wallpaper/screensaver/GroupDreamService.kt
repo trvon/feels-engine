@@ -8,13 +8,13 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
-import android.net.Uri
 import android.os.BatteryManager
 import android.service.dreams.DreamService
 import android.util.Log
 import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
+import androidx.core.net.toUri
 import dev.fengine.wallpaper.FengineApp
 import dev.fengine.wallpaper.data.Backdrop
 import dev.fengine.wallpaper.data.Ledger
@@ -101,6 +101,11 @@ class GroupDreamService : DreamService() {
     }
 
     override fun onDetachedFromWindow() {
+        drift?.cancel()
+        drift = null
+        still?.let { stillView?.removeOnLayoutChangeListener(it) }
+        still = null
+        stillView = null
         scope.cancel()
         super.onDetachedFromWindow()
     }
@@ -167,7 +172,7 @@ class GroupDreamService : DreamService() {
             val edge = maxOf(front.width, front.height).coerceAtLeast(1080)
             val bitmap =
                 withContext(Dispatchers.IO) {
-                    runCatching { Images.decode(this@GroupDreamService, Uri.parse(uri), edge) }
+                    runCatching { Images.decode(this@GroupDreamService, uri.toUri(), edge) }
                         .onFailure { e ->
                             Log.w(TAG, "decode failed: ${e.javaClass.simpleName}")
                             // Gone for good: set aside and logged, as the static path does.

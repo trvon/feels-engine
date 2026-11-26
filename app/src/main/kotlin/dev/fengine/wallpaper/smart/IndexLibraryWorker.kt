@@ -1,9 +1,9 @@
 package dev.fengine.wallpaper.smart
 
 import android.content.Context
-import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
+import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -40,7 +40,7 @@ class IndexLibraryWorker(appContext: Context, params: WorkerParameters) :
                     uri to
                         runCatching {
                             labeler.label(
-                                Images.decode(applicationContext, Uri.parse(uri), DECODE_EDGE)
+                                Images.decode(applicationContext, uri.toUri(), DECODE_EDGE)
                             )
                         }
                             .onFailure { e -> Log.w(TAG, "label failed for $uri", e) }

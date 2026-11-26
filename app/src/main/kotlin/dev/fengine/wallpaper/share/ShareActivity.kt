@@ -84,11 +84,27 @@ class ShareActivity : ComponentActivity() {
     }
 
     private fun sharedUris(intent: Intent): List<Uri> {
-        val many =
-            IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
-        val one = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+        val stream =
+            when (intent.action) {
+                Intent.ACTION_SEND_MULTIPLE ->
+                    IntentCompat.getParcelableArrayListExtra(
+                            intent,
+                            Intent.EXTRA_STREAM,
+                            Uri::class.java,
+                        )
+                        .orEmpty()
+                Intent.ACTION_SEND ->
+                    listOfNotNull(
+                        IntentCompat.getParcelableExtra(
+                            intent,
+                            Intent.EXTRA_STREAM,
+                            Uri::class.java,
+                        )
+                    )
+                else -> emptyList()
+            }
         val clip = intent.clipData?.let { c -> List(c.itemCount) { c.getItemAt(it).uri } }
-        return (many.orEmpty() + listOfNotNull(one) + clip.orEmpty().filterNotNull()).distinct()
+        return (stream + clip.orEmpty().filterNotNull()).distinct()
     }
 }
 
@@ -151,7 +167,7 @@ private fun ShareScreen(
                 ChoiceRow(
                     label = "Only the ones that show it",
                     description =
-                        "The phone looks at each for “${group!!.rule}” and keeps one photo per moment.",
+                        "The phone looks at each for “${group.rule}” and keeps one photo per moment.",
                     selected = lookThrough,
                     onClick = { if (!chosen) lookThrough = true },
                 )

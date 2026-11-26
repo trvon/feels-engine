@@ -19,10 +19,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,6 +72,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.net.toUri
 import dev.fengine.wallpaper.smart.Images
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -89,15 +92,19 @@ fun Page(content: @Composable ColumnScope.() -> Unit) {
             // A tap on empty page space ends editing, which also puts the keyboard away.
             Box(
                 modifier =
-                    Modifier.fillMaxSize().padding(padding).pointerInput(Unit) {
-                        detectTapGestures(onTap = { focus.clearFocus() })
-                    },
+                    Modifier.fillMaxSize()
+                        .padding(padding)
+                        .consumeWindowInsets(padding)
+                        .pointerInput(Unit) {
+                            detectTapGestures(onTap = { focus.clearFocus() })
+                        },
                 contentAlignment = Alignment.TopCenter,
             ) {
                 Column(
                     modifier =
                         Modifier.widthIn(max = spec.maxContentWidth)
                             .fillMaxWidth()
+                            .imePadding()
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = Space.page)
                 ) {
@@ -561,9 +568,10 @@ fun PhotoImage(
                 withContext(Dispatchers.IO) {
                     // The system thumbnail road fails for Google Photos cloud items; decode a small
                     // copy instead.
-                    loadThumbnail(context.contentResolver, Uri.parse(uri))
+                    val parsed = uri.toUri()
+                    loadThumbnail(context.contentResolver, parsed)
                         ?: runCatching {
-                            Images.decode(context, Uri.parse(uri), THUMB_EDGE).asImageBitmap()
+                            Images.decode(context, parsed, THUMB_EDGE).asImageBitmap()
                         }
                             .onFailure { Log.w("PhotoImage", "no thumbnail for $uri", it) }
                             .getOrNull()

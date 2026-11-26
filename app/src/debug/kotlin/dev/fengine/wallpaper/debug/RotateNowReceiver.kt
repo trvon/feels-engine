@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import androidx.core.graphics.createBitmap
 import dev.fengine.wallpaper.FengineApp
 import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Settings
@@ -54,12 +55,7 @@ class RotateNowReceiver : BroadcastReceiver() {
                     (0 until 8).map { i ->
                         val f = java.io.File(dir, "smoke-$i.jpg")
                         if (!f.exists()) {
-                            val bmp =
-                                android.graphics.Bitmap.createBitmap(
-                                    1200,
-                                    1600,
-                                    android.graphics.Bitmap.Config.ARGB_8888,
-                                )
+                            val bmp = createBitmap(1200, 1600)
                             val c = android.graphics.Canvas(bmp)
                             val rnd = java.util.Random(i.toLong())
                             c.drawColor(

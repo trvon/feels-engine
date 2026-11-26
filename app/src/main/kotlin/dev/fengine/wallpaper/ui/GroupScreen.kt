@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -96,7 +97,7 @@ fun GroupScreen(
     // Everything on this screen saves the moment it changes. Say so, and flash "Saved" after each
     // change
     // so the owner never wonders whether a Done or Save tap is still needed.
-    var savedTick by remember(group.id) { mutableStateOf(0) }
+    var savedTick by remember(group.id) { mutableIntStateOf(0) }
     var showSaved by remember { mutableStateOf(false) }
     LaunchedEffect(savedTick) {
         if (savedTick > 0) {

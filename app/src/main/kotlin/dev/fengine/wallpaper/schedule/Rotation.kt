@@ -3,7 +3,6 @@ package dev.fengine.wallpaper.schedule
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.res.Configuration
-import android.net.Uri
 import android.util.Log
 import androidx.core.net.toUri
 import dev.fengine.wallpaper.FengineApp
@@ -246,7 +245,7 @@ object Rotation {
                     }
                         .getOrDefault(false)
                     val why =
-                        "${outcome.reason} ${Uri.parse(write.uri).authority.orEmpty()} ${if (held) "grant" else "nogrant"}"
+                        "${outcome.reason} ${write.uri.toUri().authority.orEmpty()} ${if (held) "grant" else "nogrant"}"
                     Log.w(
                         TAG,
                         "${group.name}: photo ${write.index + 1} unreadable ($why); kept, left out of rotation",
