@@ -1,5 +1,6 @@
 package dev.fengine.wallpaper.smart
 
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -21,5 +22,32 @@ class AiReadinessTest {
         )
         assertEquals("IllegalStateException", AiReadiness.describe(IllegalStateException()))
         assertEquals("IllegalStateException", AiReadiness.describe(IllegalStateException("  ")))
+    }
+
+    @Test
+    fun retryOnNpeRecoversFromTransientInitFailure() = runTest {
+        var calls = 0
+        val out =
+            Outside.retryOnNpe(listOf(10L, 20L)) {
+                calls++
+                if (calls < 3) throw NullPointerException()
+                42
+            }
+        assertEquals(42, out)
+        assertEquals(3, calls)
+    }
+
+    @Test
+    fun retryOnNpeDoesNotRetryOtherExceptions() = runTest {
+        var calls = 0
+        val err = runCatching {
+            Outside.retryOnNpe(listOf(10L, 20L)) {
+                calls++
+                throw IllegalStateException("boom")
+            }
+        }
+            .exceptionOrNull()
+        assertTrue(err is IllegalStateException)
+        assertEquals(1, calls)
     }
 }

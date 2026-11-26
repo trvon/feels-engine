@@ -37,6 +37,26 @@ object Outside {
         }
 
     /**
+     * Retries [block] when ML Kit GenAI throws a transient [NullPointerException] right after
+     * client construction while AICore's binder connection is still settling.
+     */
+    suspend fun <T> retryOnNpe(
+        delaysMs: List<Long> = listOf(350L, 800L),
+        block: suspend () -> T,
+    ): T {
+        var last: NullPointerException? = null
+        for (attempt in 0..delaysMs.size) {
+            try {
+                return block()
+            } catch (e: NullPointerException) {
+                last = e
+                if (attempt < delaysMs.size) delay(delaysMs[attempt])
+            }
+        }
+        throw last!!
+    }
+
+    /**
      * What a model download reports, in the app's own terms (ML Kit's DownloadStatus maps here).
      */
     sealed interface Download {

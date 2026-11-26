@@ -10,7 +10,9 @@ import com.google.mlkit.genai.prompt.GenerativeModel
 import com.google.mlkit.genai.prompt.ImagePart
 import com.google.mlkit.genai.prompt.TextPart
 import com.google.mlkit.genai.prompt.generateContentRequest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 /**
  * Turns a description into photo matches in two stages: pick the ML Kit labels that could appear in
@@ -133,7 +135,13 @@ class NanoMatcher : DescriptionMatcher, AutoCloseable {
     /** v3: [judge] asks per part of the description, in what a photo shows (2026-11-20). */
     override val verdictKey = "Gemini Nano v3"
 
-    private val model: GenerativeModel = Generation.getClient()
+    private val model: GenerativeModel by lazy { Generation.getClient() }
+    @Volatile private var initialized = false
+
+    private fun client(): GenerativeModel {
+        initialized = true
+        return model
+    }
 
     /**
      * Set by the first prompt that times out: AICore is not answering, so the rest of this run uses
@@ -155,29 +163,32 @@ class NanoMatcher : DescriptionMatcher, AutoCloseable {
             }
     }
 
-    /** Bounded: AICore can take its time or not answer at all (see [Outside]). */
+    /** Bounded: AICore can take its time or throw a transient NPE while binding (see [Outside]). */
     suspend fun status(): Int =
-        Outside.within(Outside.STATUS_MS, "AICore status") { model.checkStatus() }
-            .getOrThrow()
-            .also {
-                Log.i(
-                    TAG,
-                    "checkStatus=$it (AVAILABLE=${FeatureStatus.AVAILABLE}, DOWNLOADABLE=${FeatureStatus.DOWNLOADABLE}, UNAVAILABLE=${FeatureStatus.UNAVAILABLE})",
-                )
-            }
+        withContext(Dispatchers.IO) {
+            Outside.within(Outside.STATUS_MS, "AICore status") {
+                    Outside.retryOnNpe { client().checkStatus() }
+                }
+                .getOrThrow()
+                .also {
+                    Log.i(
+                        TAG,
+                        "checkStatus=$it (AVAILABLE=${FeatureStatus.AVAILABLE}, DOWNLOADABLE=${FeatureStatus.DOWNLOADABLE}, UNAVAILABLE=${FeatureStatus.UNAVAILABLE})",
+                    )
+                }
+        }
 
-    fun download() = model.download()
+    fun download() = client().download()
 
     /** [download] in the app's terms, for [Outside.watch]. */
     fun downloadEvents(): kotlinx.coroutines.flow.Flow<Outside.Download> =
-        model.download().map { st ->
+        client().download().map { st ->
             when (st) {
                 is DownloadStatus.DownloadStarted -> Outside.Download.Started(st.bytesToDownload)
                 is DownloadStatus.DownloadProgress ->
                     Outside.Download.Progress(st.totalBytesDownloaded)
                 is DownloadStatus.DownloadCompleted -> Outside.Download.Completed
                 is DownloadStatus.DownloadFailed -> Outside.Download.Failed(st.e)
-                else -> Outside.Download.Started(0)
             }
         }
 
@@ -198,7 +209,7 @@ class NanoMatcher : DescriptionMatcher, AutoCloseable {
                 "Reply with only a comma-separated list of labels copied from the list, up to 25."
         val text =
             ask("Gemini Nano labels") {
-                    model
+                    client()
                         .generateContent(
                             generateContentRequest(TextPart(prompt)) {
                                 temperature = 0f
@@ -235,7 +246,7 @@ class NanoMatcher : DescriptionMatcher, AutoCloseable {
         for (part in Wanted.parts(description)) {
             val text =
                 ask("Gemini Nano judge") {
-                        model
+                        client()
                             .generateContent(
                                 generateContentRequest(
                                     ImagePart(bitmap),
@@ -260,7 +271,9 @@ class NanoMatcher : DescriptionMatcher, AutoCloseable {
         return if (answered) false else null
     }
 
-    override fun close() = model.close()
+    override fun close() {
+        if (initialized) runCatching { model.close() }
+    }
 
     private companion object {
         const val TAG = "NanoMatcher"

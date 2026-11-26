@@ -112,8 +112,14 @@ data class AiReadiness(
                     AiReadiness(
                         Level.UNAVAILABLE,
                         "On-device AI could not be checked",
-                        "AICore ($version) answered with an error: ${describe(failure)}. Finding photos uses " +
-                            "labels until it works.",
+                        if (failure is NullPointerException) {
+                            "AICore ($version) did not finish connecting (${describe(failure)}). " +
+                                "Tap Check again in a moment, or restart the phone if AICore just updated. " +
+                                "Finding photos uses labels meanwhile."
+                        } else {
+                            "AICore ($version) answered with an error: ${describe(failure)}. Finding photos uses " +
+                                "labels until it works."
+                        },
                         Action.CHECK_AGAIN,
                     )
                 isStub(version) && listed ->
