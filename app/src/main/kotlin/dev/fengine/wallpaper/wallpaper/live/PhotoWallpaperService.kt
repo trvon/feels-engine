@@ -19,6 +19,7 @@ import android.util.Log
 import android.view.SurfaceHolder
 import android.view.animation.LinearInterpolator
 import dev.fengine.wallpaper.FengineApp
+import dev.fengine.wallpaper.data.Appearance
 import dev.fengine.wallpaper.data.Backdrop
 import dev.fengine.wallpaper.data.ChangeTriggers
 import dev.fengine.wallpaper.data.Ledger
@@ -28,7 +29,6 @@ import dev.fengine.wallpaper.data.Settings
 import dev.fengine.wallpaper.schedule.Rotation
 import dev.fengine.wallpaper.ui.Palette
 import dev.fengine.wallpaper.wallpaper.ClockSafe
-import dev.fengine.wallpaper.wallpaper.Faces
 import dev.fengine.wallpaper.wallpaper.LostPhotos
 import dev.fengine.wallpaper.wallpaper.PhotoColors
 import dev.fengine.wallpaper.wallpaper.PhotoCopies
@@ -124,7 +124,9 @@ class PhotoWallpaperService : WallpaperService() {
         @Volatile private var backdropTinted = false
         @Volatile private var backdropColor = Color.BLACK
         @Volatile private var photoColors: WallpaperColors? = null
-        /** The photo [photoColors] came from: a resize or fold re-decodes, the colours stay. */
+        @Volatile private var extractedColors: WallpaperColors? = null
+        @Volatile private var lockedColorSeed: Int? = null
+        /** The photo [extractedColors] came from: a resize or fold re-decodes, the colours stay. */
         @Volatile private var colorsFor: String? = null
         @Volatile private var tapToChange = false
         /**
@@ -164,8 +166,17 @@ class PhotoWallpaperService : WallpaperService() {
                         val uri = photoFor(settings)
                         val whole = settings.photoFit == PhotoFit.WHOLE
                         val tinted = settings.backdrop == Backdrop.PHOTO
+                        val nextLockedSeed =
+                            Appearance.lockedWallpaperSeed(
+                                settings.dynamicColorMode,
+                                settings.pinnedColorSeed,
+                            )
                         tapToChange = settings.tapToChange
                         render.post {
+                            if (nextLockedSeed != lockedColorSeed) {
+                                lockedColorSeed = nextLockedSeed
+                                publishColors()
+                            }
                             if (whole != fitWhole || tinted != backdropTinted) {
                                 fitWhole = whole
                                 backdropTinted = tinted
@@ -235,7 +246,7 @@ class PhotoWallpaperService : WallpaperService() {
                     done.countDown()
                 }
             }
-            done.await(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+            done.await(150, java.util.concurrent.TimeUnit.MILLISECONDS)
         }
 
         override fun onOffsetsChanged(
@@ -337,10 +348,18 @@ class PhotoWallpaperService : WallpaperService() {
         }
 
         /**
-         * The current photo's colours, so the phone's palette follows Motion like a still
-         * wallpaper's.
+         * The current photo's colours (or the user's locked Material You seed), so the phone's
+         * palette follows Motion like a still wallpaper's.
          */
         override fun onComputeColors(): WallpaperColors? = photoColors
+
+        private fun publishColors() {
+            val next = lockedColorSeed?.let(PhotoColors::fromSeed) ?: extractedColors
+            if (next != null) {
+                photoColors = next
+                mainHandler.post { runCatching { notifyColorsChanged() } }
+            }
+        }
 
         private fun decodeThen(uri: String, keepOld: Boolean) {
             load?.cancel()
@@ -362,20 +381,23 @@ class PhotoWallpaperService : WallpaperService() {
                                 )
                             return@launch
                         }
-                    val found =
-                        if (drawsLock()) ClockSafe.union(Faces.detect(applicationContext, uri))
-                        else null
-                    val colors =
-                        if (uri == colorsFor) null else PhotoColors.of(applicationContext, uri)
+                    val needColors = uri != colorsFor
+                    val needFaces = drawsLock()
+                    val inspection =
+                        if (needColors || needFaces)
+                            PhotoColors.inspect(applicationContext, uri, needFaces)
+                        else PhotoColors.Inspection(null, null)
+                    val found = inspection.faces
+                    val colors = if (needColors) inspection.colors else null
                     // A destroyed engine's looper has quit: the post is refused, release here.
                     val posted = render.post {
                         if (colors != null && state.wanted == uri) {
-                            photoColors = colors
+                            extractedColors = colors
                             colorsFor = uri
                             backdropColor = Palette.backdrop(colors.primaryColor.toArgb())
                             // Android asks onComputeColors for the new palette (Material You
-                            // follows Motion).
-                            mainHandler.post { runCatching { notifyColorsChanged() } }
+                            // follows Motion, or holds the user's locked seed).
+                            publishColors()
                         }
                         val decision = state.onDecoded(uri, keepOld)
                         if (decision == LiveEngineState.Decision.NONE && state.shown != uri) {

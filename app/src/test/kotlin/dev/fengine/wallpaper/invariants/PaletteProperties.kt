@@ -1,6 +1,7 @@
 package dev.fengine.wallpaper.invariants
 
 import dev.fengine.wallpaper.data.Appearance
+import dev.fengine.wallpaper.data.DynamicColorMode
 import dev.fengine.wallpaper.data.ThemeMode
 import dev.fengine.wallpaper.screensaver.KenBurns
 import dev.fengine.wallpaper.ui.Palette
@@ -25,6 +26,15 @@ class PaletteProperties {
         assertEquals(systemDark, Appearance.isDark(ThemeMode.SYSTEM, systemDark))
         assertEquals(false, Appearance.isDark(ThemeMode.LIGHT, systemDark))
         assertEquals(true, Appearance.isDark(ThemeMode.DARK, systemDark))
+    }
+
+    @Property(tries = 500)
+    fun lockedWallpaperSeedIsOpaqueAndOnlyActiveWhenLocked(@ForAll seed: Int) {
+        assertEquals(null, Appearance.lockedWallpaperSeed(DynamicColorMode.AUTO, seed))
+        assertEquals(null, Appearance.lockedWallpaperSeed(DynamicColorMode.LOCKED, null))
+        val locked = Appearance.lockedWallpaperSeed(DynamicColorMode.LOCKED, seed)!!
+        assertEquals(0xFF, (locked ushr 24) and 0xFF)
+        assertEquals(seed and 0x00FFFFFF, locked and 0x00FFFFFF)
     }
 
     /**

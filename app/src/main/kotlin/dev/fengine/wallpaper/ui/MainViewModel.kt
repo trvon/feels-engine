@@ -3,6 +3,7 @@ package dev.fengine.wallpaper.ui
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
+import androidx.core.graphics.get
 import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,8 +11,10 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.google.mlkit.genai.common.FeatureStatus
 import dev.fengine.wallpaper.FengineApp
+import dev.fengine.wallpaper.data.Appearance
 import dev.fengine.wallpaper.data.Backdrop
 import dev.fengine.wallpaper.data.ColorSource
+import dev.fengine.wallpaper.data.DynamicColorMode
 import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Ledger
 import dev.fengine.wallpaper.data.LedgerStore
@@ -59,7 +62,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         // A force stop (or an OEM cleaner) cancels every alarm; opening the app arms them again.
-        viewModelScope.launch { runCatching { scheduler.sync(store.read()) } }
+        viewModelScope.launch {
+            runCatching {
+                val s = store.read()
+                scheduler.sync(s)
+                dev.fengine.wallpaper.shortcuts.NextPhotoWidget.publishPreview(
+                    app,
+                    s.homeGroup?.name,
+                )
+            }
+        }
         checkPhotos()
     }
 
@@ -328,6 +340,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setPhotoFit(fit: PhotoFit) = update { it.copy(photoFit = fit) }
 
+    fun setDynamicColorMode(mode: DynamicColorMode) = update { s ->
+        val seed =
+            if (mode == DynamicColorMode.LOCKED)
+                s.pinnedColorSeed ?: Appearance.COLOR_PRESETS.first().second
+            else s.pinnedColorSeed
+        s.copy(dynamicColorMode = mode, pinnedColorSeed = seed)
+    }
+
+    fun setPinnedColorSeed(seed: Int) = update {
+        it.copy(dynamicColorMode = DynamicColorMode.LOCKED, pinnedColorSeed = seed)
+    }
+
     /** Screen-saver starts by verdict over the last 7 days, from the local log. */
     val screenSaverWeek = MutableStateFlow<Map<String, Int>>(emptyMap())
 
@@ -396,7 +420,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val lum = ArrayList<Double>()
                 for (y in zone.top until zone.bottom step 2) for (x in
                     zone.left until zone.right step 2) lum +=
-                    ClockLegibility.relativeLuminance(bmp.getPixel(x, y))
+                    ClockLegibility.relativeLuminance(bmp[x, y])
                 bmp.recycle()
                 ClockLegibility.judge(lum.toDoubleArray())
             }

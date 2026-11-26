@@ -1,6 +1,10 @@
 package dev.fengine.wallpaper.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -9,7 +13,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -27,17 +33,25 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import dev.fengine.wallpaper.data.Appearance
 import dev.fengine.wallpaper.data.Backdrop
 import dev.fengine.wallpaper.data.ChangeTriggers
 import dev.fengine.wallpaper.data.ColorSource
+import dev.fengine.wallpaper.data.DynamicColorMode
 import dev.fengine.wallpaper.data.Mode
 import dev.fengine.wallpaper.data.PhotoFit
 import dev.fengine.wallpaper.data.Settings
@@ -49,6 +63,7 @@ import dev.fengine.wallpaper.ui.design.Page
 import dev.fengine.wallpaper.ui.design.Radius
 import dev.fengine.wallpaper.ui.design.Section
 import dev.fengine.wallpaper.ui.design.Segmented
+import dev.fengine.wallpaper.ui.design.Size
 import dev.fengine.wallpaper.ui.design.Space
 import dev.fengine.wallpaper.ui.design.SwitchRow
 import dev.fengine.wallpaper.ui.design.TextAction
@@ -79,12 +94,19 @@ fun SettingsScreen(
     onSetColorSource: (ColorSource) -> Unit = {},
     onSetBackdrop: (Backdrop) -> Unit = {},
     onSetPhotoFit: (PhotoFit) -> Unit = {},
+    onSetDynamicColorMode: (DynamicColorMode) -> Unit = {},
+    onSetPinnedColorSeed: (Int) -> Unit = {},
     screenSaverWeek: Map<String, Int> = emptyMap(),
     onSetTapToChange: (Boolean) -> Unit = {},
     onSetChangeOnTheme: (Boolean) -> Unit = {},
     onSetDarkAtNight: (Boolean) -> Unit = {},
     copies: Pair<Int, Long> = 0 to 0L,
     onSetKeepCopies: (Boolean) -> Unit = {},
+    onOpenWallpaperStyle: () -> Unit = {},
+    canPinWidget: Boolean = false,
+    onPinWidget: () -> Unit = {},
+    canAddTile: Boolean = false,
+    onAddTile: () -> Unit = {},
 ) {
     val moving = motion.innerHome || motion.innerLock || motion.coverHome || motion.coverLock
     Page {
@@ -206,6 +228,48 @@ fun SettingsScreen(
                 else
                     "Motion and the screen saver show each whole photo, uncropped, without the drift."
             )
+            Spacer(Modifier.height(Space.lg))
+            Text("Phone palette (Material You)", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(Space.sm))
+            Segmented(
+                options =
+                    listOf(
+                        DynamicColorMode.AUTO to "From photo",
+                        DynamicColorMode.LOCKED to "Locked accent",
+                    ),
+                selected = settings.dynamicColorMode,
+                onSelect = onSetDynamicColorMode,
+            )
+            if (settings.dynamicColorMode == DynamicColorMode.LOCKED) {
+                Spacer(Modifier.height(Space.md))
+                ColorPresetRow(
+                    selected = settings.pinnedColorSeed,
+                    onSelect = onSetPinnedColorSeed,
+                )
+            }
+            Spacer(Modifier.height(Space.sm))
+            Caption(
+                if (!moving)
+                    "Needs Motion: Android reads dynamic colours from the live wallpaper engine."
+                else if (settings.dynamicColorMode == DynamicColorMode.AUTO)
+                    "System accents, widgets and Material You apps recolour automatically with each photo."
+                else "System accents stay on your chosen colour while your photos keep changing."
+            )
+            TextAction("System Wallpaper & style", onOpenWallpaperStyle)
+        }
+
+        PreferenceGroup("Shortcuts & widgets") {
+            Text("Home screen widget", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(Space.xs))
+            Caption("A 1x1 Next photo button that adapts to your phone's Material You colours.")
+            if (canPinWidget) TextAction("Add widget to home screen", onPinWidget)
+            else Caption("Add Feels Engine from your launcher's widget picker.")
+            Spacer(Modifier.height(Space.md))
+            Text("Quick Settings tile", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(Space.xs))
+            Caption("Advance the wallpaper from the notification shade, showing the active group.")
+            if (canAddTile) TextAction("Add Quick Settings tile", onAddTile)
+            else Caption("Edit Quick Settings in the shade to drag Next photo in.")
         }
 
         PreferenceGroup("Appearance") {
@@ -298,7 +362,7 @@ private fun IntervalSlider(minutes: Int, onChange: (Int) -> Unit) {
     val stops = ChangeTriggers.INTERVAL_STOPS
     var index by
         androidx.compose.runtime.remember(minutes) {
-            mutableStateOf(ChangeTriggers.nearestStop(minutes).toFloat())
+            mutableFloatStateOf(ChangeTriggers.nearestStop(minutes).toFloat())
         }
     // Rounded, not truncated: a snapped 12.999999 is stop 13.
     val shown = stops[index.roundToInt().coerceIn(stops.indices)]
@@ -315,6 +379,50 @@ private fun IntervalSlider(minutes: Int, onChange: (Int) -> Unit) {
                 stateDescription = Format.every(shown)
             },
     )
+}
+
+/** Tonal containers use the page's palette. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ColorPresetRow(
+    selected: Int?,
+    onSelect: (Int) -> Unit,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+        verticalArrangement = Arrangement.spacedBy(Space.sm),
+    ) {
+        Appearance.COLOR_PRESETS.forEach { (label, argb) ->
+            val isSelected = selected == argb
+            Box(
+                modifier =
+                    Modifier.size(Size.touchTarget)
+                        .clip(CircleShape)
+                        .clickable(role = Role.RadioButton) { onSelect(argb) }
+                        .semantics {
+                            contentDescription = label
+                            this.selected = isSelected
+                        },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier =
+                        Modifier.size(Size.swatch)
+                            .clip(CircleShape)
+                            .background(Color(argb))
+                            .then(
+                                if (isSelected)
+                                    Modifier.border(
+                                        Size.swatchBorder,
+                                        MaterialTheme.colorScheme.onSurface,
+                                        CircleShape,
+                                    )
+                                else Modifier
+                            )
+                )
+            }
+        }
+    }
 }
 
 /** Tonal containers use the page's palette. */

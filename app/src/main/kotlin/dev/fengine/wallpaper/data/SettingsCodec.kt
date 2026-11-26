@@ -25,6 +25,8 @@ object SettingsCodec {
         val colorSource = stringPreferencesKey("color_source")
         val backdrop = stringPreferencesKey("backdrop")
         val photoFit = stringPreferencesKey("photo_fit")
+        val dynamicColorMode = stringPreferencesKey("dynamic_color_mode")
+        val pinnedColorSeed = intPreferencesKey("pinned_color_seed")
         val enabled = booleanPreferencesKey("enabled")
         val lastResult = stringPreferencesKey("last_result")
         val lastRotationAt = longPreferencesKey("last_rotation_at")
@@ -56,6 +58,9 @@ object SettingsCodec {
         prefs[Keys.colorSource] = next.colorSource.name
         prefs[Keys.backdrop] = next.backdrop.name
         prefs[Keys.photoFit] = next.photoFit.name
+        prefs[Keys.dynamicColorMode] = next.dynamicColorMode.name
+        next.pinnedColorSeed?.let { prefs[Keys.pinnedColorSeed] = it }
+            ?: prefs.remove(Keys.pinnedColorSeed)
         prefs[Keys.enabled] = next.enabled
         prefs[Keys.lastResult] = next.lastResult
         prefs[Keys.lastRotationAt] = next.lastRotationAt
@@ -110,6 +115,8 @@ object SettingsCodec {
             colorSource = enumOr(prefs[Keys.colorSource], defaults.colorSource),
             backdrop = enumOr(prefs[Keys.backdrop], defaults.backdrop),
             photoFit = enumOr(prefs[Keys.photoFit], defaults.photoFit),
+            dynamicColorMode = enumOr(prefs[Keys.dynamicColorMode], defaults.dynamicColorMode),
+            pinnedColorSeed = prefs[Keys.pinnedColorSeed],
             // Missing on installs from before the setting: a new install gets the default; one that
             // already had groups played on any charger and keeps doing so.
             dreamWirelessOnly =

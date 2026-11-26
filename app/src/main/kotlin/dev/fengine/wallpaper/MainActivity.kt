@@ -131,6 +131,12 @@ private fun FengineApp(vm: MainViewModel, openAt: String? = null) {
         // Still, a rotation or a Motion check changes these; other settings edits do not need it.
         LaunchedEffect(settings.lastResult, settings.motionOn) { vm.refreshMotion() }
         val copies by vm.copies.collectAsStateWithLifecycle()
+        val canPinWidget = remember {
+            dev.fengine.wallpaper.shortcuts.NextPhotoWidget.canPin(context)
+        }
+        val canAddTile = remember {
+            dev.fengine.wallpaper.shortcuts.NextPhotoTileService.canRequestAdd()
+        }
         SettingsScreen(
             settings = settings,
             onBack = { settingsOpen = false },
@@ -144,6 +150,8 @@ private fun FengineApp(vm: MainViewModel, openAt: String? = null) {
             onSetColorSource = vm::setColorSource,
             onSetBackdrop = vm::setBackdrop,
             onSetPhotoFit = vm::setPhotoFit,
+            onSetDynamicColorMode = vm::setDynamicColorMode,
+            onSetPinnedColorSeed = vm::setPinnedColorSeed,
             screenSaverWeek = screenSaverWeek,
             onSetTapToChange = vm::setTapToChange,
             onSetChangeOnTheme = vm::setChangeOnTheme,
@@ -154,6 +162,15 @@ private fun FengineApp(vm: MainViewModel, openAt: String? = null) {
             dreamConfigured = dreamConfigured,
             motion = motion,
             onTurnOnMotion = turnOnMotion,
+            onOpenWallpaperStyle = {
+                runCatching { context.startActivity(Intent(Intent.ACTION_SET_WALLPAPER)) }
+            },
+            canPinWidget = canPinWidget,
+            onPinWidget = { dev.fengine.wallpaper.shortcuts.NextPhotoWidget.requestPin(context) },
+            canAddTile = canAddTile,
+            onAddTile = {
+                dev.fengine.wallpaper.shortcuts.NextPhotoTileService.requestAdd(context)
+            },
             onOpenDreamSettings = {
                 runCatching {
                     context.startActivity(Intent(android.provider.Settings.ACTION_DREAM_SETTINGS))

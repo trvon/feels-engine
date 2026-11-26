@@ -70,4 +70,8 @@ object Size {
 
     /** Widest a sheet's card gets in the wide lane. */
     val sheetCardWidth: Dp = 440.dp
+
+    /** Accent colour swatch circle inside a 48 dp touch target. */
+    val swatch: Dp = 32.dp
+    val swatchBorder: Dp = 2.dp
 }

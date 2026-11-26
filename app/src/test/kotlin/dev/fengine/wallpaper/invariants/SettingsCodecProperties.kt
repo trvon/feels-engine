@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.fengine.wallpaper.data.Backdrop
 import dev.fengine.wallpaper.data.ColorSource
+import dev.fengine.wallpaper.data.DynamicColorMode
 import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Mode
 import dev.fengine.wallpaper.data.PhotoFit
@@ -90,6 +91,9 @@ class SettingsCodecProperties {
                         colorSource = ColorSource.entries[interval % 2],
                         backdrop = Backdrop.entries[(interval / 2) % 2],
                         photoFit = PhotoFit.entries[(interval / 3) % 2],
+                        dynamicColorMode = DynamicColorMode.entries[(interval / 4) % 2],
+                        pinnedColorSeed =
+                            if (interval % 3 == 0) null else (interval * 0x10101) or (0xFF shl 24),
                         motionOn = interval % 2 == 0,
                         lastAttemptAt = interval * 70_000L,
                         motionLostAt = interval * 1000L,

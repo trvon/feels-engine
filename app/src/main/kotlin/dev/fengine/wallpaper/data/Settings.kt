@@ -42,11 +42,15 @@ data class Settings(
      * keep their behaviour: see SettingsCodec.
      */
     val dreamWirelessOnly: Boolean = true,
-    /** Settings > Appearance. */
+    /** Settings > Appearance & Look. */
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val colorSource: ColorSource = ColorSource.PHOTO,
     val backdrop: Backdrop = Backdrop.BLACK,
     val photoFit: PhotoFit = PhotoFit.FILL,
+    /** Whether Motion feeds each photo's colours or a locked seed to Android Material You. */
+    val dynamicColorMode: DynamicColorMode = DynamicColorMode.AUTO,
+    /** Locked Material You seed colour (ARGB), used when [dynamicColorMode] is LOCKED. */
+    val pinnedColorSeed: Int? = null,
     /** The live engine was drawing a screen when last checked (MotionWatch). */
     val motionOn: Boolean = false,
     /** When Motion stopped without the owner choosing Still; 0 for no notice. */
