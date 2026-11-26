@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.0](https://github.com/trvon/feels-engine/compare/v0.8.0...v0.9.0) (2026-11-26)
+
+
+### Features
+
+* **theme:** add Material You palette lock, single-decode live colors, and Look controls ([39d8f20](https://github.com/trvon/feels-engine/commit/39d8f20b6f12742922b81ce5949ff9adacfad9d1))
+* **widget:** add Material You dynamic colors, previews, and in-app pinning ([4faa4f7](https://github.com/trvon/feels-engine/commit/4faa4f7b51dfd0cc5bda5692dd66c375fd5302c0))
+
+
+### Fixes
+
+* **core:** modernize edge-to-edge, window metrics, broadcast timeouts, and backup rules ([4f279db](https://github.com/trvon/feels-engine/commit/4f279dbb70155da63a24382935d8f5e51260da63))
+
 ## [0.8.0](https://github.com/trvon/feels-engine/compare/v0.7.0...v0.8.0) (2026-11-22)
 
 
