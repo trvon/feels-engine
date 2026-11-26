@@ -12,7 +12,13 @@
 -keep interface com.google.mlkit.genai.** { *; }
 -keep class com.google.android.apps.aicore.** { *; }
 -keep interface com.google.android.apps.aicore.** { *; }
--keepclassmembers class com.google.android.gms.internal.mlkit_genai_prompt.** {
-    public <init>(...);
-    <fields>;
-}
+# Generation.getClient() threw NullPointerException (Objects.requireNonNull in an obfuscated
+# constructor) in minified builds only; debug answered checkStatus. The SDK's internal classes are
+# looked up by name, so keep them whole. Reproduced and verified on an API 36 emulator, 2026-11-26.
+-keep class com.google.android.gms.internal.mlkit_genai_** { *; }
+-keep class com.google.android.gms.internal.mlkit_genai_**.** { *; }
+# The actual null: MlKitContext.get(SharedPrefManager.class). ML Kit common's components come from
+# registrars named in the manifest and created by reflection; R8 full mode broke that path.
+-keep class com.google.mlkit.common.** { *; }
+-keep class * implements com.google.firebase.components.ComponentRegistrar { *; }
+-keep class com.google.firebase.components.** { *; }
