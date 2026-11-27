@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/trvon/feels-engine/compare/v0.9.1...v0.10.0) (2026-11-27)
+
+
+### Features
+
+* **import:** add folder source and Google Photos Share guide ([8fd254e](https://github.com/trvon/feels-engine/commit/8fd254e7ffc7f7327bb25a253f221e87f7ccf2c2))
+
+
+### Fixes
+
+* **ai:** keep ML Kit components from R8 so Gemini Nano works in release builds ([2acb4e8](https://github.com/trvon/feels-engine/commit/2acb4e8c0996efeae026db7a84d0bfc2d5d37537))
+
 ## [0.9.1](https://github.com/trvon/feels-engine/compare/v0.9.0...v0.9.1) (2026-11-26)
 
 
