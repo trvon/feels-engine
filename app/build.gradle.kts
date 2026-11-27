@@ -76,6 +76,10 @@ android {
             )
             if (releaseStore != null) {
                 signingConfig = signingConfigs.getByName("release")
+            } else if (providers.gradleProperty("ciDebugSigning").isPresent) {
+                // CI's release check (scripts/release-probe.sh): the minified build, installable on
+                // an emulator, signed with the debug key. Never used for a published build.
+                signingConfig = signingConfigs.getByName("debug")
             } else {
                 logger.warn(
                     "No release signing configured; assembleRelease will be unsigned (docs/release.md)."

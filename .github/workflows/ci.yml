@@ -41,3 +41,28 @@ jobs:
         with:
           name: feels-engine-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+  # The minified build on an emulator: R8 broke ML Kit in 0.9.0 and 0.9.1 while every debug check
+  # passed. Signed with the debug key here only (-PciDebugSigning).
+  release-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Release APK (debug-signed)
+        run: ./gradlew :app:assembleRelease -PciDebugSigning --no-daemon
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          profile: pixel_5
+          script: bash scripts/release-probe.sh emulator-5554

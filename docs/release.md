@@ -22,10 +22,15 @@ debug build on every push and pull request.
 
 Before merging a release PR:
 
-1. `scripts/smoke-matrix.sh fe_api28 fe_api30 fe_api33 fe_api34` passes
+1. CI's `release-probe` job is green: it builds the minified release APK
+   (debug-signed with `-PciDebugSigning`), installs it on an API 36 emulator
+   and runs `scripts/release-probe.sh`. Locally:
+   `./gradlew :app:assembleRelease -PciDebugSigning && scripts/release-probe.sh emulator-5554`.
+   R8 broke ML Kit in 0.9.0 and 0.9.1 while every debug check passed.
+2. `scripts/smoke-matrix.sh fe_api28 fe_api30 fe_api33 fe_api34` passes
    every step (docs/build.md, "Version matrix").
-2. The release PR's CI and CodeQL are green.
-3. On the Fold and the Pixel: install the build, fold and unfold, sleep and
+3. The release PR's CI and CodeQL are green.
+4. On the Fold and the Pixel: install the build, fold and unfold, sleep and
    wake, and check "This week" on Home shows no blank screens and no
    interrupted fades.
 
