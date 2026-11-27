@@ -35,6 +35,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
+import dev.fengine.wallpaper.data.FolderSync
 import dev.fengine.wallpaper.data.Group
 import dev.fengine.wallpaper.data.Screen
 import dev.fengine.wallpaper.data.Settings
@@ -89,6 +90,13 @@ fun GroupScreen(
     onSetSkipped: (String, Boolean) -> Unit = { _, _ -> },
     clockCheck: suspend (String) -> ClockLegibility.Verdict? = { null },
     onPickAgain: (String) -> Unit = {},
+    /**
+     * Opens the system folder picker; the chosen folder's photos join the group and stay in sync.
+     */
+    onAddFolder: () -> Unit = {},
+    onRemoveFolder: (String) -> Unit = {},
+    /** Opens Google Photos for Share › Feels Engine; false when it is not installed. */
+    onOpenGooglePhotos: () -> Boolean = { false },
 ) {
     val feedsHome = settings.homeGroupId == group.id
     val feedsLock = settings.lockGroupId == group.id
@@ -196,7 +204,8 @@ fun GroupScreen(
                     "Add photos you would be happy to see all day, or describe below what the phone should find. Portraits with the subject low in the frame leave room for the clock."
                 )
             } else {
-                val found = group.matched.toSet()
+                val found = (group.matched + group.folderPhotos).toSet()
+                val inFolders = group.folderPhotos.toSet()
                 val cover = group.cover
                 Caption("Tap a photo to show it now or make it the cover.")
                 Spacer(Modifier.height(Space.sm))
@@ -207,6 +216,7 @@ fun GroupScreen(
                             group.isUnreadable(uri) -> "Can't be read"
                             group.isSkipped(uri) -> "Skipped"
                             uri == cover -> "Cover"
+                            uri in inFolders -> "Folder"
                             uri in found -> "Found"
                             else -> null
                         }
@@ -222,6 +232,44 @@ fun GroupScreen(
                     )
             }
         }
+
+        Section("Folders") {
+            if (group.folders.isEmpty())
+                Caption(
+                    "Follow a folder on this phone, like Pictures or a Wallpapers folder. New photos saved there join the group on their own, and photos deleted there leave it. Photos kept only in Google Photos are not in phone folders."
+                )
+            group.folders.forEach { tree ->
+                val count = group.folderPhotos.count { FolderSync.belongsTo(it, tree) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(FolderSync.label(tree), style = MaterialTheme.typography.titleMedium)
+                        Caption(if (count == 0) "Looking for photos..." else photos(count))
+                    }
+                    TextAction("Stop following") {
+                        onRemoveFolder(tree)
+                        saved()
+                    }
+                }
+            }
+            TextAction("Add a folder", onAddFolder)
+        }
+
+        // Bulk import with no 100-photo limit: Google Photos' own Share, whose search reaches the
+        // whole cloud library (ShareActivity saves a copy of each).
+        StatusCard(
+            title = "Adding a lot at once",
+            body =
+                "1. In Google Photos, search for a person, place or word like beach.\n" +
+                    "2. Long-press a photo, then tap the others or drag across them to select.\n" +
+                    "3. Tap Share, then Feels Engine, and choose this group.\n" +
+                    "Sharing has no limit on how many, and each photo is saved in the app so it keeps showing after Google Photos frees up space.",
+            action = "Open Google Photos" to { onOpenGooglePhotos() },
+        )
+        Spacer(Modifier.height(Space.section))
 
         if (persistedGrants >= MainViewModel.GRANT_WARN_AT) {
             Spacer(Modifier.height(Space.md))
@@ -295,12 +343,7 @@ fun GroupScreen(
                 )
                 // The phone only sees what it is handed: in 45 recent photos on a Fold 8 most were
                 // screenshots and recipes, and Gemini Nano was right about every one (2026-11-20).
-                // The picker's own Google Photos search finds the candidates; the phone then
-                // judges.
-                if (group.hasDescription)
-                    Caption(
-                        "Tip: in Google Photos, search for a person's name or a word like kids or beach, select the results, then Share › Feels Engine. Sharing has no limit on how many. The phone can only look through photos you hand it."
-                    )
+                // The Share guide card above covers handing over many at once.
                 if (group.hasDescription)
                     indexProgress?.let { (done, total) ->
                         if (total > 0)

@@ -102,6 +102,11 @@ private fun FengineApp(vm: MainViewModel, openAt: String? = null) {
         rememberLauncherForActivityResult(PickMultipleVisualMedia(vm.pickerMax())) { uris ->
             openGroupId?.let { vm.addToPool(it, uris) }
         }
+    // A folder to follow: the system folder picker, one persisted grant, no photo permission.
+    val folderPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+            openGroupId?.let { vm.addFolder(it, tree) }
+        }
 
     // Returning from Android's chooser or from elsewhere: Motion may have come back or gone.
     LifecycleResumeEffect(Unit) {
@@ -215,6 +220,9 @@ private fun FengineApp(vm: MainViewModel, openAt: String? = null) {
                 repicking = uri
                 repicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
             },
+            onAddFolder = { runCatching { folderPicker.launch(null) } },
+            onRemoveFolder = { tree -> vm.removeFolder(openGroup.id, tree) },
+            onOpenGooglePhotos = vm::openGooglePhotos,
             scanning = scanning,
             indexing = indexing,
             persistedGrants = persistedGrants,

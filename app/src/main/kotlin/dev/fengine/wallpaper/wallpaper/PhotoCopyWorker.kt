@@ -32,7 +32,12 @@ class PhotoCopyWorker(appContext: Context, params: WorkerParameters) :
     override suspend fun doWork(): Result {
         val context = applicationContext
         val settings = (context as FengineApp).settings.read()
-        val photos = settings.groups.flatMap { it.allPhotos }
+        // Folder photos stay in their folder and leave the group when deleted there: no copies.
+        val photos =
+            settings.groups.flatMap { g ->
+                val inFolders = g.folderPhotos.toHashSet()
+                g.allPhotos.filterNot { it in inFolders }
+            }
         val plan = CopyPlan.plan(photos, PhotoCopies.names(context), settings.keepCopies)
         PhotoCopies.delete(context, plan.delete)
         val pruned = plan.delete.size + SharedPhotos.prune(context, settings.groups)

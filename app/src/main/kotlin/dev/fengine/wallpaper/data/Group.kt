@@ -43,15 +43,24 @@ data class Group(
      * the user removes them; a read failure never deletes a photo the user chose.
      */
     val unreadable: List<String> = emptyList(),
+    /**
+     * Folders the person picked (`ACTION_OPEN_DOCUMENT_TREE` tree URIs, one persisted grant each).
+     * New photos saved there join the group on their own; no photo permission ([FolderSync]).
+     */
+    val folders: List<String> = emptyList(),
+    /** Document URIs listed from [folders] at the last sync, in the order they joined. */
+    val folderPhotos: List<String> = emptyList(),
 ) {
     /**
-     * Everything the rotation may show: picked first, then found, one entry per photo (see
-     * [PhotoId]).
+     * Everything the rotation may show: picked first, then found, then folder photos, one entry per
+     * photo (see [PhotoId]).
      */
     val allPhotos: List<String>
         get() {
             val out = excluded.map(PhotoId::identity).toHashSet()
-            return PhotoId.distinct((photos + matched).filterNot { PhotoId.identity(it) in out })
+            return PhotoId.distinct(
+                (photos + matched + folderPhotos).filterNot { PhotoId.identity(it) in out }
+            )
         }
 
     /**
@@ -81,6 +90,7 @@ data class Group(
                 photos = photos.drop(),
                 matched = matched.drop(),
                 pool = pool.drop(),
+                folderPhotos = folderPhotos.drop(),
                 skipped = skipped.drop(),
                 unreadable = unreadable.drop(),
                 coverUri = coverUri?.takeUnless { PhotoId.identity(it) == id },
@@ -169,9 +179,41 @@ data class Group(
         PhotoId.identity(it) == PhotoId.identity(uri)
     }
 
-    /** Every URI this group refers to, for matching persisted grants. */
+    /** Every URI this group refers to, for matching persisted grants (folder trees included). */
     val allUris: Set<String>
-        get() = (photos + matched + pool + skipped + unreadable + excluded).toSet()
+        get() =
+            (photos + matched + pool + skipped + unreadable + excluded + folders + folderPhotos)
+                .toSet()
+
+    /**
+     * The group with [uri] taken out and remembered as removed, so a rescan or folder sync does not
+     * bring it back. For found and folder photos; picked photos are simply removed.
+     */
+    fun excluding(uri: String): Group {
+        val id = PhotoId.identity(uri)
+        val next = withoutPhoto(uri)
+        return next.copy(
+            excluded = PhotoId.distinct(excluded + uri),
+            matched = next.matched.filterNot { PhotoId.identity(it) == id },
+        )
+    }
+
+    /** The group without [tree] and every photo it brought in. */
+    fun withoutFolder(tree: String): Group {
+        val gone = folderPhotos.filter { FolderSync.belongsTo(it, tree) }
+        val next = gone.fold(this) { g, u -> g.withoutPhoto(u) }
+        return next.copy(
+            folders = folders - tree,
+            excluded = next.excluded.filterNot { FolderSync.belongsTo(it, tree) },
+        )
+    }
+
+    /** The group with its folder photos replaced by a sync result, still showing the same photo. */
+    fun withFolderPhotos(synced: List<String>): Group {
+        if (synced == folderPhotos) return this
+        val shown = rotation.getOrNull(cursor)
+        return copy(folderPhotos = synced).showing(shown, -1)
+    }
 
     /**
      * The group without photos it found by reading the phone's library directly. Those URIs need
@@ -222,6 +264,8 @@ data class Group(
             .put("scanNote", scanNote)
             .put("skipped", JSONArray(skipped))
             .put("unreadable", JSONArray(unreadable))
+            .put("folders", JSONArray(folders))
+            .put("folderPhotos", JSONArray(folderPhotos))
 
     companion object {
         /**
@@ -246,6 +290,8 @@ data class Group(
                 scanNote = o.optString("scanNote", ""),
                 skipped = o.strings("skipped"),
                 unreadable = o.strings("unreadable"),
+                folders = o.strings("folders"),
+                folderPhotos = o.strings("folderPhotos"),
             )
 
         fun encode(groups: List<Group>): String = JSONArray(groups.map(Group::toJson)).toString()

@@ -11,8 +11,9 @@ published at https://trvon.github.io/feels-engine/privacy.html.
 |---|---|---|
 | `SET_WALLPAPER` | install | write the wallpaper |
 | `RECEIVE_BOOT_COMPLETED` | install | re-arm time-of-day alarms after a reboot |
-Every photo arrives through the system photo picker, including the ones a
-description looks through (Find photos). There is no library permission
+Every photo arrives through the system photo picker (including the ones a
+description looks through), through Share from another app, or from a folder
+the person picks with the system folder picker. There is no library permission
 (removed 2026-10-15 after Play's photo policy rejected two submissions).
 
 `INTERNET` is removed from the merged manifest. ML Kit's
@@ -26,6 +27,11 @@ cannot send anything.
 Picked photos need no permission. The system photo picker grants read access
 per photo and the app keeps the grant with `takePersistableUriPermission`.
 Android keeps at most 512 such grants per app and drops the oldest.
+
+A followed folder needs no permission either. The system folder picker
+(`ACTION_OPEN_DOCUMENT_TREE`) grants read access to that one folder, kept as a
+single persisted grant; the app lists only that folder and its subfolders, and
+"Stop following" releases the grant.
 
 ## What is stored
 

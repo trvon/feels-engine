@@ -25,9 +25,15 @@ or AGP refuse 25.
 
 - `SET_WALLPAPER` writes wallpapers. No photo permission at all: every photo,
   including what a description looks through, comes through the photo picker
-  with persisted grants (Play rejected READ_MEDIA_IMAGES twice; 2026-10-15).
+  with persisted grants, Share (saved copies), or a folder picked with the
+  system folder picker (one tree grant, `wallpaper/FolderSyncWorker.kt`). Play
+  rejected READ_MEDIA_IMAGES twice (2026-10-15).
   No network: `INTERNET` is removed from the merged manifest because ML Kit
   adds it. `ManifestContractTest` and CI check both.
+- Release builds are minified: ML Kit reflects over its own classes, so
+  `app/proguard-rules.pro` keeps them. `scripts/release-probe.sh` (CI job
+  `release-probe`) installs the release APK on an emulator and fails on
+  R8-shaped errors; debug builds cannot catch these.
 - Scheduling is inexact by design (WorkManager periodic, `setAndAllowWhileIdle`).
   Do not add `SCHEDULE_EXACT_ALARM` or `USE_EXACT_ALARM`.
 - Pure scheduling logic lives in `schedule/RotationPlan.kt` and stays free of

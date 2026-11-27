@@ -33,6 +33,15 @@ collapses the picker's and the library's URI for the same file.
 `PhotoIndex` (`photo_index.db`) keeps ML Kit labels per photo identity and
 Gemini Nano verdicts per rule key. Labels are computed once per photo.
 
+`Group.folders` holds folders picked with the system folder picker (tree
+URIs, one persisted grant each); `Group.folderPhotos` holds the image
+documents listed from them. `FolderSyncWorker` lists each folder (subfolders
+to three levels, at most 2,000 photos) when a folder is added, when the app
+opens and every six hours, and `FolderSync.merge` (pure, property-tested)
+keeps order, appends new photos, drops deleted ones and never brings back a
+photo the person removed. A folder that fails to list keeps its photos.
+Folder photos get no copies and no individual grants.
+
 ## Rotation
 
 `RotationScheduler` arms WorkManager periodic work (interval mode, 15 minute

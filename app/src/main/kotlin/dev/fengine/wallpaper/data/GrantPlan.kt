@@ -50,9 +50,17 @@ object GrantPlan {
             .map { it.first }
     }
 
-    /** The photos whose grants are taken again: every photo a group shows. */
+    /**
+     * The grants taken again: every picked or found photo a group shows, and each folder's tree
+     * grant. Folder photos have no grant of their own (the tree covers them).
+     */
     fun retake(groups: List<Group>): List<String> =
-        PhotoId.distinct(groups.flatMap { it.allPhotos })
+        PhotoId.distinct(
+            groups.flatMap { g ->
+                val inFolders = g.folderPhotos.toHashSet()
+                g.allPhotos.filterNot { it in inFolders } + g.folders
+            }
+        )
 
     fun retakeDue(lastMs: Long, now: Long): Boolean =
         now - lastMs >= RETAKE_EVERY_MS || now < lastMs

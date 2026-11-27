@@ -28,8 +28,11 @@ Never:
   Nano run on the phone only.
 - Request any photo or media permission. Every photo, including what a
   description looks through, comes through the photo picker plus
-  `takePersistableUriPermission` (Play rejected READ_MEDIA_IMAGES twice;
-  owner decision 2026-10-15). `ManifestContractTest` enforces it, and keeps
+  `takePersistableUriPermission`, Share from another app (saved as a copy), or
+  a folder the person picks with the system folder picker
+  (`ACTION_OPEN_DOCUMENT_TREE`, one persisted tree grant; owner decision
+  2026-11-27). Play rejected READ_MEDIA_IMAGES twice (owner decision
+  2026-10-15). `ManifestContractTest` enforces it, and keeps
   `INTERNET` removed from the merged manifest (ML Kit adds it).
 - Add exact-alarm permissions. Timing is inexact by design.
 - Call Gemini Nano per photo without the label ordering, or outside the

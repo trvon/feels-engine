@@ -339,6 +339,8 @@ to 4 share one shape: something outside the app fails, and the app says nothing.
 | 2026-11-20 | A dated health line catches stalls the owner now finds by eye | B log, D trackers | items 4, 8 | late share ≤ 5% over 14 days | 2026-12-18 |
 | 2026-11-20 | Copies keep cloud-first libraries showing at an acceptable storage cost | A doc, C estimate | item 6 | MB / 100 photos; copy coverage 100% in 24 h | 2026-12-04 |
 | 2026-11-20 | New users end setup with rotation on and try Motion | B code, owner priority | item 7 | UI test; Motion on at day 7 | 2026-12-18 |
+| 2026-11-27 | Big groups need bulk import past the picker's 100 per pick; a followed folder and a findable Google Photos Share guide cover it without a photo permission | owner ask (A for this product); picker cap and 512-grant ceiling (A, platform contract) | folder source (`FolderSync`, `FolderSyncWorker`), Share guide card on the group page | photos per group added by folder or Share vs picker; folder syncs that fail (ledger, next export) | 2026-12-18 |
+| 2026-11-27 | Release-only R8 failures reach production because every check runs the debug build | B: 0.9.0 and 0.9.1 shipped `Generation.getClient()` NPE, reproduced only with the release APK | `scripts/release-probe.sh` and CI job `release-probe` | release regressions caught before tag = all | ongoing |
 
 ## Follow-ups
 

@@ -106,6 +106,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 orphanPhotos.value = PhotoRecovery.orphans(granted, store.read().groups)
                 // While the originals are still here, keep copies for when they are not.
                 PhotoCopyWorker.enqueue(app)
+                if (store.read().groups.any { it.folders.isNotEmpty() })
+                    dev.fengine.wallpaper.wallpaper.FolderSyncWorker.enqueue(app)
                 refreshCopies()
                 appSleepRestricted.value = AppSleep.restricted(AppSleep.status(app))
             }
@@ -323,12 +325,57 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteGroup(id: String) {
-        val removed = settings.value.group(id)?.let { it.photos + it.pool }.orEmpty()
+        val removed = settings.value.group(id)?.let { it.photos + it.pool + it.folders }.orEmpty()
         update { s -> Screens.withoutGroup(s, id) }
         val stillUsed =
-            settings.value.groups.filterNot { it.id == id }.flatMap { it.photos + it.pool }.toSet()
+            settings.value.groups
+                .filterNot { it.id == id }
+                .flatMap { it.photos + it.pool + it.folders }
+                .toSet()
         removed.filterNot { it in stillUsed }.forEach(::releaseGrant)
     }
+
+    /**
+     * A folder the person picked: one persisted grant for the whole folder, then its photos join
+     * the group ([FolderSyncWorker]). No photo permission.
+     */
+    fun addFolder(groupId: String, tree: Uri?) {
+        tree ?: return
+        val app = getApplication<Application>()
+        val ok = runCatching {
+            app.contentResolver.takePersistableUriPermission(
+                tree,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        }
+            .isSuccess
+        if (!ok) return
+        val uri = tree.toString()
+        updateGroup(groupId) { if (uri in it.folders) it else it.copy(folders = it.folders + uri) }
+        dev.fengine.wallpaper.wallpaper.FolderSyncWorker.enqueue(app)
+    }
+
+    /**
+     * Stop following a folder: its photos leave the group and the grant goes if nothing else uses
+     * it.
+     */
+    fun removeFolder(groupId: String, tree: String) {
+        updateGroup(groupId) { it.withoutFolder(tree) }
+        if (settings.value.groups.none { it.id != groupId && tree in it.folders })
+            releaseGrant(tree)
+    }
+
+    /** Opens Google Photos, where Share › Feels Engine adds any number of photos. */
+    fun openGooglePhotos(): Boolean = runCatching {
+        getApplication<Application>()
+            .startActivity(
+                Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_LAUNCHER)
+                    .setPackage(GOOGLE_PHOTOS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+    }
+        .isSuccess
 
     fun setDreamWirelessOnly(on: Boolean) = update { it.copy(dreamWirelessOnly = on) }
 
@@ -466,6 +513,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         /** Unreadable photos tried per app open; each may fetch a cloud item. */
         const val MAX_RECHECK = 64
 
+        const val GOOGLE_PHOTOS = "com.google.android.apps.photos"
+
         const val AI_STALLED =
             "AICore has not started the download. It is often finishing an update of its own: " +
                 "leave the phone charging on Wi-Fi with the screen off for a while, then check " +
@@ -478,15 +527,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { android.provider.MediaStore.getPickImagesMaxLimit() }.getOrDefault(100)
         } else 100
 
-    /** A found photo the user does not want: kept out of future scans too. */
-    fun excludePhoto(groupId: String, uri: String) =
-        updateGroup(groupId) {
-            it.copy(
-                matched = it.matched - uri,
-                excluded = (it.excluded + uri).distinct(),
-                cursor = -1,
-            )
-        }
+    /** A found or folder photo the user does not want: kept out of future scans and syncs too. */
+    fun excludePhoto(groupId: String, uri: String) = updateGroup(groupId) { it.excluding(uri) }
 
     /** Which screens the live engine draws, per panel; refreshed off the main thread. */
     val motionState = MutableStateFlow(LiveWallpaper.State(false, false, false, false))

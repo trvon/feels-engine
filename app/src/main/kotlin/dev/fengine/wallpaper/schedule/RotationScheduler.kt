@@ -33,6 +33,10 @@ class RotationScheduler(private val context: Context) {
 
     fun sync(settings: Settings) {
         syncSmartScan(settings)
+        dev.fengine.wallpaper.wallpaper.FolderSyncWorker.schedule(
+            context,
+            settings.groups.any { it.folders.isNotEmpty() },
+        )
         if (!settings.enabled || !settings.canRotate) {
             cancelAll()
             return
